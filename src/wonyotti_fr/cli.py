@@ -6,6 +6,7 @@ from pathlib import Path
 from .audit import aggregate_events, write_audit
 from .bitmex_history import fetch_bitmex_history
 from .common import new_run, save_json
+from .event_evaluation import run_event_evaluation
 from .event_research import run_event_selection
 from .event_study import run_event_study
 from .market import fetch_market, repair_gaps
@@ -96,6 +97,12 @@ def main() -> None:
     selection.add_argument("--market", type=Path, default=Path("data/market-5m-complete"))
     selection.add_argument("--output", type=Path, default=Path("artifacts"))
     selection.set_defaults(func=lambda a: run_event_selection(a.study_run, a.market, a.output))
+    evaluation = commands.add_parser("event-evaluate", help="고정 사건별 후보의 다년·다시장·위험 제거 평가")
+    evaluation.add_argument("--selection-run", type=Path, required=True)
+    evaluation.add_argument("--market", type=Path, required=True)
+    evaluation.add_argument("--period", choices=["observed", "new"], required=True)
+    evaluation.add_argument("--output", type=Path, default=Path("artifacts"))
+    evaluation.set_defaults(func=lambda a: run_event_evaluation(a.selection_run, a.market, a.output, a.period))
     robustness = commands.add_parser("robustness", help="고정 후보의 연도별 재시작과 블록 재표집 진단")
     robustness.add_argument("--research-run", type=Path, required=True)
     robustness.add_argument("--market", type=Path, default=Path("data/market-complete"))
