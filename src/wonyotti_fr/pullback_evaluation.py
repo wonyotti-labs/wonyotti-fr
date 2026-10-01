@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+from dataclasses import replace
+from pathlib import Path
+
+import matplotlib
+import pandas as pd
+
+from .common import new_run, save_json, sha256
+from .engine import EngineConfig
+from .event_backtest import backtest
+from .event_diagnostics import decompose_run
+from .event_research import load_selection
+from .minute_data import prepare_minute_period
+from .pullback_diagnostics import waiting_diagnostics
+from .pullback_policy import PullbackPolicy
+from .reports import table
+from .robustness import block_interval
+
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt  # noqa: E402
+
+
+def evaluation_period(frozen: dict, period: str) -> tuple[str, str]:
+    allowed = {'observed': ('2022-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01')}
+    if frozen.get('protocol') != 'pullback_v7' or period not in allowed:
+        raise ValueError('v7 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
+    key = 'observed_evaluation_period' if period == 'observed' else 'seen_2026_period'
+    if (tuple(frozen[key]) != allowed[period] or frozen['evaluation_end_exclusive'] != '2026-10-01'
+        or frozen['unseen_evaluation_available'] is not False or frozen['risk']['bar_seconds'] != 60):
+        raise ValueError('v7 고정 후보의 평가 범위·실행 간격 오류')
+    return allowed[period]
+
+
+def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path, output: Path,
+                            period: str, symbols: list[str]) -> Path:
+    frozen, policy = load_selection(selection)
+    start, end = evaluation_period(frozen, period)
+    if not symbols or len(symbols) != len(set(symbols)) or not set(symbols) <= {'BTCUSDT', 'ETHUSDT', 'SOLUSDT'}:
+        raise ValueError('평가 심볼의 종류·중복 오류')
+    config = EngineConfig(**frozen['risk'])
+    variants = {
+        'fixed_policy': (policy, config),
+        'immediate': (PullbackPolicy(policy.base, policy.offset_bps, policy.ttl_minutes, 'immediate'), config),
+        'cash': (PullbackPolicy(policy.base, policy.offset_bps, policy.ttl_minutes, 'cash'), config),
+        'cost_x2': (policy, replace(config, fee_bps=10, slippage_bps=6)),
+        'cost_x3': (policy, replace(config, fee_bps=15, slippage_bps=9)),
+        'extra_minute_delay': (policy, replace(config, signal_delay_bars=1)),
+    }
+    destination = new_run(output, f'pullback-evaluation-{period}', {
+        'protocol': 'docs/EXPERIMENT_V7.md', 'selection_sha256': sha256(selection / 'frozen_selection.json'),
+        'market_manifest_sha256': sha256(market / 'manifest-1m.json'),
+        'feature_manifest_sha256': sha256(feature_market / 'manifest-5m.json'),
+        'period': [start, end], 'symbols': symbols, 'all_periods_already_observed': True, 'retuning': False,
+        'variants': {name: risk.__dict__ for name, (_, risk) in variants.items()}, 'bootstrap': '30-day circular blocks, 1000, seed 41'})
+    for name in ['frozen_selection.json', 'frozen_integrity.json', 'base_selection.json', 'expansion_models.json']:
+        (destination / name).write_bytes((selection / name).read_bytes())
+    print(f'진입 대기 {period} 평가: {destination}', flush=True)
+    rows, annual, intervals, decompositions, waiting = [], [], [], [], []
+    chart, axes = plt.subplots(len(symbols), 1, figsize=(12, 3.5 * len(symbols)), squeeze=False, layout='constrained')
+    try:
+        for axis, symbol in zip(axes[:, 0], symbols, strict=True):
+            bars, checks = prepare_minute_period(market, feature_market, symbol, start, end)
+            save_json(destination / f'{symbol}-input.json', checks)
+            for name, (strategy, risk) in variants.items():
+                target = destination / symbol / name
+                metrics = backtest(bars, strategy, risk, target)
+                rows.append({'symbol': symbol, 'strategy': name, **metrics})
+                save_json(destination / 'results_partial.json', rows)
+                print(f'{symbol}/{name}: 수익 {metrics["total_return"]:.2%}, 낙폭 {metrics["max_drawdown"]:.2%}, 거래 {metrics["closed_trades"]}', flush=True)
+                decompositions.append({'symbol': symbol, 'strategy': name, **decompose_run(target, risk.initial_equity)})
+                waiting.append({'symbol': symbol, 'strategy': name, **waiting_diagnostics(target, bars, risk.signal_delay_bars)})
+                curve = pd.read_parquet(target / 'equity.parquet', columns=['time', 'equity'])
+                days = (pd.to_datetime(curve.time, utc=True) - pd.Timedelta(nanoseconds=1)).dt.floor('1D')
+                daily = curve.groupby(days).equity.last()
+                returns = (daily / daily.shift(1, fill_value=risk.initial_equity) - 1).to_numpy()
+                intervals.append({'symbol': symbol, 'strategy': name, **block_interval(returns)})
+                if name in {'fixed_policy', 'immediate', 'cash'}:
+                    axis.plot(daily.index, daily / risk.initial_equity, label=name, lw=.9)
+                save_json(destination / 'decomposition.json', decompositions)
+                save_json(destination / 'waiting.json', waiting)
+                save_json(destination / 'bootstrap.json', intervals)
+            if period == 'observed':
+                for year in range(2022, 2026):
+                    part = bars[(bars.time >= f'{year}-01-01') & (bars.time < f'{year+1}-01-01')]
+                    target = destination / symbol / f'restart-{year}'
+                    metrics = backtest(part, policy, config, target)
+                    decomposition = decompose_run(target, config.initial_equity)
+                    annual.append({'symbol': symbol, 'year': year, **metrics, 'accounting_reconciled': True,
+                                   'net_pnl': decomposition['net_pnl']})
+                    save_json(destination / 'annual_restart.json', annual)
+                    print(f'{symbol}/{year} 독립 재시작: {metrics["total_return"]:.2%}', flush=True)
+            axis.set(title=f'{symbol}: fixed pullback policy ({period})', ylabel='Equity / initial')
+            axis.legend(fontsize=8)
+            axis.grid(alpha=.2)
+        chart.savefig(destination / 'equity_comparison.png', dpi=150)
+        save_json(destination / 'results.json', rows)
+        pd.DataFrame(rows).drop(columns='rejected').to_csv(destination / 'results.csv', index=False)
+        decision = {'profitability_review_candidate': False, 'live_trading_approved': False,
+                    'reason': '이미 관찰한 기간의 고정 후보 비교이며 개발·확인 실패와 선택 불확실성 보존'}
+        save_json(destination / 'decision.json', decision)
+        summary = pd.DataFrame(rows)[['symbol', 'strategy', 'total_return', 'max_drawdown', 'closed_trades', 'fees', 'permanent_halt']]
+        (destination / 'REPORT.md').write_text(
+            '# 고정 진입 대기 후보의 후속 비교\n\n' + table(summary) + '\n\n'
+            '활동·방향 모형, 대기 폭·만료 시간과 위험 설정을 다시 선택하지 않았다. '
+            'immediate는 같은 30분 보유와 위험 설정에서 대기만 제거한다. 비용은 편도 수수료·슬리피지를 함께 2·3배로 늘렸다. '
+            '추가 지연은 1분이며, 조건 충족 후 실제 체결 가격은 다음 시가와 슬리피지로 계산했다.\n\n'
+            '대기 시작·충족·만료·취소와 실제 체결까지의 가격 변화는 waiting.json과 각 waiting_episodes.parquet에 보존했다. '
+            '가격 변화는 왕복 비용을 차감한 실현 수익률과 다르다. 거래·비용·펀딩·최종 잔고 회계를 모두 대조했다.\n\n'
+            '2022~2025년 연도별 초기화는 재학습이나 연속 운용이 아니다. 30일 블록의 95% 분위 구간은 관찰 경로에 조건부이며 '
+            '여러 후보를 선택한 불확실성이나 시장 구조 변화를 포함하지 않는다. 현금과 영구 중지 뒤 기간도 포함한다. '
+            '2026년 9월까지 이미 관찰한 구간이며 새 최종 평가·수익성 승인·실거래 준비 완료를 뜻하지 않는다.\n', encoding='utf-8')
+        save_json(destination / 'summary.json', {'complete': True, 'period': period, 'symbols': symbols, 'decision': decision})
+    except Exception as error:
+        save_json(destination / 'failure.json', {'type': type(error).__name__, 'message': str(error)})
+        raise
+    finally:
+        plt.close(chart)
+    return destination

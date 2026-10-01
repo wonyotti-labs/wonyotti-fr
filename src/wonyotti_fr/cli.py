@@ -25,6 +25,7 @@ from .market import fetch_market, repair_gaps
 from .minute_repair import repair_minute_market
 from .offline import demo, replay
 from .portfolio import reconstruct_portfolio
+from .pullback_evaluation import run_pullback_evaluation
 from .pullback_research import run_pullback_selection
 from .reconciliation import reconcile_wallet
 from .reconstruct import reconstruct
@@ -222,6 +223,14 @@ def main() -> None:
     pullback.add_argument("--feature-market", type=Path, required=True)
     pullback.add_argument("--output", type=Path, default=Path("artifacts"))
     pullback.set_defaults(func=lambda a: run_pullback_selection(a.v4_selection_run, a.market, a.feature_market, a.output))
+    pullback_eval = commands.add_parser("pullback-evaluate", help="고정 진입 대기 후보의 다시장·비용·지연 비교")
+    pullback_eval.add_argument("--selection-run", type=Path, required=True)
+    pullback_eval.add_argument("--market", type=Path, required=True)
+    pullback_eval.add_argument("--feature-market", type=Path, required=True)
+    pullback_eval.add_argument("--period", choices=['observed', 'seen_2026'], required=True)
+    pullback_eval.add_argument("--symbols", nargs='+', choices=['BTCUSDT', 'ETHUSDT', 'SOLUSDT'], default=['BTCUSDT', 'ETHUSDT', 'SOLUSDT'])
+    pullback_eval.add_argument("--output", type=Path, default=Path("artifacts"))
+    pullback_eval.set_defaults(func=lambda a: run_pullback_evaluation(a.selection_run, a.market, a.feature_market, a.output, a.period, a.symbols))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)
