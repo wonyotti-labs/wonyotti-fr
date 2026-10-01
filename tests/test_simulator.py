@@ -70,3 +70,30 @@ def test_stop_cooldown_prevents_instant_reentry():
     entries = fills[fills.reason == "entry"].time.to_list()
     assert entries == [frame.iloc[1].time, frame.iloc[5].time]
     assert len(trades) == 2
+
+
+def test_drawdown_halt_prevents_later_reentry():
+    frame = bars([(100, 100, 100, 100), (100, 100, 100, 100), (70, 70, 70, 70), (200, 200, 200, 200)])
+    _, trades, fills, metrics = simulate(frame, np.ones(4, dtype=int), empty_funding(),
+                                         RiskConfig(allocation=1, fee_bps=0, slippage_bps=0, stop_fraction=0,
+                                                    daily_loss_limit=1, max_drawdown=0.2))
+    assert metrics["permanent_halt"]
+    assert len(fills[fills.reason == "entry"]) == 1
+    assert trades.iloc[0].exit_reason == "risk_halt"
+    assert metrics["total_return"] == pytest.approx(-0.3)
+
+
+def test_new_position_does_not_receive_earlier_funding():
+    frame = bars([(100, 100, 100, 100)] * 3)
+    funding = pd.DataFrame({"time": [frame.time.iloc[1]], "rate": [0.01]})
+    _, trades, _, metrics = simulate(frame, np.ones(3, dtype=int), funding, no_cost())
+    assert trades.funding_cost.sum() == 0
+    assert metrics["total_return"] == 0
+
+
+def test_missing_price_at_funding_is_not_silently_ignored():
+    frame = bars([(100, 100, 100, 100)] * 4)
+    funding = pd.DataFrame({"time": [frame.time.iloc[2]], "rate": [0.01]})
+    frame = frame.drop(index=2).reset_index(drop=True)
+    with pytest.raises(ValueError, match="펀딩 시각"):
+        simulate(frame, np.ones(3, dtype=int), funding, no_cost())
