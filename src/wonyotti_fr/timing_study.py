@@ -101,11 +101,50 @@ def timing_summary(paired: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def paired_gap_interval(frame: pd.DataFrame) -> dict:
+    names = ['reference_difference_bps', 'absolute_reference_gap_reduction_bps']
+    if frame.empty or not np.isfinite(frame[names]).all().all():
+        raise ValueError('짝 비교에는 유한한 관측값이 필요합니다.')
+    daily = frame.set_index('target_time')[names].resample('1D').agg(['sum', 'count'])
+    result = {'orders': len(frame), 'calendar_days': len(daily),
+              'active_days': int(daily[(names[0], 'count')].gt(0).sum())}
+    for name in names:
+        result[f'mean_{name}'] = float(frame[name].mean())
+        result[f'{name}_ci_low'] = None
+        result[f'{name}_ci_high'] = None
+    if len(daily) < 14 or result['active_days'] < 14:
+        return result
+    rng = np.random.default_rng(0)
+    starts = rng.integers(0, len(daily), size=(1000, (len(daily) + 6) // 7))
+    indices = ((starts[:, :, None] + np.arange(7)) % len(daily)).reshape(1000, -1)[:, :len(daily)]
+    counts = daily[(names[0], 'count')].to_numpy()[indices].sum(axis=1)
+    # 같은 날짜 블록을 두 가격 차이에 재사용해 주문 쌍과 날짜 내 의존성을 유지한다.
+    for name in names:
+        sums = daily[(name, 'sum')].to_numpy()[indices].sum(axis=1)
+        samples = sums[counts > 0] / counts[counts > 0]
+        lower, upper = np.quantile(samples, [.025, .975])
+        result[f'{name}_ci_low'], result[f'{name}_ci_high'] = float(lower), float(upper)
+    return result
+
+
+def paired_uncertainty(paired: pd.DataFrame) -> pd.DataFrame:
+    unique = paired[paired.horizon_minutes.eq(60) & paired.both_available]
+    rows = []
+    for scope, sample in [('all_orders', unique), ('exposure_expansion', unique[unique.target.isin(
+        ['enter_long', 'enter_short', 'increase'])])]:
+        for (year, liquidity), frame in sample.groupby(['year', 'lastliquidityind'], observed=True):
+            rows.append({'scope': scope, 'year': year, 'lastliquidityind': liquidity,
+                         **paired_gap_interval(frame),
+                         **{f'mean_gap_{size}_bps': float(frame[f'reference_to_fill_bps_{size}'].mean()) for size in ['1m', '5m']}})
+    return pd.DataFrame(rows)
+
+
 def run_timing_study(audit: Path, study: Path, history: Path, minute_history: Path, output: Path) -> Path:
     source, hashes = source_inputs(audit, study, history)
     minute, minute_hashes = read_minute_history(minute_history, history)
     destination = new_run(output, 'timing-study', {**hashes, **minute_hashes, 'protocol': 'docs/EXPERIMENT_V6.md',
-                                                'role': 'paired_descriptive_timing_not_profitability'})
+                                                'role': 'paired_descriptive_timing_not_profitability',
+                                                'paired_bootstrap': '7-day circular calendar blocks, 1000 draws, seed 0; conditional, no multiple-comparison correction'})
     print(f'동일 주문의 시간 해상도 비교: {destination}', flush=True)
     try:
         aggregation, aggregation_summary = aggregate_comparison(minute, source['bars'])
@@ -119,6 +158,8 @@ def run_timing_study(audit: Path, study: Path, history: Path, minute_history: Pa
         coverage.to_csv(destination / 'coverage.csv', index=False)
         summary = timing_summary(paired)
         summary.to_csv(destination / 'timing_summary.csv', index=False)
+        uncertainty = paired_uncertainty(paired)
+        uncertainty.to_csv(destination / 'paired_uncertainty.csv', index=False)
         view = summary[summary.horizon_minutes.eq(60)]
         chart, axes = plt.subplots(2, 1, figsize=(12, 8), layout='constrained')
         try:
@@ -154,6 +195,10 @@ def run_timing_study(audit: Path, study: Path, history: Path, minute_history: Pa
             '5분 연결은 각각 300초와 300초 미만이다. 같은 주문·같은 관찰 간격을 연결한 쌍에서만 차이를 비교했다. '
             '연결 실패도 분모와 별도 파일에 남겼으며 특정 손익이나 유동성만 보고 제거하지 않았다.\n\n'
             '5·15·60·240분 관찰과 평균·중앙값·분위수·시각 차이는 로컬 상세 표에 보존했다. '
+            'paired_uncertainty.csv는 60분 관찰이 연결된 같은 주문의 직전 가격 차이를 연도·유동성·전체 또는 노출 확대 행동으로 묶는다. '
+            '방향별 차이 변화와 절대 차이 감소의 평균에 대해 7일 달력 블록을 1,000번 재표집한 조건부 95% 구간을 기록했다. '
+            '같은 주문 쌍을 유지하고 거래 없는 날도 포함했다. 관측일이 14일 미만인 표본은 구간을 제시하지 않는다. '
+            '이 구간은 표본 선택·다중 비교·다른 시기의 일반화 불확실성을 포함하지 않으며 수익성 검정이 아니다. '
             'markout은 실제 체결 이후 가격 변화이며 실현 손익·자본 수익률이 아니다. '
             '주문 제출·취소·대기열·다른 부분 체결을 복원하지 못한다. 어떤 이후 가격도 신호 입력에 넣지 않았다. '
             '이 분석은 다음 후보를 설계하기 위한 진단이며 수익성 검증이나 새 후보 선택이 아니다.\n', encoding='utf-8')

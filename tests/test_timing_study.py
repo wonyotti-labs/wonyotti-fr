@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from wonyotti_fr.execution_study import markouts
-from wonyotti_fr.timing_study import aggregate_comparison, compare_order_timing
+from wonyotti_fr.timing_study import aggregate_comparison, compare_order_timing, paired_gap_interval
 
 
 def source():
@@ -43,3 +43,21 @@ def test_minute_reference_requires_strict_past_and_does_not_bridge_missing_minut
     assert broken.reference_price.isna().all()
     with pytest.raises(ValueError, match='봉 간격'):
         markouts(orders, fills, minute, interval_minutes=5)
+
+
+def test_paired_calendar_blocks_preserve_constant_difference_and_order_weighting():
+    times = pd.date_range('2020-01-01', periods=28, freq='1D', tz='UTC')
+    frame = pd.DataFrame({'target_time': times, 'reference_difference_bps': -2.,
+                          'absolute_reference_gap_reduction_bps': 3.})
+    result = paired_gap_interval(frame)
+    assert result['reference_difference_bps_ci_low'] == result['reference_difference_bps_ci_high'] == -2
+    assert result['absolute_reference_gap_reduction_bps_ci_low'] == result['absolute_reference_gap_reduction_bps_ci_high'] == 3
+    extra = frame.iloc[:1].assign(reference_difference_bps=-20., absolute_reference_gap_reduction_bps=30.)
+    sample = pd.concat([frame, extra], ignore_index=True)
+    result = paired_gap_interval(sample)
+    assert result == paired_gap_interval(sample)
+    assert result['mean_reference_difference_bps'] == pytest.approx((-2 * 28 - 20) / 29)
+    assert result['orders'] == 29 and result['active_days'] == 28
+    sparse = paired_gap_interval(frame.iloc[[0, -1]])
+    assert sparse['calendar_days'] == 28 and sparse['active_days'] == 2
+    assert sparse['reference_difference_bps_ci_low'] is None
