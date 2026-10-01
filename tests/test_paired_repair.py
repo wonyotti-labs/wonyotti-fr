@@ -94,6 +94,18 @@ def test_output_hashes_funding_preservation_and_failed_pair_unavailable(tmp_path
     manifest = json.loads((bounded_five / 'manifest-5m.json').read_text())
     assert manifest['start_month'] == manifest['end_month'] == '2021-01'
     assert load_market(bounded_one, 'BTCUSDT', '1m')[0]['count'].sum() == 10
+    for interval, path in [('1m', one_source), ('5m', five_source)]:
+        mp = path / f'manifest-{interval}.json'
+        m = json.loads(mp.read_text())
+        m['summary']['ETHUSDT'] = m['summary']['BTCUSDT']
+        save_json(mp, m)
+    selected_one, selected_five = tmp_path / 'selected-one', tmp_path / 'selected-five'
+    repair_paired_market(one_source, five_source, selected_one, selected_five, tmp_path / 'cache',
+                         requested_symbols=['ETHUSDT'])
+    assert set(json.loads((selected_one / 'manifest-1m.json').read_text())['summary']) == {'ETHUSDT'}
+    assert set(json.loads((selected_five / 'manifest-5m.json').read_text())['summary']) == {'ETHUSDT'}
+    with pytest.raises(KeyError):
+        load_market(selected_one, 'BTCUSDT', '1m')
     aggregates.loc[0, 'qty'] = 2.
     broken_one, broken_five = tmp_path / 'bad-one', tmp_path / 'bad-five'
     with pytest.raises(ValueError, match='불일치'):
@@ -117,3 +129,7 @@ def test_partial_or_reversed_scope_rejected_before_copying(tmp_path):
         repair_paired_market(*paths, start='2022-01-01')
     with pytest.raises(ValueError, match='UTC 날짜'):
         repair_paired_market(*paths, start='2025-01-01', end='2022-01-01')
+    with pytest.raises(ValueError, match='빈 목록'):
+        repair_paired_market(*paths, requested_symbols=[])
+    with pytest.raises(ValueError, match='중복'):
+        repair_paired_market(*paths, requested_symbols=['BTCUSDT', 'BTCUSDT'])

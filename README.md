@@ -121,6 +121,8 @@ uv run wonyotti timing-study --audit-run artifacts/감사실행ID --study-run ar
 
 공식 5분봉도 원체결과 다를 때는 `paired-repair --market <1분 자료> --feature-market <5분 자료> --output <새 1분 폴더> --feature-output <새 5분 폴더>`를 사용한다. 불일치 구간 전체의 원체결과 별도 집계 체결이 일치해야 두 해상도를 각각 복원한다. 모든 검사를 마치기 전 출력은 실행 입력으로 사용할 수 없다. 날짜 경계·대조 실패는 중단하며 [자료 검증 범위](docs/EXPERIMENT_V7.md)를 함께 확인한다.
 
+한 시장의 자료 검증 실패가 다른 시장의 독립 검증을 막지 않도록 `paired-repair --symbols ETHUSDT SOLUSDT`처럼 범위를 지정할 수 있다. 출력 매니페스트는 선택한 시장만 포함한다. 제외한 시장의 실패나 전체 평가 미완료를 성공으로 바꾸지는 않는다.
+
 ```bash
 uv run wonyotti pullback-select --v4-selection-run <v4 선택 폴더> \
   --market <대조를 마친 1분 자료> --feature-market <기존 5분 자료>

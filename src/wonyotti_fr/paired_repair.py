@@ -67,7 +67,10 @@ def context_ends(ends: pd.DatetimeIndex, date: pd.Timestamp) -> pd.DatetimeIndex
 
 
 def repair_paired_market(source: Path, feature_source: Path, output: Path, feature_output: Path, cache: Path,
-                         start: str | None = None, end: str | None = None, extra_targets: dict | None = None) -> dict:
+                         start: str | None = None, end: str | None = None, extra_targets: dict | None = None,
+                         requested_symbols: list[str] | None = None) -> dict:
+    if requested_symbols is not None and (not requested_symbols or len(requested_symbols) != len(set(requested_symbols))):
+        raise ValueError('선택 복원 심볼의 빈 목록·중복 오류')
     if (start is None) != (end is None):
         raise ValueError('복원 범위의 시작·종료를 함께 지정해야 합니다.')
     first, last = (pd.Timestamp(start, tz='UTC'), pd.Timestamp(end, tz='UTC')) if start else (None, None)
@@ -80,6 +83,10 @@ def repair_paired_market(source: Path, feature_source: Path, output: Path, featu
         raise ValueError('양방향 복원에는 서로 겹치지 않는 새 출력 폴더가 필요합니다.')
     manifests = {interval: copy.deepcopy(json.loads((p / f'manifest-{interval}.json').read_text()))
                  for interval, p in sources.items()}
+    if requested_symbols is not None:
+        if not set(requested_symbols) <= set(manifests['1m']['summary']):
+            raise ValueError('선택 복원 심볼이 입력에 없습니다.')
+        manifests['1m']['summary'] = {s: manifests['1m']['summary'][s] for s in requested_symbols}
     symbols = manifests['1m']['summary']
     if (not 1 <= len(symbols) <= 5 or not set(symbols) <= set(manifests['5m']['summary'])
         or any(not s.isalnum() or len(s) > 20 for s in symbols)
@@ -100,7 +107,8 @@ def repair_paired_market(source: Path, feature_source: Path, output: Path, featu
     manifests['5m']['summary'] = {s: manifests['5m']['summary'][s] for s in symbols}
     evidence = {'source_sha256': {k: sha256(v / f'manifest-{k}.json') for k, v in sources.items()},
                 'rule': '대상 모든 체결의 두 형식 대조 후 두 해상도 복원; 원본 보존',
-                'scope': [start, end] if start else None, 'extra_targets': extra_targets, 'symbols': {}}
+                'scope': [start, end] if start else None, 'extra_targets': extra_targets,
+                'requested_symbols': requested_symbols, 'symbols': {}}
     for interval, path in outputs.items():
         shutil.copytree(sources[interval], path)
         # 완료 전에는 입력으로 사용할 최종 매니페스트를 노출하지 않는다.
