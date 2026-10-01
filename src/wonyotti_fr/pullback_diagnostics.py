@@ -9,9 +9,22 @@ import pandas as pd
 from .common import save_json
 
 
+def verify_fill_activity(fills: pd.DataFrame, bars: pd.DataFrame) -> dict:
+    if 'count' not in bars or 'volume' not in bars:
+        return {'available': False, 'checked_fills': 0}
+    times = pd.to_datetime(fills.time, utc=True) if len(fills) else pd.Series([], dtype='datetime64[ns, UTC]')
+    if len(fills):
+        times = times - pd.to_timedelta(fills.reason.isin(['intrabar_stop', 'end_of_test']).astype(int), unit='min')
+    activity = bars.set_index('time')[['count', 'volume']].reindex(times)
+    if activity.isna().any().any() or activity.le(0).any().any():
+        raise ValueError('거래가 없는 분봉 또는 입력 밖에서 가정한 체결이 있습니다.')
+    return {'available': True, 'checked_fills': len(fills), 'zero_trade_fills': 0}
+
+
 def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int) -> dict:
     curve = pd.read_parquet(directory / 'equity.parquet', columns=['time', 'policy_event', 'policy_state'])
     fills = pd.read_parquet(directory / 'fills.parquet')
+    activity = verify_fill_activity(fills, bars)
     close = bars.set_index('end').close
     decisions, waiting = [], None
     for event in curve[curve.policy_event.isin(['armed', 'triggered', 'expired', 'cleared', 'immediate'])].itertuples(index=False):
@@ -67,7 +80,8 @@ def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int) -> dict
     frame.to_parquet(directory / 'waiting_episodes.parquet', index=False)
     counts = {str(key): int(value) for key, value in curve.policy_event.value_counts().items()}
     executed = [row for row in decisions if row['executed']]
-    result = {'events': counts, 'completed_waits': sum(row['status'] != 'immediate' for row in decisions),
+    result = {'events': counts, 'fill_activity': activity,
+              'completed_waits': sum(row['status'] != 'immediate' for row in decisions),
               'entry_fills': len(entries), 'matched_entry_fills': len(matched),
               'trigger_fraction': counts.get('triggered', 0) / counts['armed'] if counts.get('armed') else None,
               'triggered_without_fill': sum(row['status'] == 'triggered' and not row['executed'] for row in decisions),

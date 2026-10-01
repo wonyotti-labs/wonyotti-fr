@@ -22,11 +22,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 
 def evaluation_period(frozen: dict, period: str) -> tuple[str, str]:
-    allowed = {'observed': ('2022-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01')}
+    allowed = {'observed': ('2022-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01'),
+               'verified_2022_2024': ('2022-01-01', '2025-01-01')}
     if frozen.get('protocol') != 'pullback_v7' or period not in allowed:
         raise ValueError('v7 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
-    key = 'observed_evaluation_period' if period == 'observed' else 'seen_2026_period'
-    if (tuple(frozen[key]) != allowed[period] or frozen['evaluation_end_exclusive'] != '2026-10-01'
+    key = 'seen_2026_period' if period == 'seen_2026' else 'observed_evaluation_period'
+    expected = allowed['observed'] if period == 'verified_2022_2024' else allowed[period]
+    if (tuple(frozen[key]) != expected or frozen['evaluation_end_exclusive'] != '2026-10-01'
         or frozen['unseen_evaluation_available'] is not False or frozen['risk']['bar_seconds'] != 60):
         raise ValueError('v7 고정 후보의 평가 범위·실행 간격 오류')
     return allowed[period]
@@ -80,12 +82,13 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                 save_json(destination / 'decomposition.json', decompositions)
                 save_json(destination / 'waiting.json', waiting)
                 save_json(destination / 'bootstrap.json', intervals)
-            if period == 'observed':
-                for year in range(2022, 2026):
+            if period in {'observed', 'verified_2022_2024'}:
+                for year in range(2022, int(end[:4])):
                     part = bars[(bars.time >= f'{year}-01-01') & (bars.time < f'{year+1}-01-01')]
                     target = destination / symbol / f'restart-{year}'
                     metrics = backtest(part, policy, config, target)
                     decomposition = decompose_run(target, config.initial_equity)
+                    waiting_diagnostics(target, part, config.signal_delay_bars)
                     annual.append({'symbol': symbol, 'year': year, **metrics, 'accounting_reconciled': True,
                                    'net_pnl': decomposition['net_pnl']})
                     save_json(destination / 'annual_restart.json', annual)
@@ -100,14 +103,17 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                     'reason': '이미 관찰한 기간의 고정 후보 비교이며 개발·확인 실패와 선택 불확실성 보존'}
         save_json(destination / 'decision.json', decision)
         summary = pd.DataFrame(rows)[['symbol', 'strategy', 'total_return', 'max_drawdown', 'closed_trades', 'fees', 'permanent_halt']]
+        scope_note = ('2025년 입력 검증 실패 이후 결과 개봉 전에 고정한 2022~2024년 추가 비교다. '
+                      '2022~2025년 전체 연속 평가 및 2025년 연간 평가는 완료하지 못했다.\n\n'
+                      if period == 'verified_2022_2024' else '')
         (destination / 'REPORT.md').write_text(
-            '# 고정 진입 대기 후보의 후속 비교\n\n' + table(summary) + '\n\n'
+            '# 고정 진입 대기 후보의 후속 비교\n\n' + scope_note + table(summary) + '\n\n'
             '활동·방향 모형, 대기 폭·만료 시간과 위험 설정을 다시 선택하지 않았다. '
             'immediate는 같은 30분 보유와 위험 설정에서 대기만 제거한다. 비용은 편도 수수료·슬리피지를 함께 2·3배로 늘렸다. '
             '추가 지연은 1분이며, 조건 충족 후 실제 체결 가격은 다음 시가와 슬리피지로 계산했다.\n\n'
             '대기 시작·충족·만료·취소와 실제 체결까지의 가격 변화는 waiting.json과 각 waiting_episodes.parquet에 보존했다. '
             '가격 변화는 왕복 비용을 차감한 실현 수익률과 다르다. 거래·비용·펀딩·최종 잔고 회계를 모두 대조했다.\n\n'
-            '2022~2025년 연도별 초기화는 재학습이나 연속 운용이 아니다. 30일 블록의 95% 분위 구간은 관찰 경로에 조건부이며 '
+            '해당 기간의 연도별 초기화는 재학습이나 연속 운용이 아니다. 30일 블록의 95% 분위 구간은 관찰 경로에 조건부이며 '
             '여러 후보를 선택한 불확실성이나 시장 구조 변화를 포함하지 않는다. 현금과 영구 중지 뒤 기간도 포함한다. '
             '2026년 9월까지 이미 관찰한 구간이며 새 최종 평가·수익성 승인·실거래 준비 완료를 뜻하지 않는다.\n', encoding='utf-8')
         save_json(destination / 'summary.json', {'complete': True, 'period': period, 'symbols': symbols, 'decision': decision})

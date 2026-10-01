@@ -24,7 +24,7 @@ from .frequency_research import run_frequency_selection
 from .market import fetch_market, repair_gaps
 from .minute_repair import repair_minute_market
 from .offline import demo, replay
-from .paired_repair import repair_paired_market
+from .paired_repair import load_repair_targets, repair_paired_market
 from .portfolio import reconstruct_portfolio
 from .pullback_evaluation import run_pullback_evaluation
 from .pullback_research import run_pullback_selection
@@ -108,7 +108,11 @@ def main() -> None:
     paired.add_argument("--output", type=Path, required=True)
     paired.add_argument("--feature-output", type=Path, required=True)
     paired.add_argument("--cache", type=Path, default=Path("data/minute-repair-trades"))
-    paired.set_defaults(func=lambda a: repair_paired_market(a.market, a.feature_market, a.output, a.feature_output, a.cache))
+    paired.add_argument("--start", help="새 정규화 자료의 UTC 시작 날짜, 포함")
+    paired.add_argument("--end", help="새 정규화 자료의 UTC 종료 날짜, 미포함")
+    paired.add_argument("--extra-targets", type=Path, help="이미 발견한 오류의 심볼별 5분 종료 시각 JSON")
+    paired.set_defaults(func=lambda a: repair_paired_market(a.market, a.feature_market, a.output, a.feature_output, a.cache,
+                                                            a.start, a.end, load_repair_targets(a.extra_targets)))
     research = commands.add_parser("research", help="학습·검증·평가를 분리하여 모사 후보를 비교")
     research.add_argument("--audit-run", type=Path, required=True)
     research.add_argument("--market", type=Path, default=Path("data/market"))
@@ -236,7 +240,7 @@ def main() -> None:
     pullback_eval.add_argument("--selection-run", type=Path, required=True)
     pullback_eval.add_argument("--market", type=Path, required=True)
     pullback_eval.add_argument("--feature-market", type=Path, required=True)
-    pullback_eval.add_argument("--period", choices=['observed', 'seen_2026'], required=True)
+    pullback_eval.add_argument("--period", choices=['observed', 'seen_2026', 'verified_2022_2024'], required=True)
     pullback_eval.add_argument("--symbols", nargs='+', choices=['BTCUSDT', 'ETHUSDT', 'SOLUSDT'], default=['BTCUSDT', 'ETHUSDT', 'SOLUSDT'])
     pullback_eval.add_argument("--output", type=Path, default=Path("artifacts"))
     pullback_eval.set_defaults(func=lambda a: run_pullback_evaluation(a.selection_run, a.market, a.feature_market, a.output, a.period, a.symbols))

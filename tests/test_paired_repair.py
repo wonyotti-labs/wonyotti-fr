@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 import pytest
 from test_minute_repair import source
@@ -85,6 +87,13 @@ def test_output_hashes_funding_preservation_and_failed_pair_unavailable(tmp_path
         assert repaired['count'].sum() == 10
         assert sha256(path / 'funding.parquet') == sha256(source_path / 'funding.parquet')
     assert before == [sha256(p / 'bars.parquet') for p in [one_source, five_source]]
+    bounded_one, bounded_five = tmp_path / 'bounded-one', tmp_path / 'bounded-five'
+    bounds = repair_paired_market(one_source, five_source, bounded_one, bounded_five, tmp_path / 'cache',
+                                  '2021-01-01', '2021-01-02', {'BTCUSDT': ['2021-01-01T12:05:00Z']})
+    assert bounds['scope'] == ['2021-01-01', '2021-01-02']
+    manifest = json.loads((bounded_five / 'manifest-5m.json').read_text())
+    assert manifest['start_month'] == manifest['end_month'] == '2021-01'
+    assert load_market(bounded_one, 'BTCUSDT', '1m')[0]['count'].sum() == 10
     aggregates.loc[0, 'qty'] = 2.
     broken_one, broken_five = tmp_path / 'bad-one', tmp_path / 'bad-five'
     with pytest.raises(ValueError, match='불일치'):
@@ -92,3 +101,19 @@ def test_output_hashes_funding_preservation_and_failed_pair_unavailable(tmp_path
     assert not (broken_one / 'manifest-1m.json').exists()
     assert not (broken_five / 'manifest-5m.json').exists()
     assert (broken_one / 'failure.json').exists()
+
+
+def test_explicit_known_error_can_be_checked_even_when_two_bar_sources_agree():
+    _, trades, prior, _, five, aggregates = inputs()
+    wrong_five = five.assign(volume=9., count=9)
+    updates, checks = canonical_window(prior, wrong_five, trades, aggregates, pd.DatetimeIndex(five.end))
+    assert checks['corroboration']['target_exactly_once']
+    assert len(updates['1m']) == len(updates['5m']) == 1
+
+
+def test_partial_or_reversed_scope_rejected_before_copying(tmp_path):
+    paths = [tmp_path / str(i) for i in range(5)]
+    with pytest.raises(ValueError, match='함께'):
+        repair_paired_market(*paths, start='2022-01-01')
+    with pytest.raises(ValueError, match='UTC 날짜'):
+        repair_paired_market(*paths, start='2025-01-01', end='2022-01-01')

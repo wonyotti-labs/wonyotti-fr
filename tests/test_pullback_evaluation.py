@@ -5,7 +5,7 @@ import pytest
 from wonyotti_fr.engine import EngineConfig
 from wonyotti_fr.event_backtest import backtest
 from wonyotti_fr.event_features import MARKET_FEATURES
-from wonyotti_fr.pullback_diagnostics import waiting_diagnostics
+from wonyotti_fr.pullback_diagnostics import verify_fill_activity, waiting_diagnostics
 from wonyotti_fr.pullback_evaluation import evaluation_period
 from wonyotti_fr.pullback_policy import PullbackPolicy
 
@@ -60,11 +60,23 @@ def test_missing_wait_start_cannot_be_hidden_by_diagnostics(tmp_path):
         waiting_diagnostics(output, frame, 0)
 
 
+def test_execution_on_zero_trade_bar_is_rejected_including_end_timestamp_stops():
+    frame = bars().assign(count=2, volume=1.)
+    fills = pd.DataFrame({'time': [frame.time.iloc[1], frame.end.iloc[2]], 'reason': ['entry', 'intrabar_stop']})
+    assert verify_fill_activity(fills, frame)['checked_fills'] == 2
+    frame.loc[2, ['count', 'volume']] = 0
+    with pytest.raises(ValueError, match='거래가 없는'):
+        verify_fill_activity(fills, frame)
+
+
 def test_observed_period_guard_rejects_future_or_wrong_resolution():
     frozen = {'protocol': 'pullback_v7', 'observed_evaluation_period': ['2022-01-01', '2026-01-01'],
               'seen_2026_period': ['2026-01-01', '2026-10-01'], 'evaluation_end_exclusive': '2026-10-01',
               'unseen_evaluation_available': False, 'risk': {'bar_seconds': 60}}
     assert evaluation_period(frozen, 'seen_2026') == ('2026-01-01', '2026-10-01')
+    assert evaluation_period(frozen, 'verified_2022_2024') == ('2022-01-01', '2025-01-01')
+    with pytest.raises(ValueError, match='범위'):
+        evaluation_period({**frozen, 'observed_evaluation_period': ['2023-01-01', '2026-01-01']}, 'verified_2022_2024')
     with pytest.raises(ValueError, match='이미 관찰한'):
         evaluation_period(frozen, 'new')
     with pytest.raises(ValueError, match='범위'):
