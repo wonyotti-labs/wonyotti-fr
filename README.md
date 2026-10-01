@@ -8,6 +8,8 @@
 - [진행 상태와 남은 문제](docs/STATUS.md)
 - [연구 방법과 단위](docs/METHODOLOGY.md)
 - [사건별 실험 사전 계획](docs/EXPERIMENT_V2.md)
+- [행동 빈도 반영 실험 계획](docs/EXPERIMENT_V3.md)
+- [요구 사항별 검증 기록](docs/VERIFICATION.md)
 - [데이터 관리 원칙](DATA_POLICY.md)
 - [보안 정책](SECURITY.md)
 
@@ -51,6 +53,7 @@ uv run wonyotti event-select --study-run artifacts/사건학습ID --market data/
 uv run wonyotti event-evaluate --selection-run artifacts/선택실행ID --market data/market-5m-complete --period observed
 uv run wonyotti event-walkforward --study-run artifacts/사건학습ID --audit-run artifacts/감사실행ID
 uv run wonyotti event-diagnose --study-run artifacts/사건학습ID --evaluation-runs artifacts/완료한평가ID
+uv run wonyotti context-study --audit-run artifacts/감사실행ID --study-run artifacts/사건학습ID
 ```
 
 독립 주문의 진입·추가·축소·청산 의도를 학습한다. 같은 주문의 부분 체결은 새 판단으로 반복 학습하지 않는다. 원거래소의 봉 시작 가격은 이전 종가이므로 특징 계산에만 쓰고, 체결 평가는 별도 거래소 시세를 사용한다.
@@ -64,6 +67,16 @@ uv run wonyotti event-evaluate --selection-run artifacts/선택실행ID --market
 
 위 `new`는 v2가 처음 열었던 2026년 1~8월 구간을 뜻한다. 재실행이나 새 전략에 대해 다시 미사용 평가라고 부르면 안 된다. 2025년 12월은 지표 준비 구간이다. 날짜는 시작 포함·종료 미포함이며, 월별 수집의 `--end`는 해당 월 포함이다.
 
+## 학습 행동 빈도를 반영한 v3 연구
+
+```sh
+uv run wonyotti frequency-select --study-run artifacts/사건학습ID --audit-run artifacts/감사실행ID --v2-selection-run artifacts/선택실행ID
+uv run wonyotti frequency-evaluate --selection-run artifacts/빈도선택ID --market data/market-5m-complete --period observed
+uv run wonyotti frequency-evaluate --selection-run artifacts/빈도선택ID --market data/market-5m-2026-new --period seen_2026
+```
+
+v3는 기존 모델의 계수에 학습 구간의 행동 빈도를 반영한 점수 후보를 비교한다. 일부 기간의 매매 비용과 손실은 줄었지만 개발·확인 조건을 통과하지 못했다. `frequency-evaluate --period new`는 선행 검증 조건을 다시 계산하며, 실패한 후보로 새 기간을 열지 않는다. v3의 `new`는 2026년 9월이며 이번 연구에서는 수집하지 않았다.
+
 ## 중단과 복원이 가능한 오프라인 봇
 
 ```sh
@@ -74,6 +87,12 @@ uv run wonyotti event-replay --selection-run artifacts/선택실행ID --market d
 첫 실행은 처리 봉 수만 제한하며 열린 포지션을 유지한다. 다음 실행은 같은 모델·시세·설정·소스의 저널에서 이어서 처리한다. 전체 기간 끝에서만 비용을 내고 청산한다. `--verify-memory`는 처음부터 한 번에 처리한 잔고·체결·상태와 대조한다. 긴 기간에서는 추가 시간과 메모리가 든다.
 
 `--halt --max-bars 0`은 수동 중지 의도를 저장한다. 다음 유효 시세를 처리할 때 청산하고 재진입을 막는다. 같은 사건의 재전달은 중복 체결하지 않고, 같은 ID의 다른 시세는 거부한다. 해시 저널은 로컬 손상 탐지용이며 외부 서명이나 계정 인증은 아니다. 소스 변경 후에는 기존 저널을 다른 프로그램으로 이어서 처리하지 않고 새 실행을 만들거나 보존한 코드 스냅샷을 사용한다.
+
+```sh
+uv run wonyotti engine-stress --selection-run artifacts/빈도선택ID
+```
+
+`engine-stress`는 과거 급변 시세에서 검증용 하위 프로세스를 커밋 직전에 강제 종료하고 복구 결과를 대조한다. 기존 봇 프로세스나 사용자 작업을 종료하지 않는다. 테스트용 저널과 결과도 새 로컬 실행 폴더에 남긴다.
 
 ## 기존 v1 연구와 출력
 
@@ -86,7 +105,10 @@ uv run wonyotti event-replay --selection-run artifacts/선택실행ID --market d
 | `event-study`, `event-select` | 사건별 학습 자료·모델·시간순 모사 평가·고정 후보 선택 |
 | `event-evaluate` | 다년·다시장 성과, 위험 규칙·비용·지연 비교, 그림, 채택 판단 |
 | `event-walkforward`, `event-diagnose` | 확장 학습의 모사 성능, 원본 행동 빈도와 봇의 가격 손익·비용 분해 |
+| `context-study` | 원거래소 전체 기간의 독립 주문 맥락·지정가/유동성 비용·추가 진입별 손익 |
+| `frequency-select`, `frequency-evaluate` | 행동 빈도 반영 후보·신뢰도 진단·고정 비교·새 구간 개봉 조건 |
 | `event-replay` | 영속 저널, 중단·재개 상태, 단일 실행 대조 |
+| `engine-stress` | 실제 프로세스 종료 복구와 급변·중복·누락·수동 중지 검사 |
 | `study`, `research`, `robustness`, `replay` | v1 행동 연구·방향 모사·비용 비교·재표집·오프라인 재생 |
 
 실험마다 새 폴더를 만든다. 원본 CSV, `artifacts/` 결과, `data/` 시장 자료, 학습 모델은 Git에서 제외한다. 원본 기반 연구를 재현하려면 별도로 이용 권한이 있는 원본이 필요하다. 합성 예제와 테스트는 원본 없이 실행할 수 있다. 실제 호가 대기열·시장 충격·실시간 모의매매는 구현하지 않았다.
