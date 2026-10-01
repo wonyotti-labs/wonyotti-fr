@@ -8,28 +8,39 @@ from .engine import EngineConfig, TradingEngine
 from .event_backtest import iter_events, prepare_period
 from .event_research import load_selection
 from .journal import EventJournal, canonical, digest
+from .minute_data import prepare_minute_period
 from .period_guard import guard_replay_period
 
 
-def replay_identity(selection: Path, market: Path, symbol: str, start: str, end: str) -> dict:
+def replay_identity(selection: Path, market: Path, symbol: str, start: str, end: str,
+                    feature_market: Path | None = None) -> dict:
     source = Path(__file__).parent
-    return {'selection_sha256': sha256(selection / 'frozen_selection.json'),
-            'market_manifest_sha256': sha256(market / 'manifest-5m.json'),
+    minute = json.loads((selection / 'frozen_selection.json').read_text()).get('protocol') == 'pullback_v7'
+    if minute != (feature_market is not None):
+        raise ValueError('v7 분봉 실행에만 별도 5분 특징 자료가 필요합니다.')
+    identity = {'selection_sha256': sha256(selection / 'frozen_selection.json'),
+            'market_manifest_sha256': sha256(market / ('manifest-1m.json' if minute else 'manifest-5m.json')),
             'symbol': symbol, 'start': start, 'end_exclusive': end,
             'source_sha256': {path.name: sha256(path) for path in sorted(source.glob('*.py'))},
             'mode': 'offline_only'}
+    if minute:
+        identity['feature_manifest_sha256'] = sha256(feature_market / 'manifest-5m.json')
+    return identity
 
 
 def run_event_replay(selection: Path, market: Path, symbol: str, start: str, end: str,
                      journal_path: Path, output: Path, max_bars: int | None = None,
-                     halt: bool = False, verify_memory: bool = False) -> Path:
+                     halt: bool = False, verify_memory: bool = False, feature_market: Path | None = None) -> Path:
     if max_bars is not None and (type(max_bars) is not int or max_bars < 0):
         raise ValueError('최대 처리 봉 수는 음수가 아닌 정수여야 합니다.')
     frozen, policy = load_selection(selection)
     guard_replay_period(selection, frozen, start, end)
-    identity = replay_identity(selection, market, symbol, start, end)
+    identity = replay_identity(selection, market, symbol, start, end, feature_market)
     config = EngineConfig(**frozen['risk'])
-    bars = prepare_period(market, symbol, start, end)
+    if frozen.get('protocol') == 'pullback_v7':
+        bars, _ = prepare_minute_period(market, feature_market, symbol, start, end)
+    else:
+        bars = prepare_period(market, symbol, start, end)
     if hasattr(policy, 'prepare'):
         policy.prepare(bars)
     destination = new_run(output, 'event-replay', {**identity, 'journal': str(journal_path.resolve()),

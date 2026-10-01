@@ -13,6 +13,7 @@ from .event_backtest import iter_events, prepare_period
 from .event_replay import replay_identity
 from .event_research import load_selection
 from .journal import EventJournal, canonical
+from .minute_data import prepare_minute_period
 from .period_guard import guard_replay_period
 
 
@@ -24,14 +25,21 @@ def crash_worker(payload_path: Path) -> None:
     raise RuntimeError('강제 종료 주입 지점에 도달하지 못했습니다.')
 
 
-def verify_stress(events: list[dict], selection: Path, directory: Path, identity: dict) -> dict:
+def verify_stress(events: list[dict], selection: Path, directory: Path, identity: dict,
+                  interruption_kind: str = 'position', require_state: bool = False) -> dict:
     if len(events) < 4:
         raise ValueError('장애 검증 사건이 부족합니다.')
+    if interruption_kind not in {'position', 'waiting'}:
+        raise ValueError('지원하지 않는 중단 상태')
     frozen, policy = load_selection(selection)
     config = EngineConfig(**frozen['risk'])
     memory = TradingEngine(config)
     expected = [memory.step(event, policy, final=index == len(events) - 1) for index, event in enumerate(events)]
-    cut = next((index + 1 for index, result in enumerate(expected[:-2]) if result['quantity'] != 0), min(24, len(events) - 2))
+    candidates = [index + 1 for index, result in enumerate(expected[:-2])
+                  if (result['quantity'] != 0 if interruption_kind == 'position' else bool(json.loads(result.get('policy_state', '{}'))))]
+    if not candidates and (require_state or interruption_kind == 'waiting'):
+        raise ValueError(f'요청한 {interruption_kind} 상태가 없어 장애 검증을 실행할 수 없습니다.')
+    cut = candidates[0] if candidates else min(24, len(events) - 2)
     journal_path = directory / 'crash.sqlite'
     checks = {}
     with EventJournal(journal_path, config, identity) as journal:
@@ -83,16 +91,40 @@ def verify_stress(events: list[dict], selection: Path, directory: Path, identity
         raise ValueError(f'장애 검증 미통과: {[name for name, passed in checks.items() if not passed]}')
     return {'checks': checks, 'bars': len(events), 'interruption_after_bars': cut,
             'position_open_at_interruption': before['quantity'] != 0,
+            'waiting_at_interruption': bool(before.get('policy_state')), 'interruption_kind': interruption_kind,
             'child_process_exit_code': process.returncode, 'all_passed': True}
 
 
-def run_engine_stress(selection: Path, market: Path, output: Path, start: str = '2020-03-10', end: str = '2020-03-14') -> Path:
+def run_engine_stress(selection: Path, market: Path, output: Path, start: str = '2020-03-10', end: str = '2020-03-14',
+                       feature_market: Path | None = None) -> Path:
     frozen, _ = load_selection(selection)
     guard_replay_period(selection, frozen, start, end)
-    identity = replay_identity(selection, market, 'BTCUSDT', start, end)
+    identity = replay_identity(selection, market, 'BTCUSDT', start, end, feature_market)
     destination = new_run(output, 'engine-stress', {**identity,
                                                    'checks': '가격 급변 시세, 실제 프로세스 종료, 중복·누락·잘못된 입력, 수동 중지'})
     try:
+        if frozen.get('protocol') == 'pullback_v7':
+            bars, input_checks = prepare_minute_period(market, feature_market, 'BTCUSDT', start, end)
+            save_json(destination / 'input_verification.json', input_checks)
+            events = list(iter_events(bars))
+            cases = {}
+            for kind in ['waiting', 'position']:
+                directory = destination / kind
+                directory.mkdir()
+                cases[kind] = verify_stress(events, selection, directory, {**identity, 'interruption_kind': kind}, kind, True)
+            save_json(destination / 'verification.json', {'all_passed': all(value['all_passed'] for value in cases.values()),
+                                                         'bars': len(events), 'cases': cases})
+            (destination / 'REPORT.md').write_text(
+                '# 진입 대기·보유 중 실제 프로세스 종료 복구\n\n'
+                f'{start}부터 {end} 직전까지 {len(events):,}개 1분 시세와 확정 5분 특징을 사용했다. '
+                f'대기 중 {cases["waiting"]["interruption_after_bars"]}봉, 보유 중 {cases["position"]["interruption_after_bars"]}봉 뒤 '
+                '서로 다른 저널의 프로세스를 커밋 직전에 실제 종료했다.\n\n'
+                '두 경우 모두 전체 결과·최종 상태가 단일 실행과 일치했다. 중복·변경된 중복·누락·잘못된 시세를 검사했고, '
+                '수동 중지는 대기를 비우고 다음 시세에서 보유분을 청산한 뒤 재진입을 차단했다. '
+                '각 상태가 실제로 발생하지 않으면 이 검증은 통과하지 않는다. '
+                '거래소 주문·인증·출금이나 실제 체결·호가·시장 충격은 검증 범위가 아니다.\n', encoding='utf-8')
+            print(f'대기·보유 중 실제 장애 검증: {destination}', flush=True)
+            return destination
         bars = prepare_period(market, 'BTCUSDT', start, end)
         result = verify_stress(list(iter_events(bars)), selection, destination, identity)
         save_json(destination / 'verification.json', result)
