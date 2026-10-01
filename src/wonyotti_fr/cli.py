@@ -25,6 +25,7 @@ from .market import fetch_market, repair_gaps
 from .minute_repair import repair_minute_market
 from .offline import demo, replay
 from .portfolio import reconstruct_portfolio
+from .pullback_research import run_pullback_selection
 from .reconciliation import reconcile_wallet
 from .reconstruct import reconstruct
 from .reports import write_reconstruction_report
@@ -215,6 +216,12 @@ def main() -> None:
     timing.add_argument("--minute-history", type=Path, default=Path("data/bitmex-history-1m"))
     timing.add_argument("--output", type=Path, default=Path("artifacts"))
     timing.set_defaults(func=lambda a: run_timing_study(a.audit_run, a.study_run, a.history, a.minute_history, a.output))
+    pullback = commands.add_parser("pullback-select", help="확정 1분 종가의 진입 대기 후보 여섯 개 선택")
+    pullback.add_argument("--v4-selection-run", type=Path, required=True)
+    pullback.add_argument("--market", type=Path, required=True)
+    pullback.add_argument("--feature-market", type=Path, required=True)
+    pullback.add_argument("--output", type=Path, default=Path("artifacts"))
+    pullback.set_defaults(func=lambda a: run_pullback_selection(a.v4_selection_run, a.market, a.feature_market, a.output))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)
