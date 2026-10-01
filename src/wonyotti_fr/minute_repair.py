@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .aggregate_verification import selected_aggregate_trades, verify_aggregate_coverage
 from .common import save_json, sha256
 from .market import archive_csv, verified_archive
 from .minute_data import compare_minute_bars, validate_minutes
@@ -16,6 +17,10 @@ from .research import load_market
 
 TRADE_COLUMNS = ['id', 'price', 'qty', 'quote_qty', 'time', 'is_buyer_maker']
 BAR_COLUMNS = ['open', 'high', 'low', 'close', 'volume', 'quote_volume', 'count', 'taker_buy_volume', 'taker_buy_quote']
+
+
+class UnverifiedTradeGap(ValueError):
+    pass
 
 
 def selected_archive_trades(content: bytes, date: pd.Timestamp, ends: pd.DatetimeIndex) -> tuple[pd.DataFrame, dict]:
@@ -66,7 +71,8 @@ def rebuilt_minutes(trades: pd.DataFrame) -> pd.DataFrame:
     return rebuilt
 
 
-def reconcile_window(original: pd.DataFrame, reference: pd.DataFrame, trades: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+def reconcile_window(original: pd.DataFrame, reference: pd.DataFrame, trades: pd.DataFrame,
+                     *, aggregates: pd.DataFrame | None = None) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     rebuilt = rebuilt_minutes(trades)
     _, check = compare_minute_bars(rebuilt, reference)
     if check['incomplete'] or check['mismatched']:
@@ -79,12 +85,16 @@ def reconcile_window(original: pd.DataFrame, reference: pd.DataFrame, trades: pd
     changed = np.zeros(len(rebuilt), dtype=bool)
     for name in core:
         changed |= ~np.isclose(prior[name], rebuilt[name], rtol=0, atol=0 if name == 'count' else 1e-8)
+    corroboration = None
     if rebuilt.loc[changed, 'id_gaps'].ne(0).any():
-        raise ValueError('수정할 분봉의 원체결 ID가 연속적이지 않습니다.')
+        if aggregates is None:
+            raise UnverifiedTradeGap('수정할 분봉의 원체결 ID가 연속적이지 않습니다. 집계 체결 대조가 필요합니다.')
+        corroboration = verify_aggregate_coverage(trades, aggregates, rebuilt.loc[changed, 'time'])
     changes = prior.loc[changed, ['time', *BAR_COLUMNS]].merge(
         rebuilt.loc[changed, ['time', *BAR_COLUMNS]], on='time', suffixes=('_original', '_rebuilt'), validate='one_to_one')
     return rebuilt.loc[changed, ['time', 'end', *BAR_COLUMNS]], changes, {
         'comparison': check, 'changed_minutes': int(changed.sum()),
+        'changed_minute_id_gaps': int(rebuilt.loc[changed, 'id_gaps'].sum()), 'aggregate_corroboration': corroboration,
         'unchanged_minute_id_gaps': int(rebuilt.loc[~changed, 'id_gaps'].sum()),
         'quote_rule': '가격×수량 합계; 원체결 quote_qty의 별도 반올림 미사용'}
 
@@ -120,11 +130,22 @@ def repair_minute_market(source: Path, feature_market: Path, output: Path, cache
                 url = f'https://data.binance.vision/data/futures/um/daily/trades/{symbol}/{symbol}-trades-{date:%Y-%m-%d}.zip'
                 archive, archive_meta = verified_archive(url, cache)
                 trades, trade_meta = selected_archive_trades(archive_csv(archive), date, ends)
-                replacements, changes, checks = reconcile_window(minute, reference[reference.end.isin(ends)], trades)
                 label = f'{symbol}-{date:%Y-%m-%d}'
                 evidence_dir = output / 'reconciliation'
                 evidence_dir.mkdir(exist_ok=True)
                 trades.to_parquet(evidence_dir / f'{label}-trades.parquet', index=False)
+                aggregate_source = None
+                try:
+                    replacements, changes, checks = reconcile_window(minute, reference[reference.end.isin(ends)], trades)
+                except UnverifiedTradeGap:
+                    aggregate_url = f'https://data.binance.vision/data/futures/um/daily/aggTrades/{symbol}/{symbol}-aggTrades-{date:%Y-%m-%d}.zip'
+                    aggregate_path, aggregate_meta = verified_archive(aggregate_url, cache)
+                    aggregates, aggregate_checks = selected_aggregate_trades(archive_csv(aggregate_path), date, trades)
+                    aggregates.to_parquet(evidence_dir / f'{label}-aggregates.parquet', index=False)
+                    aggregate_source = {'archive': aggregate_meta, 'checks': aggregate_checks,
+                                        'subset_sha256': sha256(evidence_dir / f'{label}-aggregates.parquet')}
+                    save_json(evidence_dir / f'{label}-aggregate-source.json', aggregate_source)
+                    replacements, changes, checks = reconcile_window(minute, reference[reference.end.isin(ends)], trades, aggregates=aggregates)
                 changes.to_parquet(evidence_dir / f'{label}-changes.parquet', index=False)
                 for row in replacements.itertuples(index=False):
                     mask = minute.time.eq(row.time)
@@ -132,6 +153,7 @@ def repair_minute_market(source: Path, feature_market: Path, output: Path, cache
                         raise ValueError('분봉 복원 대상 중복·누락')
                     minute.loc[mask, BAR_COLUMNS] = [getattr(row, name) for name in BAR_COLUMNS]
                 details.append({'date': str(date), 'archive': archive_meta, 'trade_checks': trade_meta, 'reconstruction': checks,
+                                'aggregate_source': aggregate_source,
                                 'trade_subset_sha256': sha256(evidence_dir / f'{label}-trades.parquet'),
                                 'changes_sha256': sha256(evidence_dir / f'{label}-changes.parquet')})
             _, after = compare_minute_bars(minute, reference)
@@ -144,7 +166,7 @@ def repair_minute_market(source: Path, feature_market: Path, output: Path, cache
             manifest['summary'][symbol]['klines']['sha256'] = sha256(path)
             evidence['symbols'][symbol] = {'before': before, 'after': after, 'details': details}
         manifest['minute_reconciliation'] = {'evidence_file': 'reconciliation.json', 'source_manifest_sha256': sha256(manifest_path),
-            'note': '원본 보존. 공식 원체결·5분 집계·수정 분봉 ID 연속성 대조 후 별도 정규화 파일 생성'}
+            'note': '원본 보존. 공식 원체결·5분 집계와 ID 연속성 또는 집계 체결 교차 검증 후 별도 파일 생성'}
         save_json(output / 'reconciliation.json', evidence)
         manifest['minute_reconciliation']['evidence_sha256'] = sha256(output / 'reconciliation.json')
         save_json(output / 'manifest-1m.json', manifest)
