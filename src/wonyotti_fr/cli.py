@@ -12,6 +12,7 @@ from .event_replay import run_event_replay
 from .event_research import run_event_selection
 from .event_study import run_event_study
 from .event_walkforward import run_event_walkforward
+from .frequency_evaluation import run_frequency_evaluation
 from .frequency_research import run_frequency_selection
 from .market import fetch_market, repair_gaps
 from .offline import demo, replay
@@ -124,6 +125,12 @@ def main() -> None:
     frequency.add_argument("--market", type=Path, default=Path("data/market-5m-complete"))
     frequency.add_argument("--output", type=Path, default=Path("artifacts"))
     frequency.set_defaults(func=lambda a: run_frequency_selection(a.study_run, a.audit_run, a.v2_selection_run, a.market, a.output))
+    frequency_evaluation = commands.add_parser("frequency-evaluate", help="빈도 반영 고정 후보의 관찰 기간·조건부 새 기간 평가")
+    frequency_evaluation.add_argument("--selection-run", type=Path, required=True)
+    frequency_evaluation.add_argument("--market", type=Path, required=True)
+    frequency_evaluation.add_argument("--period", choices=["observed", "seen_2026", "new"], required=True)
+    frequency_evaluation.add_argument("--output", type=Path, default=Path("artifacts"))
+    frequency_evaluation.set_defaults(func=lambda a: run_frequency_evaluation(a.selection_run, a.market, a.output, a.period))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)
