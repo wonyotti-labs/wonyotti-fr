@@ -45,10 +45,16 @@ def new_run(root: Path, label: str, settings: dict) -> Path:
         commit = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL
         ).strip()
+        dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], text=True).strip())
     except (OSError, subprocess.CalledProcessError):
         commit = None
+        dirty = None
     source = Path(__file__).parent
-    code_hashes = {p.name: sha256(p) for p in sorted(source.glob("*.py"))}
+    snapshot = destination / "code_snapshot"
+    snapshot.mkdir()
+    for path in sorted(source.glob("*.py")):
+        (snapshot / path.name).write_bytes(path.read_bytes())
+    code_hashes = {p.name: sha256(p) for p in sorted(snapshot.glob("*.py"))}
     versions = {}
     for name in ["pandas", "numpy", "pyarrow", "httpx", "scikit-learn", "matplotlib"]:
         try:
@@ -56,8 +62,10 @@ def new_run(root: Path, label: str, settings: dict) -> Path:
         except importlib.metadata.PackageNotFoundError:
             pass
     lock = Path("uv.lock")
+    if lock.exists():
+        (snapshot / "uv.lock").write_bytes(lock.read_bytes())
     save_json(destination / "manifest.json", {
-        "created_utc": now, "settings": settings, "git_commit": commit,
+        "created_utc": now, "settings": settings, "git_commit": commit, "git_dirty": dirty,
         "source_sha256": code_hashes, "python": platform.python_version(),
         "dependencies": versions, "uv_lock_sha256": sha256(lock) if lock.exists() else None,
         "execution_mode": "offline_research_no_order_api",
