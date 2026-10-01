@@ -89,3 +89,17 @@ def test_public_api_does_not_allow_private_endpoints_or_other_buckets():
                 "https://s3-eu-west-1.amazonaws.com/another-bucket/data/anything", "https://public.bitmex.com:8080/"]:
         with pytest.raises(ValueError):
             market.safe_get(url, 100)
+
+
+@pytest.mark.parametrize('url', [
+    'https://s3-eu-west-1.amazonaws.com/public.bitmex.com/data/../../../another-bucket/file',
+    'https://s3-eu-west-1.amazonaws.com/public.bitmex.com/data/%2e%2e/%2e%2e/file',
+    'https://s3-eu-west-1.amazonaws.com/public.bitmex.com/data/%252e%252e/file',
+    'https://:password@www.bitmex.com/api/v1/trade',
+    'https://www.bitmex.com/api/v1/trade\n',
+    'https://www.bitmex.com/api/v1/trade;ignored',
+    'https://public.bitmex.com/data\\private',
+])
+def test_download_rejects_ambiguous_paths_and_implicit_credentials(url):
+    with pytest.raises(ValueError, match='허용되지 않은'):
+        market.safe_get(url, 100)

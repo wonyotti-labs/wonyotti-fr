@@ -23,11 +23,19 @@ KLINE_COLUMNS = ["open_time", "open", "high", "low", "close", "volume", "close_t
 
 
 def safe_get(url: str, limit: int) -> bytes:
+    if type(limit) is not int or not 0 < limit <= 256 * 1024 * 1024:
+        raise ValueError("다운로드 용량 제한 설정 오류")
+    if any(ord(character) < 32 or ord(character) == 127 for character in url) or "\\" in url:
+        raise ValueError("허용되지 않은 URL 문자")
     parsed = urlparse(url)
-    if parsed.scheme != "https" or parsed.hostname not in ALLOWED_HOSTS or parsed.username:
+    if (parsed.scheme != "https" or parsed.hostname not in ALLOWED_HOSTS
+        or parsed.username is not None or parsed.password is not None):
         raise ValueError("허용되지 않은 다운로드 주소")
     if parsed.port not in (None, 443) or parsed.fragment:
         raise ValueError("허용되지 않은 포트 또는 URL 조각")
+    # 클라이언트와 서버의 경로 정규화 차이로 허용 범위를 벗어나지 못하게 한다.
+    if "%" in parsed.path or parsed.params or any(part in {".", ".."} for part in parsed.path.split("/")):
+        raise ValueError("허용되지 않은 다운로드 경로 표현")
     if parsed.hostname == "www.bitmex.com" and parsed.path not in {
         "/api/v1/trade", "/api/v1/trade/bucketed", "/api/v1/funding", "/api/v1/instrument",
     }:

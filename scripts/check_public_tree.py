@@ -1,4 +1,5 @@
 """Git에 포함된 비공개 데이터와 비정상 파일을 검사한다."""
+import re
 import subprocess
 import sys
 from pathlib import PurePosixPath
@@ -14,6 +15,8 @@ def inspect_index():
         blocked = bool(set(path.parts) & forbidden_dirs) or name.startswith("research/private/")
         blocked |= path.name == ".env" or (path.name.startswith(".env.") and path.name != ".env.example")
         blocked |= any(name.endswith(suffix) for suffix in [".parquet", ".arrow", ".zip", ".csv.gz", ".pkl", ".pickle", ".joblib", ".db"])
+        blocked |= bool(re.search(r"\.(?:db|sqlite\d*)(?:-(?:wal|shm|journal))?$", path.name, re.IGNORECASE))
+        blocked |= path.name.endswith("_model.json") or path.name == "frozen_selection.json"
         blocked |= path.suffix in {".csv", ".tsv"} and not synthetic
         if blocked:
             violations.append(name)

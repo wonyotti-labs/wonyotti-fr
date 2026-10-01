@@ -28,6 +28,9 @@ research/private/
 *.pickle
 *.joblib
 *.db
+*.db-*
 *.sqlite*
+*_model.json
+frozen_selection.json
 !tests/fixtures/*.csv
 !examples/synthetic/*.csv
