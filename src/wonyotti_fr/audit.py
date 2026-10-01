@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from pathlib import Path
 
 import numpy as np
@@ -76,22 +77,47 @@ def load_wallet(source: Path) -> tuple[pd.DataFrame, dict]:
     path = files[0]
     raw = pd.read_csv(path, dtype=str).fillna("")
     data = raw[raw.apply(lambda row: any(str(v).strip() for v in row), axis=1)].copy()
+    if data.empty or not data.currency.eq("XBt").all():
+        raise ValueError("지갑 입력은 비어 있지 않은 XBt 원장이어야 합니다.")
+    if not data.transactstatus.isin(["Completed", "Canceled"]).all():
+        raise ValueError("지원하지 않는 지갑 처리 상태가 있습니다.")
+    data["source_row"] = data.index + 2
+    data["walletbalance_raw"] = data.walletbalance
+    data["balance_precision_satoshi"] = data.walletbalance.map(
+        lambda v: 10 ** max(Decimal(v).as_tuple().exponent, 0))
     for key in ["amount", "walletbalance"]:
-        data[key] = pd.to_numeric(data[key], errors="raise").astype("int64")
-    opening = int(data.iloc[0].walletbalance - data.iloc[0].amount)
-    difference = data["walletbalance"] - (data["amount"].cumsum() + opening)
+        values = data[key].map(Decimal)
+        if any(not v.is_finite() or v != v.to_integral_value() for v in values):
+            raise ValueError("지갑 금액은 유한한 정수 사토시여야 합니다.")
+        data[key] = values.map(int).astype("int64")
+    # 취소 출금은 현금 흐름에 포함하지 않는다.
+    data["posted_amount"] = data.amount.where(data.transactstatus.eq("Completed"), 0)
+    opening = int(data.iloc[0].walletbalance - data.iloc[0].posted_amount)
+    days = pd.to_datetime(data.date, format="%Y-%m-%d", errors="raise")
+    daily = data.assign(day=days).sort_values("day", kind="stable").groupby("day").agg(
+        posted_amount=("posted_amount", "sum"), recorded_last_balance=("walletbalance", "last"),
+        precision=("balance_precision_satoshi", "last"))
+    daily["expected_balance"] = daily.posted_amount.cumsum() + opening
+    daily["difference"] = daily.recorded_last_balance - daily.expected_balance
+    tolerance = daily.precision.where(daily.precision.gt(1), 0) / 2
+    unresolved = daily.difference.abs() > tolerance
     summary = {
         "file": path.name, "sha256": sha256(path), "csv_rows": len(raw),
         "nonempty_rows": len(data), "empty_rows": len(raw) - len(data),
         "types": data.transacttype.value_counts().to_dict(),
+        "statuses": data.transactstatus.value_counts().to_dict(),
         "currency": data.currency.value_counts().to_dict(),
         "opening_balance_satoshi": opening,
         "closing_balance_satoshi": int(data.iloc[-1].walletbalance),
-        "balance_identity_mismatch_rows": int((difference != 0).sum()),
-        "max_balance_difference_satoshi": int(difference.abs().max()),
+        "final_posted_balance_difference_satoshi": int(data.iloc[-1].walletbalance - (data.posted_amount.sum() + opening)),
+        "date_inversions": int(days.diff().lt(pd.Timedelta(0)).sum()),
+        "rounded_balance_rows": int(data.balance_precision_satoshi.gt(1).sum()),
+        "daily_snapshot_mismatch_beyond_precision": int(unresolved.sum()),
+        "daily_snapshot_unresolved": records(daily[unresolved].reset_index()),
+        "daily_snapshot_note": "날짜순 기장액과 각 날짜의 마지막 원본 잔액을 잠정 비교. 출금 신청/완료 날짜와 같은 날의 실제 순서는 미확인. 과학 표기 잔액의 표시 정밀도를 별도로 반영함.",
         "timestamps_complete": False,
         "timestamp_limitation": "지갑 시각이 분:초 형식이므로 일중 순자산/레버리지 복원에 사용할 수 없음",
-        "amounts_by_type_satoshi": data.groupby("transacttype").amount.sum().to_dict(),
+        "posted_amounts_by_type_satoshi": data.groupby("transacttype").posted_amount.sum().to_dict(),
     }
     return data, summary
 

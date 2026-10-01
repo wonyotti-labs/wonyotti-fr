@@ -73,7 +73,8 @@ def write_reconstruction_report(destination: Path, audit: dict, reconstruction: 
 - 전체 종목 중 XBTUSD만 포지션 복원. 다른 계약의 승수와 정산은 일반화하지 않음.
 - 시작 포지션 0 가정. 펀딩 수량 대조 불일치 {reconstruction['funding_position_mismatch_count']}건.
 - 마지막 포지션: {reconstruction['final_position_contracts']:,} 계약.
-- 지갑 내부 잔액 등식 불일치: {audit['wallet']['balance_identity_mismatch_rows']}행.
+- 완료된 거래 금액 합계와 마지막 지갑 잔액 차이: {audit['wallet']['final_posted_balance_difference_satoshi']} 사토시. 취소 출금은 기장하지 않음.
+- 지갑 날짜 역전 {audit['wallet']['date_inversions']}곳, 표시 정밀도가 낮은 잔액 {audit['wallet']['rounded_balance_rows']}행. 날짜별 마지막 잔액을 잠정 대조하면 표시 정밀도 밖 차이 {audit['wallet']['daily_snapshot_mismatch_beyond_precision']}일. 세부 사항은 audit.json에 기록.
 - 지갑 시각은 불완전하여 일중 순자산, 실제 레버리지, 미실현 손익을 포함한 계좌 낙폭을 여기서 계산하지 않음.
 
 ## 손익 대조
@@ -90,7 +91,7 @@ def write_reconstruction_report(destination: Path, audit: dict, reconstruction: 
 
 {table(grouped)}
 
-추가 진입은 최초 주문 이후 별도 주문으로 포지션을 늘린 경우를 센다. 한 주문의 부분 체결은 추가 진입 의사결정으로 반복 계산하지 않는다. 최대 계약 수는 레버리지가 아니다.
+추가 진입은 최초 주문 이후 별도 주문으로 포지션을 늘린 경우를 센다. 한 주문의 부분 체결은 추가 진입 의사결정으로 반복 계산하지 않는다. initial_qty는 최초 시각의 체결 묶음이며 최초 주문 전체 수량과 다를 수 있다. 최대 계약 수는 레버리지가 아니다.
 
 {table(normal)}
 
