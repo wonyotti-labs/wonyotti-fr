@@ -7,6 +7,7 @@ from .audit import aggregate_events, write_audit
 from .bitmex_history import fetch_bitmex_history
 from .common import new_run, save_json
 from .event_evaluation import run_event_evaluation
+from .event_replay import run_event_replay
 from .event_research import run_event_selection
 from .event_study import run_event_study
 from .market import fetch_market, repair_gaps
@@ -103,6 +104,19 @@ def main() -> None:
     evaluation.add_argument("--period", choices=["observed", "new"], required=True)
     evaluation.add_argument("--output", type=Path, default=Path("artifacts"))
     evaluation.set_defaults(func=lambda a: run_event_evaluation(a.selection_run, a.market, a.output, a.period))
+    journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
+    journal.add_argument("--selection-run", type=Path, required=True)
+    journal.add_argument("--market", type=Path, required=True)
+    journal.add_argument("--symbol", choices=["BTCUSDT", "ETHUSDT", "SOLUSDT"], default="BTCUSDT")
+    journal.add_argument("--start", required=True)
+    journal.add_argument("--end", required=True)
+    journal.add_argument("--journal", type=Path, required=True)
+    journal.add_argument("--max-bars", type=int)
+    journal.add_argument("--halt", action="store_true")
+    journal.add_argument("--verify-memory", action="store_true")
+    journal.add_argument("--output", type=Path, default=Path("artifacts"))
+    journal.set_defaults(func=lambda a: run_event_replay(a.selection_run, a.market, a.symbol, a.start, a.end,
+                                                       a.journal, a.output, a.max_bars, a.halt, a.verify_memory))
     robustness = commands.add_parser("robustness", help="고정 후보의 연도별 재시작과 블록 재표집 진단")
     robustness.add_argument("--research-run", type=Path, required=True)
     robustness.add_argument("--market", type=Path, default=Path("data/market-complete"))
