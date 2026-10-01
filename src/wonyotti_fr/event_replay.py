@@ -8,6 +8,7 @@ from .engine import EngineConfig, TradingEngine
 from .event_backtest import iter_events, prepare_period
 from .event_research import load_selection
 from .journal import EventJournal, canonical, digest
+from .period_guard import guard_replay_period
 
 
 def replay_identity(selection: Path, market: Path, symbol: str, start: str, end: str) -> dict:
@@ -25,6 +26,7 @@ def run_event_replay(selection: Path, market: Path, symbol: str, start: str, end
     if max_bars is not None and (type(max_bars) is not int or max_bars < 0):
         raise ValueError('최대 처리 봉 수는 음수가 아닌 정수여야 합니다.')
     frozen, policy = load_selection(selection)
+    guard_replay_period(selection, frozen, start, end)
     identity = replay_identity(selection, market, symbol, start, end)
     config = EngineConfig(**frozen['risk'])
     bars = prepare_period(market, symbol, start, end)

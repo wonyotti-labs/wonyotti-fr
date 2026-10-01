@@ -13,6 +13,7 @@ from .event_backtest import iter_events, prepare_period
 from .event_replay import replay_identity
 from .event_research import load_selection
 from .journal import EventJournal, canonical
+from .period_guard import guard_replay_period
 
 
 def crash_worker(payload_path: Path) -> None:
@@ -86,6 +87,8 @@ def verify_stress(events: list[dict], selection: Path, directory: Path, identity
 
 
 def run_engine_stress(selection: Path, market: Path, output: Path, start: str = '2020-03-10', end: str = '2020-03-14') -> Path:
+    frozen, _ = load_selection(selection)
+    guard_replay_period(selection, frozen, start, end)
     identity = replay_identity(selection, market, 'BTCUSDT', start, end)
     destination = new_run(output, 'engine-stress', {**identity,
                                                    'checks': '가격 급변 시세, 실제 프로세스 종료, 중복·누락·잘못된 입력, 수동 중지'})

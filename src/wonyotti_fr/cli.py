@@ -15,6 +15,7 @@ from .event_research import run_event_selection
 from .event_study import run_event_study
 from .event_walkforward import run_event_walkforward
 from .execution_study import run_execution_study
+from .expansion_evaluation import run_expansion_evaluation
 from .expansion_research import run_expansion_selection
 from .frequency_evaluation import run_frequency_evaluation
 from .frequency_research import run_frequency_selection
@@ -161,6 +162,13 @@ def main() -> None:
     expansion.add_argument("--market", type=Path, default=Path("data/market-5m-complete"))
     expansion.add_argument("--output", type=Path, default=Path("artifacts"))
     expansion.set_defaults(func=lambda a: run_expansion_selection(a.audit_run, a.study_run, a.history, a.market, a.output))
+    expansion_evaluation = commands.add_parser("expansion-evaluate", help="노출 확대 후보의 다년·비용·지연 비교")
+    expansion_evaluation.add_argument("--selection-run", type=Path, required=True)
+    expansion_evaluation.add_argument("--v3-selection-run", type=Path, required=True)
+    expansion_evaluation.add_argument("--market", type=Path, required=True)
+    expansion_evaluation.add_argument("--period", choices=["observed", "seen_2026", "new"], required=True)
+    expansion_evaluation.add_argument("--output", type=Path, default=Path("artifacts"))
+    expansion_evaluation.set_defaults(func=lambda a: run_expansion_evaluation(a.selection_run, a.v3_selection_run, a.market, a.output, a.period))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)
