@@ -11,6 +11,7 @@
 - [행동 빈도 반영 실험 계획](docs/EXPERIMENT_V3.md)
 - [노출 확대 시점·방향 분리 계획](docs/EXPERIMENT_V4.md)
 - [보유 시간·비용을 고려한 진입 계획](docs/EXPERIMENT_V5.md)
+- [최초 체결 시점 해상도 연구](docs/EXPERIMENT_V6.md)
 - [요구 사항별 검증 기록](docs/VERIFICATION.md)
 - [데이터 관리 원칙](DATA_POLICY.md)
 - [보안 정책](SECURITY.md)
@@ -77,7 +78,7 @@ uv run wonyotti frequency-evaluate --selection-run artifacts/빈도선택ID --ma
 uv run wonyotti frequency-evaluate --selection-run artifacts/빈도선택ID --market data/market-5m-2026-new --period seen_2026
 ```
 
-v3는 기존 모델의 계수에 학습 구간의 행동 빈도를 반영한 점수 후보를 비교한다. 일부 기간의 매매 비용과 손실은 줄었지만 개발·확인 조건을 통과하지 못했다. `frequency-evaluate --period new`는 선행 검증 조건을 다시 계산하며, 실패한 후보로 새 기간을 열지 않는다. v3의 `new`는 2026년 9월이며 이번 연구에서는 수집하지 않았다.
+v3는 기존 모델의 계수에 학습 구간의 행동 빈도를 반영한 점수 후보를 비교한다. 일부 기간의 매매 비용과 손실은 줄었지만 개발·확인 조건을 통과하지 못했다. `frequency-evaluate --period new`는 선행 검증 조건을 다시 계산하며, 실패한 후보로 새 기간을 열지 않는다. v3의 `new`는 2026년 9월이며 v3 단계에서는 수집하지 않았다. 이후 v5에서 개봉한 이력은 아래에 구분한다.
 
 ## 노출 확대를 학습하는 v4 연구
 
@@ -88,7 +89,26 @@ uv run wonyotti expansion-evaluate --selection-run artifacts/노출확대선택I
 uv run wonyotti expansion-evaluate --selection-run artifacts/노출확대선택ID --v3-selection-run artifacts/빈도선택ID --market data/market-5m-2026-new --period seen_2026
 ```
 
-새 진입과 추가 진입의 시점·방향을 분리해 학습한다. 로지스틱 회귀와 경사 부스팅을 숫자 JSON으로 저장하며 실행 코드가 포함된 모델 파일은 읽지 않는다. 최초 체결 이후의 가격 분석은 설명 연구이며 신호 입력으로 사용하지 않는다. v4도 개발·2021년 조건을 통과하지 못했다. 같은 `event-replay`와 `engine-stress` 명령으로 고정 후보를 검증할 수 있다. v3·v4의 새 기간 개봉 조건은 재생 명령에도 적용한다.
+새 진입과 추가 진입의 시점·방향을 분리해 학습한다. 로지스틱 회귀와 경사 부스팅을 숫자 JSON으로 저장하며 실행 코드가 포함된 모델 파일은 읽지 않는다. 최초 체결 이후의 가격 분석은 설명 연구이며 신호 입력으로 사용하지 않는다. v4도 개발·2021년 조건을 통과하지 못했다. 같은 `event-replay`와 `engine-stress` 명령으로 고정 후보를 검증할 수 있다. v3 이후 후보의 새 기간 개봉 조건은 재생 명령에도 적용한다.
+
+## 보유 시간·비용 예측 v5 연구
+
+```sh
+uv run wonyotti edge-select --audit-run artifacts/감사실행ID --study-run artifacts/사건학습ID --v4-selection-run artifacts/노출확대선택ID
+uv run wonyotti edge-evaluate --selection-run artifacts/비용예측선택ID --v4-selection-run artifacts/노출확대선택ID --market data/market-5m-complete --period observed
+uv run wonyotti edge-evaluate --selection-run artifacts/비용예측선택ID --v4-selection-run artifacts/노출확대선택ID --market data/market-5m-2026-new --period seen_2026
+```
+
+개발·2021년 선행 조건을 통과한 뒤 2026년 9월을 열었다. 월별 시세가 아직 없어 공식 일별 자료로 보완한 경로는 다음과 같다. 보완 전 실패 실행도 보존한다.
+
+```sh
+uv run wonyotti market --interval 5m --start 2026-08 --end 2026-09 --output data/market-5m-2026-september
+uv run wonyotti market-repair --interval 5m --market data/market-5m-2026-september --output data/market-5m-2026-september-complete --start 2026-08-01 --end 2026-10-01
+uv run wonyotti edge-evaluate --selection-run artifacts/비용예측선택ID --v4-selection-run artifacts/노출확대선택ID --market data/market-5m-2026-september-complete --period new
+uv run wonyotti edge-diagnose --selection-run artifacts/비용예측선택ID --audit-run artifacts/감사실행ID --study-run artifacts/사건학습ID --recent-market data/market-5m-2026-new --new-market data/market-5m-2026-september-complete
+```
+
+v5도 다른 시장 손실과 거래 표본 부족으로 채택하지 않았다. 9월 무거래를 수익성 증거로 해석하지 않는다. 이후 후보의 평가에서 9월을 다시 미사용 구간으로 부르면 안 된다. 후속 연구는 `bitmex-history --interval 1m --output data/bitmex-history-1m`으로 별도 자료를 수집해 체결 시점의 차이부터 검증한다.
 
 ## 중단과 복원이 가능한 오프라인 봇
 
@@ -121,6 +141,7 @@ uv run wonyotti engine-stress --selection-run artifacts/빈도선택ID
 | `context-study` | 원거래소 전체 기간의 독립 주문 맥락·지정가/유동성 비용·추가 진입별 손익 |
 | `frequency-select`, `frequency-evaluate` | 행동 빈도 반영 후보·신뢰도 진단·고정 비교·새 구간 개봉 조건 |
 | `execution-study`, `expansion-select`, `expansion-evaluate` | 최초 체결 이후 가격·비용, 노출 확대 시점·방향 모델, 다년 비교 |
+| `edge-select`, `edge-evaluate`, `edge-diagnose` | 보유 시간·비용 예측 후보, 단계별 신호 표본, 후속 기간 비교 |
 | `event-replay` | 영속 저널, 중단·재개 상태, 단일 실행 대조 |
 | `engine-stress` | 실제 프로세스 종료 복구와 급변·중복·누락·수동 중지 검사 |
 | `study`, `research`, `robustness`, `replay` | v1 행동 연구·방향 모사·비용 비교·재표집·오프라인 재생 |

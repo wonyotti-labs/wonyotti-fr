@@ -27,3 +27,5 @@ v4에서 고정한 활동·방향 모형과 진입 기준을 유지한다. 2018~
 5. 숫자 JSON 회귀 모델의 학습 라이브러리 일치, 미래 가격의 입력 차단, 정답 경계, 비용 조건과 위험 청산, 영속 실행 복원을 검증한다. 원본과 파생 결과는 로컬에만 보존한다.
 
 공통 실행·보고 기준은 [v4 계획](EXPERIMENT_V4.md)과 같다. 실제 주문·인증·출금은 연결하지 않는다.
+
+방법 참고: [scikit-learn Ridge 회귀](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.Ridge.html). 규제 회귀의 사용이 예측력이나 수익성을 입증하지는 않는다.
