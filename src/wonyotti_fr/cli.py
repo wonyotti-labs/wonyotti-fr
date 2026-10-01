@@ -14,6 +14,7 @@ from .event_replay import run_event_replay
 from .event_research import run_event_selection
 from .event_study import run_event_study
 from .event_walkforward import run_event_walkforward
+from .execution_study import run_execution_study
 from .frequency_evaluation import run_frequency_evaluation
 from .frequency_research import run_frequency_selection
 from .market import fetch_market, repair_gaps
@@ -146,6 +147,12 @@ def main() -> None:
     context.add_argument("--history", type=Path, default=Path("data/bitmex-history"))
     context.add_argument("--output", type=Path, default=Path("artifacts"))
     context.set_defaults(func=lambda a: run_context_study(a.audit_run, a.history, a.study_run, a.output))
+    execution = commands.add_parser("execution-study", help="최초 독립 체결의 이후 가격·비용·유동성 분석")
+    execution.add_argument("--audit-run", type=Path, required=True)
+    execution.add_argument("--study-run", type=Path, required=True)
+    execution.add_argument("--history", type=Path, default=Path("data/bitmex-history"))
+    execution.add_argument("--output", type=Path, default=Path("artifacts"))
+    execution.set_defaults(func=lambda a: run_execution_study(a.audit_run, a.study_run, a.history, a.output))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)
