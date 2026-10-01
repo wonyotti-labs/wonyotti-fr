@@ -82,7 +82,9 @@ def write_reconstruction_report(destination: Path, audit: dict, reconstruction: 
 - 계산한 실현손익(수수료·펀딩 차감): {reconstruction['realized_net_btc']:,.8f} BTC.
 - 지갑 XBTUSD 실현손익: {reconstruction['wallet_xbtusd_pnl_btc']:,.8f} BTC.
 - 차이(계산값 - 지갑): {reconstruction['wallet_difference_btc']:,.10f} BTC.
-- 원본 체결 비용을 사용한 가중평균 원가 방식. 일별 실현/수수료 인식과 잔여 포지션 때문에 차이가 생길 수 있으나, 원인이 확인되지 않은 차이는 미해결로 남김.
+- 지갑 날짜는 전일 12:00 이상, 당일 12:00 미만 UTC의 실현손익을 집계한다. 마지막 지갑 날짜 범위 밖의 사건 순손익: {reconstruction['wallet_reconciliation']['outside_wallet_window_btc']:,.10f} BTC.
+- 같은 기간에 맞춘 누적 잔차: {reconstruction['wallet_reconciliation']['aligned_residual_satoshi']:,.6f} 사토시. 세부 일별 대조는 wallet_daily_reconciliation.csv와 reconstruction.json에 보존한다.
+- 원본 체결 비용을 사용한 가중평균 원가 방식. 표시 단위와 일별 반올림의 작은 잔차를 강제로 0으로 맞추지 않는다.
 - 원본 내부 일관성은 자료의 외부 진위나 현재 총재산을 입증하지 않음.
 
 ## 매매 행동
