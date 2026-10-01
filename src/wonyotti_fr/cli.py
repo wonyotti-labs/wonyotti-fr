@@ -22,6 +22,7 @@ from .expansion_research import run_expansion_selection
 from .frequency_evaluation import run_frequency_evaluation
 from .frequency_research import run_frequency_selection
 from .market import fetch_market, repair_gaps
+from .minute_repair import repair_minute_market
 from .offline import demo, replay
 from .portfolio import reconstruct_portfolio
 from .reconciliation import reconcile_wallet
@@ -92,6 +93,12 @@ def main() -> None:
     repair.add_argument("--start", help="선택 보완 범위 UTC 시작, 기존 자료 포함")
     repair.add_argument("--end", help="선택 보완 범위 UTC 종료, 미포함")
     repair.set_defaults(func=lambda a: repair_gaps(a.market, a.output, a.interval, a.start, a.end))
+    minute_repair = commands.add_parser("minute-repair", help="공식 원체결과 5분 대조로 불일치 분봉을 별도 복원")
+    minute_repair.add_argument("--market", type=Path, required=True)
+    minute_repair.add_argument("--feature-market", type=Path, required=True)
+    minute_repair.add_argument("--output", type=Path, required=True)
+    minute_repair.add_argument("--cache", type=Path, default=Path("data/minute-repair-trades"))
+    minute_repair.set_defaults(func=lambda a: repair_minute_market(a.market, a.feature_market, a.output, a.cache))
     research = commands.add_parser("research", help="학습·검증·평가를 분리하여 모사 후보를 비교")
     research.add_argument("--audit-run", type=Path, required=True)
     research.add_argument("--market", type=Path, default=Path("data/market"))
