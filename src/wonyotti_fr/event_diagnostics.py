@@ -16,6 +16,10 @@ def decompose_run(directory: Path, initial_equity: float) -> dict:
     fills = pd.read_parquet(directory / 'fills.parquet')
     metrics = json.loads((directory / 'metrics.json').read_text())
     final = json.loads((directory / 'final_state.json').read_text())
+    config_path = directory / 'config.json'
+    settings = json.loads(config_path.read_text()) if config_path.exists() else {'bar_seconds': 300, 'initial_equity': initial_equity}
+    if settings['initial_equity'] != initial_equity or settings['bar_seconds'] not in (60, 300, 900, 3600):
+        raise ValueError('손익 분석의 초기 자본·시세 간격이 실행과 다릅니다.')
     if not final['completed'] or final['quantity'] != 0:
         raise ValueError('완료하고 청산한 실행만 손익 분해에 사용합니다.')
     net = float(trades.net_pnl.sum()) if len(trades) else 0.0
@@ -33,7 +37,7 @@ def decompose_run(directory: Path, initial_equity: float) -> dict:
     return {'net_pnl': net, 'price_pnl_after_slippage_before_fees': gross,
             'fees': fees, 'funding_cost': funding, 'turnover_over_initial_equity': turnover / initial_equity,
             'average_trade_pnl': float(trades.net_pnl.mean()) if len(trades) else None,
-            'median_hold_minutes': float(trades.hold_bars.median() * 5) if len(trades) else None,
+            'median_hold_minutes': float(trades.hold_bars.median() * settings['bar_seconds'] / 60) if len(trades) else None,
             'first_halt_time': curve.time.iloc[first_halt] if halted.any() else None,
             'flat_fraction_before_halt': float(active.quantity.eq(0).mean()),
             'trade_additions': int(trades['adds'].sum()) if len(trades) else 0,

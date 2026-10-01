@@ -115,10 +115,15 @@ def iter_events(data: pd.DataFrame):
 
 
 def summarize(engine: TradingEngine, curve: pd.DataFrame, rejected: dict) -> dict:
-    state, config = engine.state, engine.config
-    elapsed_years = len(curve) * config.bar_seconds / (365.25 * 24 * 3600)
-    final = float(curve.equity.iloc[-1])
     daily = curve.set_index(pd.to_datetime(curve.time, utc=True)).equity.resample('1D').last()
+    return summarize_observations(engine, len(curve), float(curve.equity.iloc[-1]),
+                                  float(curve.exposure.mean()), float(curve.accounting_residual.abs().max()), daily, rejected)
+
+
+def summarize_observations(engine: TradingEngine, bars: int, final: float, average_exposure: float,
+                           max_residual: float, daily: pd.Series, rejected: dict) -> dict:
+    state, config = engine.state, engine.config
+    elapsed_years = bars * config.bar_seconds / (365.25 * 24 * 3600)
     daily_returns = daily.pct_change().dropna()
     deviation = daily_returns.std()
     return {'total_return': final / config.initial_equity - 1,
@@ -128,14 +133,18 @@ def summarize(engine: TradingEngine, curve: pd.DataFrame, rejected: dict) -> dic
             'profit_factor': state['sum_gains'] / state['sum_losses'] if state['sum_losses'] else None,
             'daily_sharpe': float(np.sqrt(365.25) * daily_returns.mean() / deviation) if deviation > 0 else None,
             'fees': state['total_fees'], 'funding_cost': state['total_funding'],
-            'average_exposure': float(curve.exposure.mean()), 'permanent_halt': state['permanent_halted'],
-            'max_accounting_residual': float(curve.accounting_residual.abs().max()),
-            'rejected': rejected, 'final_equity': final, 'bars': len(curve)}
+            'average_exposure': average_exposure, 'permanent_halt': state['permanent_halted'],
+            'max_accounting_residual': max_residual,
+            'rejected': rejected, 'final_equity': final, 'bars': bars}
 
 
-def backtest(data: pd.DataFrame, policy: EventPolicy, config: EngineConfig, output: Path | None = None) -> dict:
+def backtest(data: pd.DataFrame, policy: EventPolicy, config: EngineConfig, output: Path | None = None,
+             *, streaming: bool = True, batch_size: int = 8192) -> dict:
     if len(data) < 2:
         raise ValueError('백테스트 시세가 부족합니다.')
+    if streaming:
+        from .streaming_backtest import streaming_backtest
+        return streaming_backtest(data, policy, config, output, batch_size)
     if hasattr(policy, 'prepare'):
         policy.prepare(data)
     engine = TradingEngine(config)
@@ -152,6 +161,7 @@ def backtest(data: pd.DataFrame, policy: EventPolicy, config: EngineConfig, outp
     if output is not None:
         from .common import save_json
         output.mkdir(parents=True, exist_ok=False)
+        save_json(output / 'config.json', asdict(config))
         frame.to_parquet(output / 'equity.parquet', index=False)
         pd.DataFrame(trades).to_parquet(output / 'trades.parquet', index=False)
         pd.DataFrame(fills).to_parquet(output / 'fills.parquet', index=False)
