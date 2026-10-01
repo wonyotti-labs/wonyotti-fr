@@ -17,7 +17,7 @@ import pandas as pd
 from .common import save_json, sha256
 
 BASE = "https://data.binance.vision/data/futures/um/monthly"
-ALLOWED_HOSTS = {"data.binance.vision", "public.bitmex.com"}
+ALLOWED_HOSTS = {"data.binance.vision", "public.bitmex.com", "www.bitmex.com", "s3-eu-west-1.amazonaws.com"}
 KLINE_COLUMNS = ["open_time", "open", "high", "low", "close", "volume", "close_time",
                  "quote_volume", "count", "taker_buy_volume", "taker_buy_quote", "ignore"]
 
@@ -26,6 +26,14 @@ def safe_get(url: str, limit: int) -> bytes:
     parsed = urlparse(url)
     if parsed.scheme != "https" or parsed.hostname not in ALLOWED_HOSTS or parsed.username:
         raise ValueError("허용되지 않은 다운로드 주소")
+    if parsed.port not in (None, 443) or parsed.fragment:
+        raise ValueError("허용되지 않은 포트 또는 URL 조각")
+    if parsed.hostname == "www.bitmex.com" and parsed.path not in {
+        "/api/v1/trade", "/api/v1/trade/bucketed", "/api/v1/funding", "/api/v1/instrument",
+    }:
+        raise ValueError("공개 시세 읽기 경로만 허용합니다.")
+    if parsed.hostname == "s3-eu-west-1.amazonaws.com" and not parsed.path.startswith("/public.bitmex.com/data/"):
+        raise ValueError("공식 BitMEX 자료 경로만 허용합니다.")
     for attempt in range(3):
         try:
             with httpx.Client(timeout=httpx.Timeout(45, connect=15), follow_redirects=False,
@@ -188,11 +196,13 @@ def fetch_market(root: Path, symbols: list[str], start: str, end: str,
     return manifest
 
 
-def repair_gaps(source: Path, output: Path) -> dict:
+def repair_gaps(source: Path, output: Path, interval: str = "15m") -> dict:
     import json
     import shutil
 
-    manifest_path = source / "manifest-15m.json"
+    if interval not in {"1m", "5m", "15m", "1h"}:
+        raise ValueError("지원하지 않는 봉 간격")
+    manifest_path = source / f"manifest-{interval}.json"
     manifest = json.loads(manifest_path.read_text())
     if output.exists() or output.resolve().is_relative_to(source.resolve()):
         raise ValueError("보완 자료는 원본 밖의 새 폴더에 저장해야 합니다.")
@@ -205,15 +215,15 @@ def repair_gaps(source: Path, output: Path) -> dict:
         if not path.resolve().is_relative_to(output.resolve()) or sha256(path) != metadata["sha256"]:
             raise ValueError("보완 입력 경로 또는 체크섬 오류")
         frame = pd.read_parquet(path)
-        expected = pd.date_range(frame.time.min(), frame.time.max(), freq="15min")
+        expected = pd.date_range(frame.time.min(), frame.time.max(), freq=pd.Timedelta(interval))
         missing = expected.difference(frame.time)
-        if len(missing) > 96 * 31:
+        if len(missing) > pd.Timedelta(days=31) / pd.Timedelta(interval):
             raise ValueError("결측이 31일을 초과합니다. 자료 범위를 먼저 검토하세요.")
         additions = []
         for date in sorted(set(missing.strftime("%Y-%m-%d"))):
-            url = f"https://data.binance.vision/data/futures/um/daily/klines/{symbol}/15m/{symbol}-15m-{date}.zip"
+            url = f"https://data.binance.vision/data/futures/um/daily/klines/{symbol}/{interval}/{symbol}-{interval}-{date}.zip"
             archive, record = verified_archive(url, output / "archives")
-            daily = parse_klines(archive_csv(archive), "15m")
+            daily = parse_klines(archive_csv(archive), interval)
             addition = daily[daily.time.isin(missing)]
             additions.append(addition)
             repairs.append({**record, "symbol": symbol, "date": date, "kind": "klines", "rows_added": len(addition)})
@@ -226,5 +236,5 @@ def repair_gaps(source: Path, output: Path) -> dict:
         summary["klines"] = {**metadata, "rows": len(frame), "gaps": 0, "sha256": sha256(path)}
     manifest["daily_repairs"] = repairs
     manifest["repaired_at"] = datetime.now(UTC)
-    save_json(output / "manifest-15m.json", manifest)
+    save_json(output / f"manifest-{interval}.json", manifest)
     return manifest

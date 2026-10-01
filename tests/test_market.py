@@ -82,3 +82,10 @@ def test_daily_repair_preserves_source_and_only_adds_missing(monkeypatch, tmp_pa
     assert sha256(path) == original_hash
     assert len(pd.read_parquet(output / path.name)) == 3
     assert result["daily_repairs"][0]["rows_added"] == 1
+
+
+def test_public_api_does_not_allow_private_endpoints_or_other_buckets():
+    for url in ["https://www.bitmex.com/api/v1/order", "https://www.bitmex.com/api/v1/user/wallet",
+                "https://s3-eu-west-1.amazonaws.com/another-bucket/data/anything", "https://public.bitmex.com:8080/"]:
+        with pytest.raises(ValueError):
+            market.safe_get(url, 100)

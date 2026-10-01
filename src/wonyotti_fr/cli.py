@@ -4,14 +4,18 @@ import argparse
 from pathlib import Path
 
 from .audit import aggregate_events, write_audit
+from .bitmex_history import fetch_bitmex_history
 from .common import new_run, save_json
 from .market import fetch_market, repair_gaps
 from .offline import demo, replay
+from .portfolio import reconstruct_portfolio
+from .reconciliation import reconcile_wallet
 from .reconstruct import reconstruct
 from .reports import write_reconstruction_report
 from .research import run_research
 from .robustness import run_robustness
 from .study import run_study
+from .verification import verify_samples
 
 
 def run_audit(args) -> None:
@@ -25,12 +29,14 @@ def run_audit(args) -> None:
     wallet_pnl = int(wallet.loc[(wallet.address == "XBTUSD") & (wallet.transacttype == "RealisedPNL"), "amount"].sum())
     summary["wallet_xbtusd_pnl_btc"] = wallet_pnl / 1e8
     summary["wallet_difference_btc"] = summary["realized_net_btc"] - wallet_pnl / 1e8
+    daily, summary["wallet_reconciliation"] = reconcile_wallet(actions, wallet)
+    daily.to_csv(destination / "wallet_daily_reconciliation.csv", index=False)
     save_json(destination / "reconstruction.json", summary)
     episodes.to_parquet(destination / "episodes.parquet", index=False)
     actions.to_parquet(destination / "actions.parquet", index=False)
     write_reconstruction_report(destination, audit, summary, episodes, actions)
     print(f"보고서: {destination / 'REPORT.md'}", flush=True)
-    print(f"에피소드 {len(episodes):,}개 / 손익 대조 차이 {summary['wallet_difference_btc']:.10f} BTC", flush=True)
+    print(f"에피소드 {len(episodes):,}개 / 같은 기간 대조 잔차 {summary['wallet_reconciliation']['aligned_residual_satoshi']:.6f} 사토시", flush=True)
 
 
 def main() -> None:
@@ -41,6 +47,20 @@ def main() -> None:
     audit.add_argument("--timezone", default="UTC", help="독립 검증 전까지 명시적 가정")
     audit.add_argument("--output", type=Path, default=Path("artifacts"))
     audit.set_defaults(func=run_audit)
+    portfolio = commands.add_parser("portfolio", help="원본 정산 통화와 비용으로 전체 계약 복원")
+    portfolio.add_argument("--audit-run", type=Path, required=True)
+    portfolio.add_argument("--output", type=Path, default=Path("artifacts"))
+    portfolio.set_defaults(func=lambda a: reconstruct_portfolio(a.audit_run, a.output))
+    verify = commands.add_parser("verify", help="공식 공개 체결로 원본 표본을 외부 대조")
+    verify.add_argument("--audit-run", type=Path, required=True)
+    verify.add_argument("--output", type=Path, default=Path("artifacts"))
+    verify.add_argument("--cache", type=Path, default=Path("data/bitmex-verification"))
+    verify.set_defaults(func=lambda a: verify_samples(a.audit_run, a.output, a.cache))
+    history = commands.add_parser("bitmex-history", help="원거래소 공식 5분봉을 특징 연구용으로 수집")
+    history.add_argument("--start", default="2018-03-01")
+    history.add_argument("--end", default="2022-01-01")
+    history.add_argument("--output", type=Path, default=Path("data/bitmex-history"))
+    history.set_defaults(func=lambda a: fetch_bitmex_history(a.output, a.start, a.end))
     market = commands.add_parser("market", help="공식 시세/펀딩 자료를 체크섬 검증 후 저장")
     market.add_argument("--symbols", nargs="+", default=["BTCUSDT", "ETHUSDT", "SOLUSDT"])
     market.add_argument("--start", default="2019-09")
@@ -51,7 +71,8 @@ def main() -> None:
     repair = commands.add_parser("market-repair", help="월별 자료의 내부 결측을 공식 일별 자료로 보완")
     repair.add_argument("--market", type=Path, required=True)
     repair.add_argument("--output", type=Path, required=True)
-    repair.set_defaults(func=lambda a: repair_gaps(a.market, a.output))
+    repair.add_argument("--interval", default="15m", choices=["1m", "5m", "15m", "1h"])
+    repair.set_defaults(func=lambda a: repair_gaps(a.market, a.output, a.interval))
     research = commands.add_parser("research", help="학습·검증·평가를 분리하여 모사 후보를 비교")
     research.add_argument("--audit-run", type=Path, required=True)
     research.add_argument("--market", type=Path, default=Path("data/market"))
