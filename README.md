@@ -126,7 +126,16 @@ uv run wonyotti pullback-select --v4-selection-run <v4 선택 폴더> \
   --market <대조를 마친 1분 자료> --feature-market <기존 5분 자료>
 ```
 
-`pullback-select`는 확정된 5분 특징과 1분 종가로 여섯 후보를 비교한다. 선택은 2020년, 고정 후 확인은 2021년이다. 대기 상태도 저장하며 지정가 체결·리베이트를 가정하지 않는다. 후속 다년 평가와 실제 프로세스 종료 복원 검증은 진행 중이다.
+`pullback-select`는 확정된 5분 특징과 1분 종가로 여섯 후보를 비교한다. 선택은 2020년, 고정 후 확인은 2021년이다. 대기 상태도 저장하며 지정가 체결·리베이트를 가정하지 않는다. 개발·확인과 2026년 세 시장에서 손실을 기록했다. 진입 대기·보유 중 실제 프로세스 종료 복원과 한 달 중단·재개 대조를 통과했다.
+
+```sh
+uv run wonyotti pullback-evaluate --selection-run <v7 선택 폴더> \
+  --market <검증된 1분 자료> --feature-market <검증된 5분 자료> --period seen_2026
+uv run wonyotti pullback-evaluate --selection-run <v7 선택 폴더> \
+  --market <2022~2024년 1분 자료> --feature-market <2022~2024년 5분 자료> --period verified_2022_2024
+```
+
+`seen_2026`은 2026년 1~9월의 이미 관찰한 기간이다. `observed`는 원래 계획한 2022~2025년 전체 기간이며 현재 입력 검증 실패로 완료하지 못했다. `verified_2022_2024`는 시세 검증 실패 이후 성과 확인 전에 고정한 추가 범위다. 두 결과를 합쳐 2025년까지 평가한 것으로 해석하지 않는다. 고정 후보·즉시 진입·현금·비용 2·3배·추가 1분 지연과 거래 회계·진입 대기·조건부 재표집을 기록한다. 기간별 자료를 만들 때는 `paired-repair --start 2021-12-01 --end 2025-01-01`과 이미 발견한 오류의 `--extra-targets`를 사용한다.
 
 
 ## 중단과 복원이 가능한 오프라인 봇
@@ -137,6 +146,14 @@ uv run wonyotti event-replay --selection-run artifacts/선택실행ID --market d
 ```
 
 첫 실행은 처리 봉 수만 제한하며 열린 포지션을 유지한다. 다음 실행은 같은 모델·시세·설정·소스의 저널에서 이어서 처리한다. 전체 기간 끝에서만 비용을 내고 청산한다. `--verify-memory`는 처음부터 한 번에 처리한 잔고·체결·상태와 대조한다. 긴 기간에서는 추가 시간과 메모리가 든다.
+
+v7은 `--market`에 1분 자료를 지정하고 `--feature-market`에 별도 5분 특징 자료를 함께 지정한다. 두 입력의 해시를 저널에 묶는다. 진입 대기·만료 상태도 재개하며, 다음처럼 실제 종료 복구를 검증할 수 있다.
+
+```sh
+uv run wonyotti engine-stress --selection-run <v7 선택 폴더> \
+  --market <개발 1분 자료> --feature-market <개발 5분 자료> \
+  --start 2020-03-10 --end 2020-03-14
+```
 
 `--halt --max-bars 0`은 수동 중지 의도를 저장한다. 다음 유효 시세를 처리할 때 청산하고 재진입을 막는다. 같은 사건의 재전달은 중복 체결하지 않고, 같은 ID의 다른 시세는 거부한다. 해시 저널은 로컬 손상 탐지용이며 외부 서명이나 계정 인증은 아니다. 소스 변경 후에는 기존 저널을 다른 프로그램으로 이어서 처리하지 않고 새 실행을 만들거나 보존한 코드 스냅샷을 사용한다.
 
@@ -162,6 +179,8 @@ uv run wonyotti engine-stress --selection-run artifacts/빈도선택ID
 | `execution-study`, `expansion-select`, `expansion-evaluate` | 최초 체결 이후 가격·비용, 노출 확대 시점·방향 모델, 다년 비교 |
 | `edge-select`, `edge-evaluate`, `edge-diagnose` | 보유 시간·비용 예측 후보, 단계별 신호 표본, 후속 기간 비교 |
 | `timing-study` | 같은 주문의 1분·5분 연결과 집계 일치·누락 비교 |
+| `minute-repair`, `paired-repair` | 원체결 대조·두 해상도 복원·전후 값·실패·범위별 자료 |
+| `pullback-select`, `pullback-evaluate` | 확정 종가의 진입 대기 후보·고정 비교·대기 사건·실제 가격 차이 |
 | `event-replay` | 영속 저널, 중단·재개 상태, 단일 실행 대조 |
 | `engine-stress` | 실제 프로세스 종료 복구와 급변·중복·누락·수동 중지 검사 |
 | `study`, `research`, `robustness`, `replay` | v1 행동 연구·방향 모사·비용 비교·재표집·오프라인 재생 |
