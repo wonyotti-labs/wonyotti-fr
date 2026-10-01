@@ -28,6 +28,8 @@ def run_event_replay(selection: Path, market: Path, symbol: str, start: str, end
     identity = replay_identity(selection, market, symbol, start, end)
     config = EngineConfig(**frozen['risk'])
     bars = prepare_period(market, symbol, start, end)
+    if hasattr(policy, 'prepare'):
+        policy.prepare(bars)
     destination = new_run(output, 'event-replay', {**identity, 'journal': str(journal_path.resolve()),
                                                  'max_bars': max_bars, 'halt': halt, 'verify_memory': verify_memory})
     try:

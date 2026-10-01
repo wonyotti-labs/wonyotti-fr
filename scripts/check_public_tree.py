@@ -16,7 +16,7 @@ def inspect_index():
         blocked |= path.name == ".env" or (path.name.startswith(".env.") and path.name != ".env.example")
         blocked |= any(name.endswith(suffix) for suffix in [".parquet", ".arrow", ".zip", ".csv.gz", ".pkl", ".pickle", ".joblib", ".db"])
         blocked |= bool(re.search(r"\.(?:db|sqlite\d*)(?:-(?:wal|shm|journal))?$", path.name, re.IGNORECASE))
-        blocked |= path.name.endswith("_model.json") or path.name == "frozen_selection.json"
+        blocked |= path.name.endswith(("_model.json", "_models.json")) or path.name == "frozen_selection.json"
         blocked |= path.suffix in {".csv", ".tsv"} and not synthetic
         if blocked:
             violations.append(name)

@@ -136,6 +136,8 @@ def summarize(engine: TradingEngine, curve: pd.DataFrame, rejected: dict) -> dic
 def backtest(data: pd.DataFrame, policy: EventPolicy, config: EngineConfig, output: Path | None = None) -> dict:
     if len(data) < 2:
         raise ValueError('백테스트 시세가 부족합니다.')
+    if hasattr(policy, 'prepare'):
+        policy.prepare(data)
     engine = TradingEngine(config)
     curve, trades, fills, rejected = [], [], [], {}
     for index, event in enumerate(iter_events(data)):

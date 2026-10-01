@@ -80,6 +80,9 @@ def load_selection(selection: Path) -> tuple[dict, EventPolicy]:
     if sha256(frozen_path) != integrity['frozen_selection_sha256']:
         raise ValueError('고정 선택 파일이 변경됐습니다.')
     frozen = json.loads(frozen_path.read_text())
+    if frozen.get('protocol') == 'expansion_v4':
+        from .expansion_research import load_expansion_selection
+        return load_expansion_selection(selection, frozen)
     for name, checksum in frozen['model_sha256'].items():
         if name not in {'entry_model.json', 'management_model.json'} or sha256(selection / name) != checksum:
             raise ValueError('고정 선택의 모델 지문이 다릅니다.')

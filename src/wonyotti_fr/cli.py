@@ -15,6 +15,7 @@ from .event_research import run_event_selection
 from .event_study import run_event_study
 from .event_walkforward import run_event_walkforward
 from .execution_study import run_execution_study
+from .expansion_research import run_expansion_selection
 from .frequency_evaluation import run_frequency_evaluation
 from .frequency_research import run_frequency_selection
 from .market import fetch_market, repair_gaps
@@ -153,6 +154,13 @@ def main() -> None:
     execution.add_argument("--history", type=Path, default=Path("data/bitmex-history"))
     execution.add_argument("--output", type=Path, default=Path("artifacts"))
     execution.set_defaults(func=lambda a: run_execution_study(a.audit_run, a.study_run, a.history, a.output))
+    expansion = commands.add_parser("expansion-select", help="노출 확대의 시점·방향 분리 후보 선택")
+    expansion.add_argument("--audit-run", type=Path, required=True)
+    expansion.add_argument("--study-run", type=Path, required=True)
+    expansion.add_argument("--history", type=Path, default=Path("data/bitmex-history"))
+    expansion.add_argument("--market", type=Path, default=Path("data/market-5m-complete"))
+    expansion.add_argument("--output", type=Path, default=Path("artifacts"))
+    expansion.set_defaults(func=lambda a: run_expansion_selection(a.audit_run, a.study_run, a.history, a.market, a.output))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)
