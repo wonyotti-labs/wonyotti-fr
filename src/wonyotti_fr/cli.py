@@ -11,6 +11,7 @@ from .event_evaluation import run_event_evaluation
 from .event_replay import run_event_replay
 from .event_research import run_event_selection
 from .event_study import run_event_study
+from .event_walkforward import run_event_walkforward
 from .market import fetch_market, repair_gaps
 from .offline import demo, replay
 from .portfolio import reconstruct_portfolio
@@ -110,6 +111,11 @@ def main() -> None:
     diagnostics.add_argument("--evaluation-runs", type=Path, nargs="+", required=True)
     diagnostics.add_argument("--output", type=Path, default=Path("artifacts"))
     diagnostics.set_defaults(func=lambda a: run_event_diagnostics(a.study_run, a.evaluation_runs, a.output))
+    walkforward = commands.add_parser("event-walkforward", help="사건별 분류기의 확장 학습 모사 검증")
+    walkforward.add_argument("--study-run", type=Path, required=True)
+    walkforward.add_argument("--audit-run", type=Path, required=True)
+    walkforward.add_argument("--output", type=Path, default=Path("artifacts"))
+    walkforward.set_defaults(func=lambda a: run_event_walkforward(a.study_run, a.audit_run, a.output))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)
