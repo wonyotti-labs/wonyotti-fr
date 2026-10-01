@@ -12,6 +12,7 @@
 - [노출 확대 시점·방향 분리 계획](docs/EXPERIMENT_V4.md)
 - [보유 시간·비용을 고려한 진입 계획](docs/EXPERIMENT_V5.md)
 - [최초 체결 시점 해상도 연구](docs/EXPERIMENT_V6.md)
+- [확정 종가에 따른 진입 대기 계획](docs/EXPERIMENT_V7.md)
 - [요구 사항별 검증 기록](docs/VERIFICATION.md)
 - [데이터 관리 원칙](DATA_POLICY.md)
 - [보안 정책](SECURITY.md)
@@ -130,16 +131,20 @@ uv run wonyotti pullback-select --v4-selection-run <v4 선택 폴더> \
   --market <대조를 마친 1분 자료> --feature-market <기존 5분 자료>
 ```
 
-`pullback-select`는 확정된 5분 특징과 1분 종가로 여섯 후보를 비교한다. 선택은 2020년, 고정 후 확인은 2021년이다. 대기 상태도 저장하며 지정가 체결·리베이트를 가정하지 않는다. 개발·확인과 2026년 세 시장에서 손실을 기록했다. 진입 대기·보유 중 실제 프로세스 종료 복원과 한 달 중단·재개 대조를 통과했다.
+`pullback-select`는 확정된 5분 특징과 1분 종가로 여섯 후보를 비교한다. 선택은 2020년, 고정 후 확인은 2021년이다. 대기 상태도 저장하며 지정가 체결·리베이트를 가정하지 않는다. 개발·확인 및 2022~2025년·2026년의 세 시장 연속 운용에서 손실을 기록했다. 진입 대기·보유 중 실제 프로세스 종료 복원과 한 달 중단·재개 대조를 통과했다.
 
 ```sh
+uv run wonyotti pullback-evaluate --selection-run <v7 선택 폴더> \
+  --market <전체 기간 1분 자료> --feature-market <전체 기간 5분 자료> --period observed
 uv run wonyotti pullback-evaluate --selection-run <v7 선택 폴더> \
   --market <검증된 1분 자료> --feature-market <검증된 5분 자료> --period seen_2026
 uv run wonyotti pullback-evaluate --selection-run <v7 선택 폴더> \
   --market <2022~2024년 1분 자료> --feature-market <2022~2024년 5분 자료> --period verified_2022_2024
 ```
 
-`seen_2026`은 2026년 1~9월의 이미 관찰한 기간이다. `observed`는 원래 계획한 2022~2025년 전체 기간이며 현재 입력 검증 실패로 완료하지 못했다. `verified_2022_2024`는 시세 검증 실패 이후 성과 확인 전에 고정한 추가 범위다. 두 결과를 합쳐 2025년까지 평가한 것으로 해석하지 않는다. 고정 후보·즉시 진입·현금·비용 2·3배·추가 1분 지연과 거래 회계·진입 대기·조건부 재표집을 기록한다. 기간별 자료를 만들 때는 `paired-repair --start 2021-12-01 --end 2025-01-01`과 이미 발견한 오류의 `--extra-targets`를 사용한다.
+`observed`는 원래 계획한 2022~2025년 전체 기간이고 `seen_2026`은 2026년 1~9월이다. 두 기간의 세 시장·여섯 조건 및 12개 연간 자본 초기화를 완료했다. 모두 이미 관찰한 구간이다. BTC의 미연결 체결 10건은 보존하고, 미수정 분봉의 추가 대조를 근거로 봉 기반 전체 평가를 수행했다. 해당 체결의 개별 진위나 누락 원인은 미확정이다. 시장별로 다른 검증 폴더를 사용할 때는 `--symbols BTCUSDT` 또는 `--symbols ETHUSDT SOLUSDT`로 평가 대상을 지정한다.
+
+`verified_2022_2024`는 자료 검증 실패 뒤 성과 확인 전에 고정했던 추가 범위다. 이 결과와 원래 전체 기간 결과를 각각 보존한다. 고정 후보·즉시 진입·현금·비용 2·3배·추가 1분 지연과 거래 회계·진입 대기·조건부 재표집을 기록한다. 기간별 자료를 만들 때는 `paired-repair --start 2021-12-01 --end 2025-01-01`과 이미 발견한 오류의 `--extra-targets`를 사용한다.
 
 
 ## 중단과 복원이 가능한 오프라인 봇
