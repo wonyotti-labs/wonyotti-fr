@@ -34,6 +34,23 @@ def test_same_market_minute_aggregation_detects_missing_values_and_price_changes
         compare_minute_bars(minute.assign(open=1000), five)
 
 
+def test_zero_trade_carry_is_not_the_next_active_candle_open_or_range():
+    minute, _ = source()
+    minute = minute.iloc[:10].copy()
+    minute.loc[:4, ['open', 'high', 'low', 'close']] = 150.
+    minute.loc[:4, ['volume', 'count']] = 0
+    minute.loc[5, ['open', 'high', 'low', 'close']] = 150.
+    minute.loc[5, ['volume', 'count']] = 0
+    from wonyotti_fr.minute_data import aggregate_minutes
+    five = aggregate_minutes(minute)
+    five['time'] = five.end - pd.Timedelta(minutes=5)
+    assert five.loc[0, 'open'] == 150 and five.loc[0, 'count'] == 0
+    assert five.loc[1, 'open'] == minute.loc[6, 'open'] and five.loc[1, 'high'] < 150
+    assert compare_minute_bars(minute, five)[1]['mismatched'] == 0
+    with pytest.raises(ValueError, match='OHLC'):
+        compare_minute_bars(minute.assign(count=0), five)
+
+
 def test_future_five_minute_prices_do_not_change_earlier_minute_inputs():
     minute, five = source()
     original = attach_confirmed_features(minute, five)

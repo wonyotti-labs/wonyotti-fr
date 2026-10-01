@@ -19,16 +19,27 @@ def validate_minutes(frame: pd.DataFrame, minutes: int) -> None:
         or not np.isfinite(prices).all().all() or prices.le(0).any().any()
         or frame.high.lt(prices.max(axis=1)).any() or frame.low.gt(prices.min(axis=1)).any()
         or not np.isfinite(frame[['volume', 'count']]).all().all()
-        or frame[['volume', 'count']].lt(0).any().any() or frame['count'].mod(1).ne(0).any()):
+        or frame[['volume', 'count']].lt(0).any().any() or frame['count'].mod(1).ne(0).any()
+        or (frame['count'].eq(0) & (frame.volume.ne(0) | prices.max(axis=1).ne(prices.min(axis=1)))).any()):
         raise ValueError('실행 시세의 시간·OHLC·거래량 오류')
+
+
+def aggregate_minutes(minute: pd.DataFrame) -> pd.DataFrame:
+    grouped = minute.groupby(minute.end.dt.ceil('5min')).agg(
+        minutes=('close', 'size'), open=('open', 'first'), high=('high', 'max'),
+        low=('low', 'min'), close=('close', 'last'), volume=('volume', 'sum'), count=('count', 'sum'))
+    active = minute[minute['count'].gt(0)]
+    actual = active.groupby(active.end.dt.ceil('5min')).agg(
+        open=('open', 'first'), high=('high', 'max'), low=('low', 'min'), close=('close', 'last'))
+    # 무거래 분봉의 이월 가격을 이후 첫 실제 체결이나 고가·저가로 취급하지 않는다.
+    grouped.loc[actual.index, actual.columns] = actual
+    return grouped.reset_index()
 
 
 def compare_minute_bars(minute: pd.DataFrame, five: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     validate_minutes(minute, 1)
     validate_minutes(five, 5)
-    grouped = minute.groupby(minute.end.dt.ceil('5min')).agg(
-        minutes=('close', 'size'), open=('open', 'first'), high=('high', 'max'),
-        low=('low', 'min'), close=('close', 'last'), volume=('volume', 'sum'), count=('count', 'sum')).reset_index()
+    grouped = aggregate_minutes(minute)
     names = ['open', 'high', 'low', 'close', 'volume', 'count']
     joined = grouped.merge(five[['end', *names]], on='end', how='outer', suffixes=('_minute', '_five'),
                            validate='one_to_one', indicator=True)
