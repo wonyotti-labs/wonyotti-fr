@@ -9,6 +9,7 @@ from .common import new_run, save_json, sha256
 from .engine import EngineConfig
 from .event_backtest import EventPolicy, backtest, candidate_plan, prepare_period, read_models
 from .event_study import evaluate_imitation
+from .frequency_model import FrequencyModel
 from .reports import table
 
 
@@ -83,4 +84,10 @@ def load_selection(selection: Path) -> tuple[dict, EventPolicy]:
         if name not in {'entry_model.json', 'management_model.json'} or sha256(selection / name) != checksum:
             raise ValueError('고정 선택의 모델 지문이 다릅니다.')
     entry, management = read_models(selection)
+    adjustment = frozen.get('score_adjustment')
+    if adjustment is not None:
+        if adjustment.get('format') != 'training_class_frequency_v1':
+            raise ValueError('지원하지 않는 점수 조정 형식입니다.')
+        entry = FrequencyModel.from_counts(entry, adjustment['counts']['entry'], adjustment['alpha'])
+        management = FrequencyModel.from_counts(management, adjustment['counts']['management'], adjustment['alpha'])
     return frozen, EventPolicy(entry, management, frozen['entry_threshold'], frozen['management_threshold'])

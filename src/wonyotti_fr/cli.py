@@ -12,6 +12,7 @@ from .event_replay import run_event_replay
 from .event_research import run_event_selection
 from .event_study import run_event_study
 from .event_walkforward import run_event_walkforward
+from .frequency_research import run_frequency_selection
 from .market import fetch_market, repair_gaps
 from .offline import demo, replay
 from .portfolio import reconstruct_portfolio
@@ -116,6 +117,13 @@ def main() -> None:
     walkforward.add_argument("--audit-run", type=Path, required=True)
     walkforward.add_argument("--output", type=Path, default=Path("artifacts"))
     walkforward.set_defaults(func=lambda a: run_event_walkforward(a.study_run, a.audit_run, a.output))
+    frequency = commands.add_parser("frequency-select", help="학습 행동 빈도를 반영한 12개 후보 선택")
+    frequency.add_argument("--study-run", type=Path, required=True)
+    frequency.add_argument("--audit-run", type=Path, required=True)
+    frequency.add_argument("--v2-selection-run", type=Path, required=True)
+    frequency.add_argument("--market", type=Path, default=Path("data/market-5m-complete"))
+    frequency.add_argument("--output", type=Path, default=Path("artifacts"))
+    frequency.set_defaults(func=lambda a: run_frequency_selection(a.study_run, a.audit_run, a.v2_selection_run, a.market, a.output))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)
