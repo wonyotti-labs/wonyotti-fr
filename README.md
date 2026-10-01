@@ -119,6 +119,14 @@ uv run wonyotti timing-study --audit-run artifacts/감사실행ID --study-run ar
 
 실행용 1분 자료에서 집계 불일치가 발견되면 `minute-repair --market <1분 자료> --feature-market <5분 자료> --output <새 폴더>`로 공식 개별 체결을 대조한다. 원체결 집계가 공식 5분 가격·거래량·건수와 일치하고, 바뀔 분봉의 체결 ID가 연속적일 때만 별도 파일에 복원한다. 원본·전후 값·체크섬·실패를 보존하며 이 검사가 모든 분봉의 정확성을 인증하는 것은 아니다.
 
+```bash
+uv run wonyotti pullback-select --v4-selection-run <v4 선택 폴더> \
+  --market <대조를 마친 1분 자료> --feature-market <기존 5분 자료>
+```
+
+`pullback-select`는 확정된 5분 특징과 1분 종가로 여섯 후보를 비교한다. 선택은 2020년, 고정 후 확인은 2021년이다. 대기 상태도 저장하며 지정가 체결·리베이트를 가정하지 않는다. 후속 다년 평가와 실제 프로세스 종료 복원 검증은 진행 중이다.
+
+
 ## 중단과 복원이 가능한 오프라인 봇
 
 ```sh
