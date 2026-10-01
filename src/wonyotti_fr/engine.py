@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 
@@ -10,6 +11,24 @@ import pandas as pd
 from .simulator import RiskConfig
 
 INTENTS = {"hold", "enter_long", "enter_short", "increase", "reduce", "exit"}
+
+
+@dataclass(frozen=True)
+class PolicyDecision:
+    intent: str
+    state: dict
+    event: str
+
+
+def validate_policy_state(state: dict) -> None:
+    if not isinstance(state, dict) or len(state) > 16:
+        raise ValueError('정책 상태는 16개 이하의 단순 필드여야 합니다.')
+    for key, value in state.items():
+        if (type(key) is not str or not 1 <= len(key) <= 64
+            or type(value) not in (str, int, float, bool, type(None))
+            or (type(value) is str and len(value) > 256)
+            or (type(value) in (int, float) and (abs(value) > 1e20 or not np.isfinite(value)))):
+            raise ValueError('정책 상태의 키·값·크기 오류')
 
 
 @dataclass(frozen=True)
@@ -76,6 +95,8 @@ class TradingEngine:
 
     def _validate_state(self):
         s = self.state
+        if 'policy_state' in s:
+            validate_policy_state(s['policy_state'])
         if s.get("version") != 1 or s.get("pending") not in INTENTS:
             raise ValueError("상태 형식 또는 대기 주문 오류")
         queue = s.get("deferred_intents")
@@ -99,14 +120,18 @@ class TradingEngine:
                 "favorable_move": direction * (price / s["entry_price"] - 1) if direction else 0.0,
                 "hold_bars": s["index"] - s["entry_index"] if direction else 0,
                 "adds": s["active_trade"]["adds"] if direction else 0,
-                "pending": s["pending"], "halted": s["permanent_halted"] or s["manual_halt"]}
+                "pending": s["pending"], "halted": s["permanent_halted"] or s["manual_halt"],
+                "bar_seconds": self.config.bar_seconds,
+                "policy_state": copy.deepcopy(s.get('policy_state', {}))}
 
     def halt(self):
         self.state["manual_halt"] = True
         self.state["pending"] = "hold"
         self.state["deferred_intents"] = []
+        if 'policy_state' in self.state:
+            self.state['policy_state'] = {}
 
-    def step(self, bar: dict, decide: Callable[[dict, dict], str], final: bool = False) -> dict:
+    def step(self, bar: dict, decide: Callable[[dict, dict], str | PolicyDecision], final: bool = False) -> dict:
         event = validate_bar(bar, self.config.bar_seconds)
         # 실패한 입력이나 정책 실행은 직전 정상 상태를 바꾸지 않는다.
         trial = copy.copy(self)
@@ -244,7 +269,19 @@ class TradingEngine:
         s["max_drawdown"] = min(s["max_drawdown"], drawdown)
         s["last_end"], s["last_close"] = bar["end"], closing
         s["index"] += 1
-        next_intent = "hold" if final or blocked else decide(bar, self.view(closing))
+        decision = "hold" if final or blocked else decide(bar, self.view(closing))
+        policy_event = ''
+        if isinstance(decision, PolicyDecision):
+            validate_policy_state(decision.state)
+            if type(decision.event) is not str or not 1 <= len(decision.event) <= 64:
+                raise ValueError('정책 사건의 형식·크기 오류')
+            s['policy_state'] = copy.deepcopy(decision.state)
+            next_intent, policy_event = decision.intent, decision.event
+        else:
+            next_intent = decision
+            if 'policy_state' in s:
+                policy_event = 'cleared' if s['policy_state'] else 'idle'
+                s['policy_state'] = {}
         if next_intent not in INTENTS:
             raise ValueError("정책이 지원하지 않는 주문 의도를 반환했습니다.")
         if final or blocked:
@@ -260,11 +297,14 @@ class TradingEngine:
         residual = equity - c.initial_equity - s["closed_net"] - active_net - unrealized
         if abs(residual) > max(1e-7, equity * 1e-10):
             raise ValueError("거래별 손익과 순자산 회계가 일치하지 않습니다.")
-        return {"time": bar["end"], "equity": equity, "quantity": s["quantity"],
+        result = {"time": bar["end"], "equity": equity, "quantity": s["quantity"],
                 "exposure": abs(s["quantity"] * closing) / equity, "drawdown": drawdown,
                 "halted": s["permanent_halted"] or s["manual_halt"], "daily_halted": s["daily_halted"],
                 "executed_intent": intent, "next_intent": next_intent, "fills": fills, "closed_trades": closed,
                 "rejected": rejected, "accounting_residual": residual, "completed": final}
+        if 'policy_state' in s:
+            result.update(policy_event=policy_event, policy_state=json.dumps(s['policy_state'], sort_keys=True, allow_nan=False))
+        return result
 
     def settings(self) -> dict:
         return asdict(self.config)
