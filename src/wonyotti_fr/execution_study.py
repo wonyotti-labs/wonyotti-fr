@@ -13,20 +13,26 @@ from .reports import table
 
 
 def markouts(orders: pd.DataFrame, fills: pd.DataFrame, bars: pd.DataFrame,
-             horizons: tuple[int, ...] = (5, 15, 60, 240)) -> pd.DataFrame:
+             horizons: tuple[int, ...] = (5, 15, 60, 240), *, interval_minutes: int = 5) -> pd.DataFrame:
+    if type(interval_minutes) is not int or interval_minutes not in (1, 5):
+        raise ValueError('체결 맥락의 봉 간격은 1분 또는 5분이어야 합니다.')
+    interval = pd.Timedelta(minutes=interval_minutes)
+    if 'time' in bars and not (bars.end - bars.time).eq(interval).all():
+        raise ValueError('체결 맥락의 자료와 봉 간격이 다릅니다.')
     if (bars.end.duplicated().any() or not bars.end.is_monotonic_increasing
         or not np.isfinite(bars.close).all() or (bars.close <= 0).any()):
         raise ValueError('가격 기준의 순서·유한성 오류')
     first = fills.drop_duplicates('order_key', keep='first')
     frame = orders.merge(first[['order_key', 'lastpx', 'execcomm', 'execcost', 'lastliquidityind']],
                           on='order_key', validate='one_to_one')
+    frame['target_time'] = frame.target_time.astype('datetime64[ns, UTC]')
     if (frame.lastpx.le(0).any() or frame.execcost.eq(0).any()
         or not np.isfinite(frame[['lastpx', 'execcomm', 'execcost']]).all().all()):
         raise ValueError('최초 체결 가격·비용 오류')
     prices = bars[['end', 'close']].copy().astype({'end': 'datetime64[ns, UTC]'})
     frame = pd.merge_asof(frame.sort_values('target_time'), prices.rename(columns={'end': 'reference_time', 'close': 'reference_price'}),
                           left_on='target_time', right_on='reference_time', direction='backward',
-                          allow_exact_matches=False, tolerance=pd.Timedelta(minutes=5))
+                          allow_exact_matches=False, tolerance=interval)
     direction = np.where(frame.side.eq('Buy'), 1, -1)
     frame['reference_to_fill_bps'] = direction * np.log(frame.reference_price / frame.lastpx) * 10000
     frame['first_fill_fee_bps'] = frame.execcomm / frame.execcost.abs() * 10000
@@ -38,7 +44,7 @@ def markouts(orders: pd.DataFrame, fills: pd.DataFrame, bars: pd.DataFrame,
         part['requested_end'] = part.target_time + pd.Timedelta(minutes=horizon)
         part = pd.merge_asof(part, prices.rename(columns={'end': 'outcome_time', 'close': 'outcome_price'}),
                              left_on='requested_end', right_on='outcome_time', direction='forward',
-                             tolerance=pd.Timedelta(minutes=5) - pd.Timedelta(nanoseconds=1))
+                             tolerance=interval - pd.Timedelta(nanoseconds=1))
         part['horizon_minutes'] = horizon
         part['markout_bps'] = direction * np.log(part.outcome_price / part.lastpx) * 10000
         part['subsequent_reference_move_bps'] = direction * np.log(part.outcome_price / part.reference_price) * 10000

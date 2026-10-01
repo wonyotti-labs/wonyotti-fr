@@ -30,6 +30,7 @@ from .reports import write_reconstruction_report
 from .research import run_research
 from .robustness import run_robustness
 from .study import run_study
+from .timing_study import run_timing_study
 from .verification import verify_samples
 
 
@@ -200,6 +201,13 @@ def main() -> None:
     edge_diagnostics.add_argument("--output", type=Path, default=Path("artifacts"))
     edge_diagnostics.set_defaults(func=lambda a: run_edge_diagnostics(a.selection_run, a.audit_run, a.study_run, a.history,
                                                                      a.market, a.recent_market, a.new_market, a.output))
+    timing = commands.add_parser("timing-study", help="동일 주문의 1분·5분 시세와 체결 가격 차이 비교")
+    timing.add_argument("--audit-run", type=Path, required=True)
+    timing.add_argument("--study-run", type=Path, required=True)
+    timing.add_argument("--history", type=Path, default=Path("data/bitmex-history"))
+    timing.add_argument("--minute-history", type=Path, default=Path("data/bitmex-history-1m"))
+    timing.add_argument("--output", type=Path, default=Path("artifacts"))
+    timing.set_defaults(func=lambda a: run_timing_study(a.audit_run, a.study_run, a.history, a.minute_history, a.output))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)
