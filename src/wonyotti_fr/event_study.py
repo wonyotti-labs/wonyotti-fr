@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
-from sklearn.metrics import balanced_accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix
 
 from .common import new_run, save_json, sha256
 from .event_features import purged_train, training_events
@@ -13,13 +13,17 @@ from .event_model import EventModel
 
 def evaluate_imitation(model: EventModel, data: pd.DataFrame) -> dict:
     if data.empty:
-        raise ValueError('모사 평가 자료가 없습니다.')
+        return {'rows': 0, 'balanced_accuracy': None, 'status': 'no_samples',
+                'reason': '해당 포지션 상태의 평가 표본 없음'}
     predicted = model.predict(data)
-    return {'rows': len(data), 'balanced_accuracy': float(balanced_accuracy_score(data.target, predicted)),
-            'labels': model.classes,
-            'confusion_matrix': confusion_matrix(data.target, predicted, labels=model.classes).tolist(),
-            'classification': classification_report(data.target, predicted, labels=model.classes,
-                                                      output_dict=True, zero_division=0)}
+    labels = sorted(set(model.classes) | set(data.target))
+    report = classification_report(data.target, predicted, labels=labels, output_dict=True, zero_division=0)
+    observed = [label for label in labels if report[label]['support'] > 0]
+    return {'rows': len(data), 'balanced_accuracy': sum(report[label]['recall'] for label in observed) / len(observed),
+            'labels': labels, 'missing_target_classes': [label for label in labels if label not in observed],
+            'insufficient_class_support': any(report[label]['support'] < 20 for label in labels),
+            'confusion_matrix': confusion_matrix(data.target, predicted, labels=labels).tolist(),
+            'classification': report}
 
 
 def run_event_study(audit_run: Path, history: Path, output: Path) -> Path:

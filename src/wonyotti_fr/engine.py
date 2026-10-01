@@ -20,6 +20,7 @@ class EngineConfig(RiskConfig):
     reduction_fraction: float = 0.5
     max_adds: int = 1
     allow_adverse_add: bool = False
+    signal_delay_bars: int = 0
 
     def validate(self):
         super().validate()
@@ -32,6 +33,8 @@ class EngineConfig(RiskConfig):
             raise ValueError("추가 진입 횟수 오류")
         if type(self.allow_adverse_add) is not bool:
             raise ValueError("불리한 추가 진입 설정 오류")
+        if type(self.signal_delay_bars) is not int or self.signal_delay_bars not in (0, 1):
+            raise ValueError("추가 실행 지연은 0~1봉이어야 합니다.")
 
 
 def validate_bar(bar: dict, seconds: int) -> dict:
@@ -67,6 +70,7 @@ class TradingEngine:
             "last_close": None, "pending": "hold", "active_trade": None, "completed": False,
             "total_fees": 0.0, "total_funding": 0.0, "closed_net": 0.0, "closed_trades": 0,
             "max_drawdown": 0.0, "wins": 0, "sum_gains": 0.0, "sum_losses": 0.0,
+            "deferred_intents": [],
         }
         self._validate_state()
 
@@ -74,6 +78,9 @@ class TradingEngine:
         s = self.state
         if s.get("version") != 1 or s.get("pending") not in INTENTS:
             raise ValueError("상태 형식 또는 대기 주문 오류")
+        queue = s.get("deferred_intents")
+        if not isinstance(queue, list) or len(queue) > self.config.signal_delay_bars or any(item not in INTENTS for item in queue):
+            raise ValueError("지연 주문 상태 오류")
         for key in ["cash", "quantity", "entry_price", "peak", "day_equity", "total_fees", "total_funding", "closed_net"]:
             if not np.isfinite(s[key]):
                 raise ValueError("상태에 유한하지 않은 숫자가 있습니다.")
@@ -97,11 +104,13 @@ class TradingEngine:
     def halt(self):
         self.state["manual_halt"] = True
         self.state["pending"] = "hold"
+        self.state["deferred_intents"] = []
 
     def step(self, bar: dict, decide: Callable[[dict, dict], str], final: bool = False) -> dict:
         event = validate_bar(bar, self.config.bar_seconds)
         # 실패한 입력이나 정책 실행은 직전 정상 상태를 바꾸지 않는다.
-        trial = TradingEngine(self.config, self.state)
+        trial = copy.copy(self)
+        trial.state = copy.deepcopy(self.state)
         result = trial._advance(event, decide, final)
         trial._validate_state()
         self.state = trial.state
@@ -238,6 +247,12 @@ class TradingEngine:
         next_intent = "hold" if final or blocked else decide(bar, self.view(closing))
         if next_intent not in INTENTS:
             raise ValueError("정책이 지원하지 않는 주문 의도를 반환했습니다.")
+        if final or blocked:
+            s["deferred_intents"] = []
+        elif c.signal_delay_bars:
+            # 지연된 의도도 상태에 저장해 재시작 후 같은 순서로 실행한다.
+            s["deferred_intents"].append(next_intent)
+            next_intent = s["deferred_intents"].pop(0) if len(s["deferred_intents"]) > c.signal_delay_bars else "hold"
         s["pending"] = next_intent
         unrealized = s["quantity"] * (closing - s["entry_price"])
         active_net = (s["active_trade"]["gross_realized"] - s["active_trade"]["fees"]

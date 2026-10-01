@@ -19,8 +19,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 
-def load_market(market: Path, symbol: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    manifest = json.loads((market / "manifest-15m.json").read_text())
+def load_market(market: Path, symbol: str, interval: str = "15m") -> tuple[pd.DataFrame, pd.DataFrame]:
+    if interval not in {"1m", "5m", "15m", "1h"}:
+        raise ValueError("지원하지 않는 시세 간격")
+    manifest = json.loads((market / f"manifest-{interval}.json").read_text())
     summary = manifest["summary"][symbol]
     paths = [(market / summary[k]["file"]).resolve() for k in ["klines", "fundingRate"]]
     for key, path in zip(["klines", "fundingRate"], paths, strict=True):
@@ -31,8 +33,10 @@ def load_market(market: Path, symbol: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     return pd.read_parquet(paths[0]), pd.read_parquet(paths[1])
 
 
-def check_funding_coverage(market: Path, symbol: str, start: str, end: str):
-    manifest = json.loads((market / "manifest-15m.json").read_text())
+def check_funding_coverage(market: Path, symbol: str, start: str, end: str, interval: str = "15m"):
+    if interval not in {"1m", "5m", "15m", "1h"}:
+        raise ValueError("지원하지 않는 시세 간격")
+    manifest = json.loads((market / f"manifest-{interval}.json").read_text())
     required = set(str(p) for p in pd.period_range(start[:7], (pd.Timestamp(end) - pd.Timedelta(days=1)).strftime("%Y-%m"), freq="M"))
     available = {r["month"] for r in manifest["successful"] if r["symbol"] == symbol and r["kind"] == "fundingRate"}
     if required - available:

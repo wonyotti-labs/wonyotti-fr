@@ -6,6 +6,7 @@ from pathlib import Path
 from .audit import aggregate_events, write_audit
 from .bitmex_history import fetch_bitmex_history
 from .common import new_run, save_json
+from .event_research import run_event_selection
 from .event_study import run_event_study
 from .market import fetch_market, repair_gaps
 from .offline import demo, replay
@@ -90,6 +91,11 @@ def main() -> None:
     events.add_argument("--history", type=Path, default=Path("data/bitmex-history"))
     events.add_argument("--output", type=Path, default=Path("artifacts"))
     events.set_defaults(func=lambda a: run_event_study(a.audit_run, a.history, a.output))
+    selection = commands.add_parser("event-select", help="2020년에서 사건별 정책 선택 후 설정 고정")
+    selection.add_argument("--study-run", type=Path, required=True)
+    selection.add_argument("--market", type=Path, default=Path("data/market-5m-complete"))
+    selection.add_argument("--output", type=Path, default=Path("artifacts"))
+    selection.set_defaults(func=lambda a: run_event_selection(a.study_run, a.market, a.output))
     robustness = commands.add_parser("robustness", help="고정 후보의 연도별 재시작과 블록 재표집 진단")
     robustness.add_argument("--research-run", type=Path, required=True)
     robustness.add_argument("--market", type=Path, default=Path("data/market-complete"))

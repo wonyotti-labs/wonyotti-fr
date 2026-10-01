@@ -82,3 +82,15 @@ def test_future_policy_cannot_rewrite_past_state():
     assert engine.state["cash"] == alternative.state["cash"]
     assert engine.state["quantity"] == alternative.state["quantity"]
     assert engine.state["pending"] != alternative.state["pending"]
+
+
+def test_extra_execution_delay_survives_restart():
+    engine = TradingEngine(config(signal_delay_bars=1))
+    first = engine.step(bar(0), actions)
+    assert first['next_intent'] == 'hold'
+    assert engine.state['deferred_intents'] == ['enter_long']
+    resumed = TradingEngine(engine.config, engine.snapshot())
+    assert not resumed.step(bar(1), actions)['fills']
+    assert resumed.step(bar(2), actions)['quantity'] == 25
+    resumed.halt()
+    assert resumed.state['deferred_intents'] == []
