@@ -24,6 +24,7 @@ from .frequency_research import run_frequency_selection
 from .market import fetch_market, repair_gaps
 from .minute_repair import repair_minute_market
 from .offline import demo, replay
+from .paired_repair import repair_paired_market
 from .portfolio import reconstruct_portfolio
 from .pullback_evaluation import run_pullback_evaluation
 from .pullback_research import run_pullback_selection
@@ -101,6 +102,13 @@ def main() -> None:
     minute_repair.add_argument("--output", type=Path, required=True)
     minute_repair.add_argument("--cache", type=Path, default=Path("data/minute-repair-trades"))
     minute_repair.set_defaults(func=lambda a: repair_minute_market(a.market, a.feature_market, a.output, a.cache))
+    paired = commands.add_parser("paired-repair", help="두 형식의 원체결 대조 후 1분·5분 자료를 함께 복원")
+    paired.add_argument("--market", type=Path, required=True)
+    paired.add_argument("--feature-market", type=Path, required=True)
+    paired.add_argument("--output", type=Path, required=True)
+    paired.add_argument("--feature-output", type=Path, required=True)
+    paired.add_argument("--cache", type=Path, default=Path("data/minute-repair-trades"))
+    paired.set_defaults(func=lambda a: repair_paired_market(a.market, a.feature_market, a.output, a.feature_output, a.cache))
     research = commands.add_parser("research", help="학습·검증·평가를 분리하여 모사 후보를 비교")
     research.add_argument("--audit-run", type=Path, required=True)
     research.add_argument("--market", type=Path, default=Path("data/market"))

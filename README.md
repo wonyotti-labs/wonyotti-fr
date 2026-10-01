@@ -119,6 +119,8 @@ uv run wonyotti timing-study --audit-run artifacts/감사실행ID --study-run ar
 
 실행용 1분 자료에서 집계 불일치가 발견되면 `minute-repair --market <1분 자료> --feature-market <5분 자료> --output <새 폴더>`로 공식 개별 체결을 대조한다. 원체결 집계가 공식 5분 가격·거래량·건수와 일치해야 한다. 수정할 분봉에 ID 공백이 있으면 별도 집계 체결에 모든 시장 체결이 정확히 한 번씩 연결되고 가격·수량·방향·시각이 일치해야 한다. 원본·전후 값·체크섬·실패를 보존하며 이 검사가 모든 분봉의 정확성을 인증하는 것은 아니다.
 
+공식 5분봉도 원체결과 다를 때는 `paired-repair --market <1분 자료> --feature-market <5분 자료> --output <새 1분 폴더> --feature-output <새 5분 폴더>`를 사용한다. 불일치 구간 전체의 원체결과 별도 집계 체결이 일치해야 두 해상도를 각각 복원한다. 모든 검사를 마치기 전 출력은 실행 입력으로 사용할 수 없다. 날짜 경계·대조 실패는 중단하며 [자료 검증 범위](docs/EXPERIMENT_V7.md)를 함께 확인한다.
+
 ```bash
 uv run wonyotti pullback-select --v4-selection-run <v4 선택 폴더> \
   --market <대조를 마친 1분 자료> --feature-market <기존 5분 자료>
