@@ -204,12 +204,20 @@ def fetch_market(root: Path, symbols: list[str], start: str, end: str,
     return manifest
 
 
-def repair_gaps(source: Path, output: Path, interval: str = "15m") -> dict:
+def repair_gaps(source: Path, output: Path, interval: str = "15m",
+                start: str | None = None, end: str | None = None) -> dict:
     import json
     import shutil
 
     if interval not in {"1m", "5m", "15m", "1h"}:
         raise ValueError("지원하지 않는 봉 간격")
+    if (start is None) != (end is None):
+        raise ValueError("보완 범위의 시작과 종료를 함께 지정해야 합니다.")
+    first = pd.Timestamp(start, tz='UTC') if start else None
+    last = pd.Timestamp(end, tz='UTC') if end else None
+    step = pd.Timedelta(interval)
+    if first is not None and (first >= last or first.value % step.value or last.value % step.value):
+        raise ValueError("보완 범위의 순서·봉 경계 오류")
     manifest_path = source / f"manifest-{interval}.json"
     manifest = json.loads(manifest_path.read_text())
     if output.exists() or output.resolve().is_relative_to(source.resolve()):
@@ -223,7 +231,10 @@ def repair_gaps(source: Path, output: Path, interval: str = "15m") -> dict:
         if not path.resolve().is_relative_to(output.resolve()) or sha256(path) != metadata["sha256"]:
             raise ValueError("보완 입력 경로 또는 체크섬 오류")
         frame = pd.read_parquet(path)
-        expected = pd.date_range(frame.time.min(), frame.time.max(), freq=pd.Timedelta(interval))
+        if first is not None and (first > frame.time.min() or last <= frame.time.max()):
+            raise ValueError("보완 범위는 기존 자료 전체를 포함해야 합니다.")
+        expected = (pd.date_range(first, last, freq=step, inclusive='left') if first is not None
+                    else pd.date_range(frame.time.min(), frame.time.max(), freq=step))
         missing = expected.difference(frame.time)
         if len(missing) > pd.Timedelta(days=31) / pd.Timedelta(interval):
             raise ValueError("결측이 31일을 초과합니다. 자료 범위를 먼저 검토하세요.")
@@ -241,8 +252,11 @@ def repair_gaps(source: Path, output: Path, interval: str = "15m") -> dict:
             if frame.time.duplicated().any() or len(expected.difference(frame.time)):
                 raise ValueError("공식 일별 자료로 결측을 모두 보완하지 못했습니다.")
             frame.to_parquet(path, index=False)
-        summary["klines"] = {**metadata, "rows": len(frame), "gaps": 0, "sha256": sha256(path)}
+        summary["klines"] = {**metadata, "rows": len(frame), "gaps": 0, "sha256": sha256(path),
+                              "first": frame.time.min(), "last": frame.time.max()}
     manifest["daily_repairs"] = repairs
+    if first is not None:
+        manifest["requested_repair_range"] = {"start": first, "end_exclusive": last}
     manifest["repaired_at"] = datetime.now(UTC)
     save_json(output / f"manifest-{interval}.json", manifest)
     return manifest
