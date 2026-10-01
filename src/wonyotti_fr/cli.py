@@ -7,6 +7,7 @@ from .audit import aggregate_events, write_audit
 from .bitmex_history import fetch_bitmex_history
 from .common import new_run, save_json
 from .context_study import run_context_study
+from .edge_diagnostics import run_edge_diagnostics
 from .edge_research import run_edge_selection
 from .engine_stress import run_engine_stress
 from .event_diagnostics import run_event_diagnostics
@@ -70,11 +71,12 @@ def main() -> None:
     verify.add_argument("--output", type=Path, default=Path("artifacts"))
     verify.add_argument("--cache", type=Path, default=Path("data/bitmex-verification"))
     verify.set_defaults(func=lambda a: verify_samples(a.audit_run, a.output, a.cache))
-    history = commands.add_parser("bitmex-history", help="원거래소 공식 5분봉을 특징 연구용으로 수집")
+    history = commands.add_parser("bitmex-history", help="원거래소 공식 1분·5분봉을 특징 연구용으로 수집")
     history.add_argument("--start", default="2018-03-01")
     history.add_argument("--end", default="2022-01-01")
     history.add_argument("--output", type=Path, default=Path("data/bitmex-history"))
-    history.set_defaults(func=lambda a: fetch_bitmex_history(a.output, a.start, a.end))
+    history.add_argument("--interval", choices=['1m', '5m'], default='5m')
+    history.set_defaults(func=lambda a: fetch_bitmex_history(a.output, a.start, a.end, a.interval))
     market = commands.add_parser("market", help="공식 시세/펀딩 자료를 체크섬 검증 후 저장")
     market.add_argument("--symbols", nargs="+", default=["BTCUSDT", "ETHUSDT", "SOLUSDT"])
     market.add_argument("--start", default="2019-09")
@@ -187,6 +189,17 @@ def main() -> None:
     edge_evaluation.add_argument("--period", choices=["observed", "seen_2026", "new"], required=True)
     edge_evaluation.add_argument("--output", type=Path, default=Path("artifacts"))
     edge_evaluation.set_defaults(func=lambda a: run_expansion_evaluation(a.selection_run, a.v4_selection_run, a.market, a.output, a.period))
+    edge_diagnostics = commands.add_parser("edge-diagnose", help="비용 예측 신호의 단계별 표본 변화 분석")
+    edge_diagnostics.add_argument("--selection-run", type=Path, required=True)
+    edge_diagnostics.add_argument("--audit-run", type=Path, required=True)
+    edge_diagnostics.add_argument("--study-run", type=Path, required=True)
+    edge_diagnostics.add_argument("--history", type=Path, default=Path("data/bitmex-history"))
+    edge_diagnostics.add_argument("--market", type=Path, default=Path("data/market-5m-complete"))
+    edge_diagnostics.add_argument("--recent-market", type=Path, required=True)
+    edge_diagnostics.add_argument("--new-market", type=Path, required=True)
+    edge_diagnostics.add_argument("--output", type=Path, default=Path("artifacts"))
+    edge_diagnostics.set_defaults(func=lambda a: run_edge_diagnostics(a.selection_run, a.audit_run, a.study_run, a.history,
+                                                                     a.market, a.recent_market, a.new_market, a.output))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)

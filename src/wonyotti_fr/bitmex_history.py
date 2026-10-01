@@ -36,24 +36,29 @@ def cached_public_json(url: str, cache: Path) -> tuple[list, dict]:
     return json.loads(path.read_text()), metadata
 
 
-def fetch_bitmex_history(output: Path, start: str = "2018-03-01", end: str = "2022-01-01") -> Path:
+def fetch_bitmex_history(output: Path, start: str = "2018-03-01", end: str = "2022-01-01", interval: str = "5m") -> Path:
+    if interval not in {'1m', '5m'}:
+        raise ValueError('원거래소 연구 간격은 1m 또는 5m입니다.')
+    step = pd.Timedelta(interval)
     begin, finish = pd.Timestamp(start, tz="UTC"), pd.Timestamp(end, tz="UTC")
-    if begin >= finish or (finish - begin).days > 1500:
-        raise ValueError("수집 기간은 1~1500일이어야 합니다.")
+    if (begin >= finish or finish - begin > pd.Timedelta(days=1500)
+        or begin.value % step.value or finish.value % step.value):
+        raise ValueError("수집 기간은 봉 경계와 일치하고 1500일 이하여야 합니다.")
     manifest_path = output / "manifest.json"
     if manifest_path.exists():
         existing = json.loads(manifest_path.read_text())
-        if existing["start"] != start or existing["end_exclusive"] != end:
-            raise ValueError("다른 수집 범위는 새 폴더를 사용하세요.")
+        if existing["start"] != start or existing["end_exclusive"] != end or existing['interval'] != interval:
+            raise ValueError("다른 수집 범위·간격은 새 폴더를 사용하세요.")
         path = output / existing["file"]
-        if sha256(path) != existing["sha256"]:
+        if not path.resolve().is_relative_to(output.resolve()) or sha256(path) != existing["sha256"]:
             raise ValueError("완료된 시장 자료가 변경되었습니다.")
         return path
-    cursor = begin + pd.Timedelta(minutes=5)
+    cursor = begin + step
+    max_pages = int(np.ceil((finish - begin) / step / 1000)) + 4
     chunks, sources = [], []
     while cursor <= finish:
         url = "https://www.bitmex.com/api/v1/trade/bucketed?" + urlencode({
-            "symbol": "XBTUSD", "binSize": "5m", "partial": "false", "count": 1000,
+            "symbol": "XBTUSD", "binSize": interval, "partial": "false", "count": 1000,
             "reverse": "false", "startTime": cursor.isoformat(), "endTime": finish.isoformat(),
         })
         values, metadata = cached_public_json(url, output / "responses")
@@ -67,11 +72,11 @@ def fetch_bitmex_history(output: Path, start: str = "2018-03-01", end: str = "20
         sources.append(metadata)
         cursor = frame.end.max() + pd.Timedelta(milliseconds=1)
         if len(sources) % 20 == 0:
-            print(f"BitMEX 5분봉 {sum(len(f) for f in chunks):,}개, 현재 {frame.end.max()}", flush=True)
-        if len(sources) > 500:
+            print(f"BitMEX {interval}봉 {sum(len(f) for f in chunks):,}개, 현재 {frame.end.max()}", flush=True)
+        if len(sources) > max_pages:
             raise ValueError("시장 수집 페이지 상한 초과")
     frame = pd.concat(chunks, ignore_index=True)
-    frame["time"] = frame.end - pd.Timedelta(minutes=5)
+    frame["time"] = frame.end - step
     frame = frame[(frame.time >= begin) & (frame.end <= finish)].copy()
     numeric = ["open", "high", "low", "close", "homeNotional", "volume", "trades"]
     frame[numeric] = frame[numeric].apply(pd.to_numeric, errors="raise")
@@ -80,14 +85,14 @@ def fetch_bitmex_history(output: Path, start: str = "2018-03-01", end: str = "20
     frame = frame[~invalid].copy()
     if frame.time.duplicated().any():
         raise ValueError("중복 캔들")
-    expected = pd.date_range(begin, finish, freq="5min", inclusive="left")
+    expected = pd.date_range(begin, finish, freq=step, inclusive="left")
     missing = expected.difference(frame.time)
     result = frame[["time", "end", "open", "high", "low", "close", "homeNotional", "volume", "trades"]].rename(
         columns={"homeNotional": "volume", "volume": "contract_volume"})
-    path = output / "XBTUSD-5m.parquet"
+    path = output / f"XBTUSD-{interval}.parquet"
     result.to_parquet(path, index=False)
     manifest = {"source": "BitMEX official public bucketed trades API", "start": start, "end_exclusive": end,
-                "symbol": "XBTUSD", "interval": "5m", "rows": len(result), "missing_bars": len(missing),
+                "symbol": "XBTUSD", "interval": interval, "rows": len(result), "missing_bars": len(missing),
                 "missing_sample": [str(v) for v in missing[:30]], "invalid_price_rows_excluded": invalid_count,
                 "file": path.name, "sha256": sha256(path), "responses": sources,
                 "open_price_note": "BitMEX bucketed open은 이전 봉 종가다. 실제 다음 봉 첫 체결가로 사용하지 않는다.",
