@@ -7,6 +7,7 @@ from .audit import aggregate_events, write_audit
 from .bitmex_history import fetch_bitmex_history
 from .common import new_run, save_json
 from .context_study import run_context_study
+from .edge_research import run_edge_selection
 from .engine_stress import run_engine_stress
 from .event_diagnostics import run_event_diagnostics
 from .event_evaluation import run_event_evaluation
@@ -169,6 +170,21 @@ def main() -> None:
     expansion_evaluation.add_argument("--period", choices=["observed", "seen_2026", "new"], required=True)
     expansion_evaluation.add_argument("--output", type=Path, default=Path("artifacts"))
     expansion_evaluation.set_defaults(func=lambda a: run_expansion_evaluation(a.selection_run, a.v3_selection_run, a.market, a.output, a.period))
+    edge = commands.add_parser("edge-select", help="보유 시간·비용 예측 후보 선택")
+    edge.add_argument("--audit-run", type=Path, required=True)
+    edge.add_argument("--study-run", type=Path, required=True)
+    edge.add_argument("--v4-selection-run", type=Path, required=True)
+    edge.add_argument("--history", type=Path, default=Path("data/bitmex-history"))
+    edge.add_argument("--market", type=Path, default=Path("data/market-5m-complete"))
+    edge.add_argument("--output", type=Path, default=Path("artifacts"))
+    edge.set_defaults(func=lambda a: run_edge_selection(a.audit_run, a.study_run, a.history, a.v4_selection_run, a.market, a.output))
+    edge_evaluation = commands.add_parser("edge-evaluate", help="보유 시간·비용 예측 후보의 고정 비교")
+    edge_evaluation.add_argument("--selection-run", type=Path, required=True)
+    edge_evaluation.add_argument("--v4-selection-run", type=Path, required=True)
+    edge_evaluation.add_argument("--market", type=Path, required=True)
+    edge_evaluation.add_argument("--period", choices=["observed", "seen_2026", "new"], required=True)
+    edge_evaluation.add_argument("--output", type=Path, default=Path("artifacts"))
+    edge_evaluation.set_defaults(func=lambda a: run_expansion_evaluation(a.selection_run, a.v4_selection_run, a.market, a.output, a.period))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)

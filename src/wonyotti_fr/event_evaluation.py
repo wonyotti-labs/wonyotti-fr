@@ -32,8 +32,8 @@ def run_event_evaluation(selection: Path, market: Path, output: Path, period: st
     if period not in {'observed', 'new'}:
         raise ValueError('평가 구간은 observed 또는 new입니다.')
     frozen, policy = load_selection(selection)
-    if frozen.get('protocol') in {'frequency_v3', 'expansion_v4'}:
-        raise ValueError('v3·v4는 각 후보의 새 자료 개봉 조건을 검사하는 전용 평가 명령을 사용합니다.')
+    if frozen.get('protocol') in {'frequency_v3', 'expansion_v4', 'edge_v5'}:
+        raise ValueError('v3 이후 후보는 새 자료 개봉 조건을 검사하는 전용 평가 명령을 사용합니다.')
     start, end = frozen['observed_evaluation_period' if period == 'observed' else 'new_evaluation_period']
     config = EngineConfig(**frozen['risk'])
     variants = {

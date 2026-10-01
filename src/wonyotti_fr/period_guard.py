@@ -7,7 +7,7 @@ import pandas as pd
 
 def guard_replay_period(selection: Path, frozen: dict, start: str, end: str) -> None:
     protocol = frozen.get('protocol')
-    if protocol not in {'frequency_v3', 'expansion_v4'}:
+    if protocol not in {'frequency_v3', 'expansion_v4', 'edge_v5'}:
         return
     first, last = pd.Timestamp(start, tz='UTC'), pd.Timestamp(end, tz='UTC')
     new_start, new_end = (pd.Timestamp(value, tz='UTC') for value in frozen['new_evaluation_period'])

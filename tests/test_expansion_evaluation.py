@@ -6,9 +6,10 @@ from wonyotti_fr.expansion_research import expansion_gate
 from wonyotti_fr.period_guard import guard_replay_period
 
 
-def test_failed_gate_cannot_be_bypassed_by_flag_or_replay(tmp_path):
+@pytest.mark.parametrize('protocol', ['expansion_v4', 'edge_v5'])
+def test_failed_gate_cannot_be_bypassed_by_flag_or_replay(tmp_path, protocol):
     metrics = {'total_return': -.01, 'closed_trades': 25, 'permanent_halt': False}
-    frozen = {'protocol': 'expansion_v4', 'development_metrics': metrics,
+    frozen = {'protocol': protocol, 'development_metrics': metrics,
               'new_evaluation_period': ['2026-09-01', '2026-10-01'],
               'seen_2026_period': ['2026-01-01', '2026-09-01']}
     save_json(tmp_path / 'frozen_selection.json', frozen)
