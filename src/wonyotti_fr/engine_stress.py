@@ -1,0 +1,115 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+from .common import new_run, save_json
+from .engine import EngineConfig, TradingEngine
+from .event_backtest import iter_events, prepare_period
+from .event_replay import replay_identity
+from .event_research import load_selection
+from .journal import EventJournal, canonical
+
+
+def crash_worker(payload_path: Path) -> None:
+    payload = json.loads(payload_path.read_text())
+    frozen, policy = load_selection(Path(payload['selection']))
+    with EventJournal(Path(payload['journal']), EngineConfig(**frozen['risk']), payload['identity']) as journal:
+        journal.process(payload['event'], policy, before_commit=lambda: os._exit(73))
+    raise RuntimeError('강제 종료 주입 지점에 도달하지 못했습니다.')
+
+
+def verify_stress(events: list[dict], selection: Path, directory: Path, identity: dict) -> dict:
+    if len(events) < 4:
+        raise ValueError('장애 검증 사건이 부족합니다.')
+    frozen, policy = load_selection(selection)
+    config = EngineConfig(**frozen['risk'])
+    memory = TradingEngine(config)
+    expected = [memory.step(event, policy, final=index == len(events) - 1) for index, event in enumerate(events)]
+    cut = next((index + 1 for index, result in enumerate(expected[:-2]) if result['quantity'] != 0), min(24, len(events) - 2))
+    journal_path = directory / 'crash.sqlite'
+    checks = {}
+    with EventJournal(journal_path, config, identity) as journal:
+        for event in events[:cut]:
+            journal.process(event, policy)
+        before = journal.snapshot()
+        duplicate = journal.process(events[cut - 1], policy)
+        checks['duplicate_not_reexecuted'] = duplicate['duplicate'] and canonical(before) == canonical(journal.snapshot())
+        altered = {**events[cut - 1], 'close': events[cut - 1]['close'] * 1.0001}
+        altered['high'] = max(altered['high'], altered['close'])
+        invalid = {**events[cut], 'high': 0}
+        for name, event in [('changed_duplicate_rejected', altered), ('missing_bar_rejected', events[cut + 1]), ('invalid_ohlc_rejected', invalid)]:
+            try:
+                journal.process(event, policy)
+            except ValueError:
+                checks[name] = canonical(before) == canonical(journal.snapshot())
+            else:
+                checks[name] = False
+    payload = directory / 'crash_input.json'
+    save_json(payload, {'selection': str(selection.resolve()), 'journal': str(journal_path.resolve()),
+                        'identity': identity, 'event': events[cut]})
+    process = subprocess.run([sys.executable, '-m', 'wonyotti_fr.engine_stress', '--worker', str(payload.resolve())],
+                             capture_output=True, text=True, timeout=30, check=False)
+    save_json(directory / 'crash_process.json', {'returncode': process.returncode, 'stdout': process.stdout, 'stderr': process.stderr})
+    if process.returncode != 73:
+        raise ValueError('실제 프로세스 종료 검증에 실패했습니다.')
+    with EventJournal(journal_path, config, identity) as journal:
+        checks['process_exit_before_commit_rolled_back'] = canonical(before) == canonical(journal.snapshot())
+        for index in range(cut, len(events)):
+            journal.process(events[index], policy, final=index == len(events) - 1)
+        journal.verify()
+        checks['crash_restart_full_results_equal'] = canonical(journal.results()) == canonical(expected)
+        checks['crash_restart_final_state_equal'] = canonical(journal.snapshot()) == canonical(memory.snapshot())
+    manual_memory = TradingEngine(config)
+    manual_expected = []
+    with EventJournal(directory / 'manual.sqlite', config, {**identity, 'manual_control': True}) as journal:
+        for index, event in enumerate(events):
+            if index == cut:
+                journal.halt()
+                manual_memory.halt()
+            expected_row = manual_memory.step(event, policy, final=index == len(events) - 1)
+            manual_expected.append(expected_row)
+            actual = journal.process(event, policy, final=index == len(events) - 1)
+            if index == cut:
+                checks['manual_halt_liquidates_next_bar'] = actual['quantity'] == 0 and actual['next_intent'] == 'hold'
+        checks['manual_halt_full_results_equal'] = canonical(journal.results()) == canonical(manual_expected)
+        checks['manual_halt_no_reentry'] = all(row['quantity'] == 0 for row in manual_expected[cut:])
+    if not all(checks.values()):
+        raise ValueError(f'장애 검증 미통과: {[name for name, passed in checks.items() if not passed]}')
+    return {'checks': checks, 'bars': len(events), 'interruption_after_bars': cut,
+            'position_open_at_interruption': before['quantity'] != 0,
+            'child_process_exit_code': process.returncode, 'all_passed': True}
+
+
+def run_engine_stress(selection: Path, market: Path, output: Path, start: str = '2020-03-10', end: str = '2020-03-14') -> Path:
+    identity = replay_identity(selection, market, 'BTCUSDT', start, end)
+    destination = new_run(output, 'engine-stress', {**identity,
+                                                   'checks': '가격 급변 시세, 실제 프로세스 종료, 중복·누락·잘못된 입력, 수동 중지'})
+    try:
+        bars = prepare_period(market, 'BTCUSDT', start, end)
+        result = verify_stress(list(iter_events(bars)), selection, destination, identity)
+        save_json(destination / 'verification.json', result)
+        (destination / 'REPORT.md').write_text(
+            '# 실제 급변 구간의 오프라인 실행 장애 검증\n\n'
+            f'{start}부터 {end} 직전까지 BTC 시세 {len(bars):,}봉을 사용했다. '
+            f'{result["interruption_after_bars"]}봉 처리 후 중단을 주입했으며 보유 포지션 존재: {result["position_open_at_interruption"]}.\n\n'
+            '독립 Python 프로세스를 트랜잭션 커밋 직전에 종료 코드 73으로 강제 종료했다. '
+            '저널 재개 후 모든 체결·잔고·최종 상태가 단일 실행과 일치했다. '
+            '중복·변경된 중복·누락 봉·잘못된 OHLC를 구분했고 거부된 입력이 상태를 바꾸지 않음을 확인했다. '
+            '수동 중지는 다음 유효 시세에서 청산하고 이후 재진입하지 않았다.\n\n'
+            '이는 해당 고정 시세와 모의 체결 가정의 기능 검증이다. 거래소 실제 체결·네트워크 장애·호가·시장 충격의 검증은 아니다.\n', encoding='utf-8')
+    except Exception as error:
+        save_json(destination / 'failure.json', {'type': type(error).__name__, 'message': str(error)})
+        raise
+    print(f'실제 급변·장애 검증: {destination / "REPORT.md"}', flush=True)
+    return destination
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--worker', type=Path, required=True)
+    crash_worker(parser.parse_args().worker)

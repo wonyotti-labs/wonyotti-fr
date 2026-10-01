@@ -6,6 +6,7 @@ from pathlib import Path
 from .audit import aggregate_events, write_audit
 from .bitmex_history import fetch_bitmex_history
 from .common import new_run, save_json
+from .engine_stress import run_engine_stress
 from .event_diagnostics import run_event_diagnostics
 from .event_evaluation import run_event_evaluation
 from .event_replay import run_event_replay
@@ -131,6 +132,13 @@ def main() -> None:
     frequency_evaluation.add_argument("--period", choices=["observed", "seen_2026", "new"], required=True)
     frequency_evaluation.add_argument("--output", type=Path, default=Path("artifacts"))
     frequency_evaluation.set_defaults(func=lambda a: run_frequency_evaluation(a.selection_run, a.market, a.output, a.period))
+    stress = commands.add_parser("engine-stress", help="실제 급변 시세와 프로세스 종료·중복·누락·중지 검증")
+    stress.add_argument("--selection-run", type=Path, required=True)
+    stress.add_argument("--market", type=Path, default=Path("data/market-5m-complete"))
+    stress.add_argument("--start", default="2020-03-10")
+    stress.add_argument("--end", default="2020-03-14")
+    stress.add_argument("--output", type=Path, default=Path("artifacts"))
+    stress.set_defaults(func=lambda a: run_engine_stress(a.selection_run, a.market, a.output, a.start, a.end))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)
