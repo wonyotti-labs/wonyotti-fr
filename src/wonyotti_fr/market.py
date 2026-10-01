@@ -186,3 +186,45 @@ def fetch_market(root: Path, symbols: list[str], start: str, end: str,
                 "successful": successful, "missing": missing, "summary": market_summary}
     save_json(root / f"manifest-{interval}.json", manifest)
     return manifest
+
+
+def repair_gaps(source: Path, output: Path) -> dict:
+    import json
+    import shutil
+
+    manifest_path = source / "manifest-15m.json"
+    manifest = json.loads(manifest_path.read_text())
+    if output.exists() or output.resolve().is_relative_to(source.resolve()):
+        raise ValueError("보완 자료는 원본 밖의 새 폴더에 저장해야 합니다.")
+    shutil.copytree(source, output)
+    manifest["parent_manifest_sha256"] = sha256(manifest_path)
+    repairs = []
+    for symbol, summary in manifest["summary"].items():
+        metadata = summary["klines"]
+        path = output / metadata["file"]
+        if not path.resolve().is_relative_to(output.resolve()) or sha256(path) != metadata["sha256"]:
+            raise ValueError("보완 입력 경로 또는 체크섬 오류")
+        frame = pd.read_parquet(path)
+        expected = pd.date_range(frame.time.min(), frame.time.max(), freq="15min")
+        missing = expected.difference(frame.time)
+        if len(missing) > 96 * 31:
+            raise ValueError("결측이 31일을 초과합니다. 자료 범위를 먼저 검토하세요.")
+        additions = []
+        for date in sorted(set(missing.strftime("%Y-%m-%d"))):
+            url = f"https://data.binance.vision/data/futures/um/daily/klines/{symbol}/15m/{symbol}-15m-{date}.zip"
+            archive, record = verified_archive(url, output / "archives")
+            daily = parse_klines(archive_csv(archive), "15m")
+            addition = daily[daily.time.isin(missing)]
+            additions.append(addition)
+            repairs.append({**record, "symbol": symbol, "date": date, "kind": "klines", "rows_added": len(addition)})
+            print(f"일별 공식 자료 보완: {symbol} {date}, {len(addition)}봉", flush=True)
+        if additions:
+            frame = pd.concat([frame, *additions], ignore_index=True).sort_values("time")
+            if frame.time.duplicated().any() or len(expected.difference(frame.time)):
+                raise ValueError("공식 일별 자료로 결측을 모두 보완하지 못했습니다.")
+            frame.to_parquet(path, index=False)
+        summary["klines"] = {**metadata, "rows": len(frame), "gaps": 0, "sha256": sha256(path)}
+    manifest["daily_repairs"] = repairs
+    manifest["repaired_at"] = datetime.now(UTC)
+    save_json(output / "manifest-15m.json", manifest)
+    return manifest

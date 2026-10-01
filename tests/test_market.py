@@ -53,3 +53,32 @@ def test_cache_is_reverified(monkeypatch, tmp_path):
 def test_download_host_allowlist():
     with pytest.raises(ValueError, match="허용되지 않은"):
         market.safe_get("https://example.com/archive.zip", 100)
+
+
+def test_daily_repair_preserves_source_and_only_adds_missing(monkeypatch, tmp_path):
+    import json
+
+    import pandas as pd
+
+    from wonyotti_fr.common import sha256
+
+    source = tmp_path / "source"
+    source.mkdir()
+    content = b"1577836800000,100,105,99,103,10,1577837699999,1000,5,6,600,0\n"
+    content += b"1577837700000,103,105,99,104,10,1577838599999,1000,5,6,600,0\n"
+    content += b"1577838600000,104,105,99,104,10,1577839499999,1000,5,6,600,0\n"
+    complete = market.parse_klines(content, "15m")
+    path = source / "BTCUSDT-15m.parquet"
+    complete.iloc[[0, 2]].to_parquet(path, index=False)
+    original_hash = sha256(path)
+    (source / "manifest-15m.json").write_text(json.dumps({"summary": {"BTCUSDT": {"klines": {
+        "file": path.name, "sha256": original_hash, "rows": 2, "gaps": 1}}}}))
+    archive = tmp_path / "BTCUSDT-15m-2020-01-01.zip"
+    with zipfile.ZipFile(archive, "w") as handle:
+        handle.writestr(archive.stem + ".csv", content)
+    monkeypatch.setattr(market, "verified_archive", lambda url, cache: (archive, {"url": url}))
+    output = tmp_path / "repaired"
+    result = market.repair_gaps(source, output)
+    assert sha256(path) == original_hash
+    assert len(pd.read_parquet(output / path.name)) == 3
+    assert result["daily_repairs"][0]["rows_added"] == 1
