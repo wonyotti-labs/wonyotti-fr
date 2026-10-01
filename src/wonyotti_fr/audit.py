@@ -13,6 +13,7 @@ COLUMNS = [
     "date", "execid", "orderid", "symbol", "side", "lastqty", "lastpx",
     "lastliquidityind", "orderqty", "exectype", "ordtype", "ordstatus", "cumqty",
     "execcomm", "execcost", "trdmatchid", "transacttime", "timestamp",
+    "currency", "settlcurrency",
 ]
 
 
@@ -60,6 +61,8 @@ def load_executions(source: Path, timezone: str = "UTC") -> tuple[pd.DataFrame, 
         "files": manifests, "rows": len(data), "duplicate_execid": 0,
         "source_timezone_assumption": timezone, "timezone_independently_verified": False,
         "types": data["exectype"].value_counts().to_dict(),
+        "settlement_currencies": data.settlcurrency.value_counts().to_dict(),
+        "symbol_currencies": records(data[["symbol", "currency", "settlcurrency"]].drop_duplicates()),
         "trade_symbols": data.loc[trade, "symbol"].value_counts().to_dict(),
         "trade_order_types": data.loc[trade, "ordtype"].value_counts().to_dict(),
         "liquidity": data.loc[trade, "lastliquidityind"].value_counts().to_dict(),
@@ -122,9 +125,10 @@ def load_wallet(source: Path) -> tuple[pd.DataFrame, dict]:
     return data, summary
 
 
-def aggregate_events(data: pd.DataFrame, symbol: str) -> pd.DataFrame:
+def aggregate_events(data: pd.DataFrame, symbol: str, allow_settlement: bool = False) -> pd.DataFrame:
     selected = data[data.symbol.eq(symbol)].copy()
-    unsupported = set(selected.exectype.unique()) - {"Trade", "Funding"}
+    allowed = {"Trade", "Funding", "Settlement"} if allow_settlement else {"Trade", "Funding"}
+    unsupported = set(selected.exectype.unique()) - allowed
     if unsupported:
         raise ValueError(f"{symbol}에서 아직 지원하지 않는 이벤트: {sorted(unsupported)}")
     selected["maker_fills"] = selected.lastliquidityind.eq("AddedLiquidity").astype(int)

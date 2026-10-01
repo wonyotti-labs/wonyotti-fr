@@ -8,7 +8,7 @@ getcontext().prec = 36
 D = Decimal
 
 
-def reconstruct(events: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+def reconstruct(events: pd.DataFrame, inverse: bool = True) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     quantity = 0
     basis = D(0)
     gross = D(0)
@@ -76,7 +76,7 @@ def reconstruct(events: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict]
             else:
                 close_qty = min(abs(quantity), fill_qty)
                 direction_before = 1 if quantity > 0 else -1
-                realized = D(direction_before * close_qty) * (basis - unit_cost)
+                realized = D(direction_before * close_qty) * (basis - unit_cost) * (1 if inverse else -1)
                 gross += realized
                 assert episode is not None
                 episode["gross"] += realized
@@ -118,6 +118,7 @@ def reconstruct(events: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict]
     total_net = gross - fees - funding
     audit = {
         "initial_position_assumption": 0, "final_position_contracts": quantity,
+        "cost_convention": "inverse" if inverse else "linear_or_quanto_original_settlement_units",
         "final_basis_satoshi_per_contract": str(basis),
         "realized_gross_btc": float(gross / D(10**8)), "trade_fees_btc": float(fees / D(10**8)),
         "funding_cost_btc": float(funding / D(10**8)), "realized_net_btc": float(total_net / D(10**8)),

@@ -49,3 +49,15 @@ def test_open_episode_is_not_reported_as_closed():
     assert not episodes.iloc[0].closed
     assert summary["final_position_contracts"] == -20
     assert summary["realized_net_btc"] == -7 / 1e8
+
+
+def test_quanto_partial_close_and_zero_price_settlement():
+    rows = [event(0, "Buy", 10, 10000, 2), event(1, "Sell", 4, 12000, 1),
+            event(2, "Sell", 6, 1, 0, kind="Settlement")]
+    rows[2]["cost_satoshi"], rows[2]["price"] = 0, 0
+    for row in rows:
+        row["cost_satoshi"] *= -1
+    episodes, _, summary = reconstruct(pd.DataFrame(rows), inverse=False)
+    assert summary["realized_net_btc"] == pytest.approx((8000 - 60000 - 3) / 1e8)
+    assert summary["final_position_contracts"] == 0
+    assert episodes.iloc[0].closed
