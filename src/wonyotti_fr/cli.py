@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .audit import aggregate_events, write_audit
 from .common import new_run, save_json
+from .market import fetch_market
 from .reconstruct import reconstruct
 from .reports import write_reconstruction_report
 
@@ -36,6 +37,13 @@ def main() -> None:
     audit.add_argument("--timezone", default="UTC", help="독립 검증 전까지 명시적 가정")
     audit.add_argument("--output", type=Path, default=Path("artifacts"))
     audit.set_defaults(func=run_audit)
+    market = commands.add_parser("market", help="공식 시세/펀딩 자료를 체크섬 검증 후 저장")
+    market.add_argument("--symbols", nargs="+", default=["BTCUSDT", "ETHUSDT", "SOLUSDT"])
+    market.add_argument("--start", default="2019-09")
+    market.add_argument("--end", default="2025-12")
+    market.add_argument("--interval", default="15m", choices=["1m", "5m", "15m", "1h"])
+    market.add_argument("--output", type=Path, default=Path("data/market"))
+    market.set_defaults(func=lambda a: fetch_market(a.output, a.symbols, a.start, a.end, a.interval))
     args = parser.parse_args()
     args.func(args)
 
