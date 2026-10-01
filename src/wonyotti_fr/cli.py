@@ -6,6 +6,7 @@ from pathlib import Path
 from .audit import aggregate_events, write_audit
 from .bitmex_history import fetch_bitmex_history
 from .common import new_run, save_json
+from .context_study import run_context_study
 from .engine_stress import run_engine_stress
 from .event_diagnostics import run_event_diagnostics
 from .event_evaluation import run_event_evaluation
@@ -139,6 +140,12 @@ def main() -> None:
     stress.add_argument("--end", default="2020-03-14")
     stress.add_argument("--output", type=Path, default=Path("artifacts"))
     stress.set_defaults(func=lambda a: run_engine_stress(a.selection_run, a.market, a.output, a.start, a.end))
+    context = commands.add_parser("context-study", help="원거래소 전체 기간의 주문 맥락과 체결 비용 분석")
+    context.add_argument("--audit-run", type=Path, required=True)
+    context.add_argument("--study-run", type=Path, required=True)
+    context.add_argument("--history", type=Path, default=Path("data/bitmex-history"))
+    context.add_argument("--output", type=Path, default=Path("artifacts"))
+    context.set_defaults(func=lambda a: run_context_study(a.audit_run, a.history, a.study_run, a.output))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)
