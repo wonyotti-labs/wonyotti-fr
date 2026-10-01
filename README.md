@@ -110,6 +110,13 @@ uv run wonyotti edge-diagnose --selection-run artifacts/비용예측선택ID --a
 
 v5도 다른 시장 손실과 거래 표본 부족으로 채택하지 않았다. 9월 무거래를 수익성 증거로 해석하지 않는다. 이후 후보의 평가에서 9월을 다시 미사용 구간으로 부르면 안 된다. 후속 연구는 `bitmex-history --interval 1m --output data/bitmex-history-1m`으로 별도 자료를 수집해 체결 시점의 차이부터 검증한다.
 
+```sh
+uv run wonyotti bitmex-history --interval 1m --output data/bitmex-history-1m
+uv run wonyotti timing-study --audit-run artifacts/감사실행ID --study-run artifacts/사건학습ID --minute-history data/bitmex-history-1m
+```
+
+`timing-study`는 두 간격의 수집이 완료된 후 실행한다. 같은 주문의 직전 확정 가격과 이후 가격을 연결하고, 1분봉을 집계한 값과 공식 5분 자료를 대조한다. 미완성 봉·값 차이·연결 실패를 각각 남긴다. 시간 해상도를 높인 것 자체를 수익성 확보로 해석하지 않는다.
+
 ## 중단과 복원이 가능한 오프라인 봇
 
 ```sh
@@ -142,11 +149,14 @@ uv run wonyotti engine-stress --selection-run artifacts/빈도선택ID
 | `frequency-select`, `frequency-evaluate` | 행동 빈도 반영 후보·신뢰도 진단·고정 비교·새 구간 개봉 조건 |
 | `execution-study`, `expansion-select`, `expansion-evaluate` | 최초 체결 이후 가격·비용, 노출 확대 시점·방향 모델, 다년 비교 |
 | `edge-select`, `edge-evaluate`, `edge-diagnose` | 보유 시간·비용 예측 후보, 단계별 신호 표본, 후속 기간 비교 |
+| `timing-study` | 같은 주문의 1분·5분 연결과 집계 일치·누락 비교 |
 | `event-replay` | 영속 저널, 중단·재개 상태, 단일 실행 대조 |
 | `engine-stress` | 실제 프로세스 종료 복구와 급변·중복·누락·수동 중지 검사 |
 | `study`, `research`, `robustness`, `replay` | v1 행동 연구·방향 모사·비용 비교·재표집·오프라인 재생 |
 
 실험마다 새 폴더를 만든다. 원본 CSV, `artifacts/` 결과, `data/` 시장 자료, 학습 모델은 Git에서 제외한다. 원본 기반 연구를 재현하려면 별도로 이용 권한이 있는 원본이 필요하다. 합성 예제와 테스트는 원본 없이 실행할 수 있다. 실제 호가 대기열·시장 충격·실시간 모의매매는 구현하지 않았다.
+
+사건별 백테스트 출력은 작은 묶음으로 저장한다. `storage.json`에 출력별 최대 대기 행 수, `config.json`에 해당 실행의 시간 간격·위험 설정을 남긴다. 입력 시세와 특징 캐시는 별도 메모리를 사용한다. 실패하면 부분 출력과 `failure.json`을 보존하고 성공 지표를 생성하지 않는다. 기존 다년 실행과 모든 잔고·체결·최종 상태를 대조했다.
 
 ## 개발과 공개 범위
 
