@@ -6,6 +6,7 @@ from pathlib import Path
 from .audit import aggregate_events, write_audit
 from .bitmex_history import fetch_bitmex_history
 from .common import new_run, save_json
+from .event_diagnostics import run_event_diagnostics
 from .event_evaluation import run_event_evaluation
 from .event_replay import run_event_replay
 from .event_research import run_event_selection
@@ -104,6 +105,11 @@ def main() -> None:
     evaluation.add_argument("--period", choices=["observed", "new"], required=True)
     evaluation.add_argument("--output", type=Path, default=Path("artifacts"))
     evaluation.set_defaults(func=lambda a: run_event_evaluation(a.selection_run, a.market, a.output, a.period))
+    diagnostics = commands.add_parser("event-diagnose", help="완료한 사건별 평가의 매매 빈도·가격 손익·비용 분해")
+    diagnostics.add_argument("--study-run", type=Path, required=True)
+    diagnostics.add_argument("--evaluation-runs", type=Path, nargs="+", required=True)
+    diagnostics.add_argument("--output", type=Path, default=Path("artifacts"))
+    diagnostics.set_defaults(func=lambda a: run_event_diagnostics(a.study_run, a.evaluation_runs, a.output))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)
     journal.add_argument("--market", type=Path, required=True)
