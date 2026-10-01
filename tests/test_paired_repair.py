@@ -39,6 +39,9 @@ def test_all_target_trades_require_independent_evidence_even_without_id_gaps():
         canonical_window(prior, five, trades.iloc[2:], aggregates, pd.DatetimeIndex(five.end))
     with pytest.raises(ValueError, match='불일치'):
         canonical_window(prior, five, trades, aggregates.assign(qty=1.1), pd.DatetimeIndex(five.end))
+    # 개별 체결 하나가 통째로 없으면 나머지 체결의 일대일 연결만으로 통과시키지 않는다.
+    with pytest.raises(ValueError, match='전체가 개별 체결에서 누락'):
+        canonical_window(prior, five, trades.drop(index=3), aggregates, pd.DatetimeIndex(five.end))
 
 
 def test_cross_boundary_group_requires_context_and_missing_context_is_rejected():

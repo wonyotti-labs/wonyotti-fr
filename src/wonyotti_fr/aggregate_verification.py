@@ -39,12 +39,20 @@ def verify_aggregate_coverage(trades: pd.DataFrame, aggregates: pd.DataFrame, mi
         raise ValueError('집계 교차 검증의 대상·순서 오류')
     coverage = np.zeros(len(trades), dtype=np.int16)
     verified, skipped_partial, residual = 0, 0, 0.
-    for row in aggregates.itertuples(index=False):
+    starts = pd.to_datetime(aggregates.time, unit='ms', utc=True)
+    relevant = (starts.dt.floor('1min').isin(minutes)
+                | (starts + pd.Timedelta(milliseconds=100)).dt.floor('1min').isin(minutes))
+    for row, expected in zip(aggregates.itertuples(index=False), relevant, strict=True):
         low, high = int(np.searchsorted(ids, row.first_id)), int(np.searchsorted(ids, row.last_id, side='right'))
         if low == high or not target[low:high].any():
-            continue
+            if not expected:
+                continue
+            if low == high:
+                raise ValueError('대상 시각의 집계 체결 전체가 개별 체결에서 누락됐습니다.')
         if ids[low] != row.first_id or ids[high - 1] != row.last_id:
             # 원체결 범위 밖까지 걸친 집계는 증거로 쓰지 않고 최종 연결 범위 검사에서 거부한다.
+            if expected:
+                raise ValueError('대상 시각의 집계 체결 경계를 개별 체결로 확인할 수 없습니다. 정확히 한 번씩 연결 필요')
             skipped_partial += 1
             continue
         error = abs(float(quantities[low:high].sum()) - row.qty)
