@@ -115,7 +115,7 @@ uv run wonyotti bitmex-history --interval 1m --output data/bitmex-history-1m
 uv run wonyotti timing-study --audit-run artifacts/감사실행ID --study-run artifacts/사건학습ID --minute-history data/bitmex-history-1m
 ```
 
-`timing-study`는 두 간격의 수집이 완료된 후 실행한다. 같은 주문의 직전 확정 가격과 이후 가격을 연결하고, 1분봉을 집계한 값과 공식 5분 자료를 대조한다. 미완성 봉·값 차이·연결 실패를 각각 남긴다. 시간 해상도를 높인 것 자체를 수익성 확보로 해석하지 않는다.
+`timing-study`는 두 간격의 수집이 완료된 후 실행한다. 같은 주문의 직전 확정 가격과 이후 가격을 연결하고, 1분봉을 집계한 값과 공식 5분 자료를 대조한다. 미완성 봉·값 차이·연결 실패를 각각 남긴다. 전체 기간의 집계와 같은 주문 연결을 완료했다. 시간 해상도를 높인 것 자체를 수익성 확보로 해석하지 않는다. 후속 구현은 [v7 진입 대기 계획](docs/EXPERIMENT_V7.md)에 따른다.
 
 ## 중단과 복원이 가능한 오프라인 봇
 
