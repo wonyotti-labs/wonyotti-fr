@@ -8,9 +8,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .aggregate_verification import selected_aggregate_trades, verify_aggregate_coverage
+from .aggregate_verification import (
+    UnmatchedAggregateTrades,
+    selected_aggregate_trades,
+    verify_aggregate_coverage,
+)
+from .candle_corroboration import verify_unchanged_candles
 from .common import save_json, sha256
-from .market import archive_csv, verified_archive
+from .market import archive_csv, parse_klines, verified_archive
 from .minute_data import compare_minute_bars, validate_minutes
 from .minute_repair import BAR_COLUMNS, rebuilt_minutes, selected_archive_trades
 from .research import load_market
@@ -25,7 +30,8 @@ def load_repair_targets(path: Path | None) -> dict | None:
 
 
 def canonical_window(minute: pd.DataFrame, five: pd.DataFrame, trades: pd.DataFrame,
-                     aggregates: pd.DataFrame, ends: pd.DatetimeIndex) -> tuple[dict, dict]:
+                     aggregates: pd.DataFrame, ends: pd.DatetimeIndex,
+                     *, candle_sources: dict[str, pd.DataFrame] | None = None) -> tuple[dict, dict]:
     if (ends.empty or ends.has_duplicates or not ends.is_monotonic_increasing or ends.tz is None
         or (ends.as_unit('ns').asi8 % pd.Timedelta(minutes=5).value).any()):
         raise ValueError('양방향 복원 대상의 5분 경계 오류')
@@ -34,8 +40,17 @@ def canonical_window(minute: pd.DataFrame, five: pd.DataFrame, trades: pd.DataFr
     expected = pd.DatetimeIndex(sorted(t - pd.Timedelta(minutes=k) for t in ends for k in range(1, 6)))
     if not np.array_equal(rebuilt.time.dt.as_unit('ns').array.asi8, expected.as_unit('ns').asi8):
         raise ValueError('복원 대상의 전체 1분 체결 구간 부족')
-    # 두 봉 자료 모두 오류가 있을 수 있어 모든 대상 체결을 별도 집계 형식과 대조한다.
-    corroboration = verify_aggregate_coverage(trades, aggregates, rebuilt.time)
+    unchanged = None
+    try:
+        corroboration = verify_aggregate_coverage(trades, aggregates, rebuilt.time)
+    except UnmatchedAggregateTrades as error:
+        if candle_sources is None:
+            raise
+        unchanged = verify_unchanged_candles(minute, rebuilt, error.minutes, candle_sources)
+        corroboration = error.report
+        remaining = rebuilt.loc[~rebuilt.time.isin(error.minutes), 'time']
+        if len(remaining):
+            unchanged['remaining_minutes_aggregate_check'] = verify_aggregate_coverage(trades, aggregates, remaining)
     derived = rebuilt.groupby(rebuilt.end.dt.ceil('5min')).agg(
         open=('open', 'first'), high=('high', 'max'), low=('low', 'min'), close=('close', 'last'),
         volume=('volume', 'sum'), quote_volume=('quote_volume', 'sum'), count=('count', 'sum'),
@@ -56,6 +71,7 @@ def canonical_window(minute: pd.DataFrame, five: pd.DataFrame, trades: pd.DataFr
             canonical.loc[changed, ['time', *BAR_COLUMNS]], on='time',
             suffixes=('_original', '_rebuilt'), validate='one_to_one')
     return updates, {'corroboration': corroboration, 'changes': changes,
+                     'unchanged_candle_evidence': unchanged, 'bar_values_verified': True,
                      'changed_minutes': len(updates['1m']), 'changed_five_minutes': len(updates['5m'])}
 
 
@@ -68,7 +84,9 @@ def context_ends(ends: pd.DatetimeIndex, date: pd.Timestamp) -> pd.DatetimeIndex
 
 def repair_paired_market(source: Path, feature_source: Path, output: Path, feature_output: Path, cache: Path,
                          start: str | None = None, end: str | None = None, extra_targets: dict | None = None,
-                         requested_symbols: list[str] | None = None) -> dict:
+                         requested_symbols: list[str] | None = None, verify_unchanged_minutes: bool = False) -> dict:
+    if type(verify_unchanged_minutes) is not bool:
+        raise ValueError('미수정 분봉 증거 사용 설정 오류')
     if requested_symbols is not None and (not requested_symbols or len(requested_symbols) != len(set(requested_symbols))):
         raise ValueError('선택 복원 심볼의 빈 목록·중복 오류')
     if (start is None) != (end is None):
@@ -108,7 +126,7 @@ def repair_paired_market(source: Path, feature_source: Path, output: Path, featu
     evidence = {'source_sha256': {k: sha256(v / f'manifest-{k}.json') for k, v in sources.items()},
                 'rule': '대상 모든 체결의 두 형식 대조 후 두 해상도 복원; 원본 보존',
                 'scope': [start, end] if start else None, 'extra_targets': extra_targets,
-                'requested_symbols': requested_symbols, 'symbols': {}}
+                'requested_symbols': requested_symbols, 'verify_unchanged_minutes': verify_unchanged_minutes, 'symbols': {}}
     for interval, path in outputs.items():
         shutil.copytree(sources[interval], path)
         # 완료 전에는 입력으로 사용할 최종 매니페스트를 노출하지 않는다.
@@ -150,7 +168,24 @@ def repair_paired_market(source: Path, feature_source: Path, output: Path, featu
                           'aggregate_archive': agg_meta, 'raw_checks': raw_checks, 'aggregate_checks': agg_checks}
                 details.append(detail)
                 save_json(output / 'paired-reconciliation.partial.json', evidence)
-                updates, checks = canonical_window(minute, five, trades, aggregates, ends)
+                try:
+                    updates, checks = canonical_window(minute, five, trades, aggregates, ends)
+                except UnmatchedAggregateTrades as error:
+                    if not verify_unchanged_minutes:
+                        raise
+                    trades[trades.id.isin(error.ids)].to_parquet(evidence_dir / f'{label}-unmatched-trades.parquet', index=False)
+                    candle_sources, candle_meta = {}, {}
+                    for frequency, stamp in [('daily', f'{date:%Y-%m-%d}'), ('monthly', f'{date:%Y-%m}')]:
+                        url = f'https://data.binance.vision/data/futures/um/{frequency}/klines/{symbol}/1m/{symbol}-1m-{stamp}.zip'
+                        candle_path, meta = verified_archive(url, cache)
+                        candles = parse_klines(archive_csv(candle_path), '1m')
+                        candle_sources[frequency] = candles[candles.time.isin(error.minutes)].reset_index(drop=True)
+                        candle_sources[frequency].to_parquet(evidence_dir / f'{label}-{frequency}-unchanged-candles.parquet', index=False)
+                        candle_meta[frequency] = meta
+                    detail['unchanged_candle_sources'] = candle_meta
+                    detail['strict_trade_check'] = error.report
+                    save_json(output / 'paired-reconciliation.partial.json', evidence)
+                    updates, checks = canonical_window(minute, five, trades, aggregates, ends, candle_sources=candle_sources)
                 for interval, frame in [('1m', minute), ('5m', five)]:
                     checks['changes'][interval].to_parquet(evidence_dir / f'{label}-{interval}-changes.parquet', index=False)
                     for row in updates[interval].itertuples(index=False):
@@ -188,6 +223,7 @@ def repair_paired_market(source: Path, feature_source: Path, output: Path, featu
             save_json(path / 'paired-reconciliation.json', evidence)
             manifests[interval]['paired_reconciliation'] = {
                 'source_sha256': evidence['source_sha256'], 'evidence_file': 'paired-reconciliation.json',
+                'verify_unchanged_minutes': verify_unchanged_minutes,
                 'scope': evidence['scope'], 'evidence_sha256': sha256(path / 'paired-reconciliation.json')}
             if first is not None:
                 manifests[interval]['start_month'] = first.strftime('%Y-%m')

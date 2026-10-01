@@ -8,6 +8,12 @@ import pandas as pd
 AGGREGATE_COLUMNS = ['aggregate_id', 'price', 'qty', 'first_id', 'last_id', 'time', 'is_buyer_maker']
 
 
+class UnmatchedAggregateTrades(ValueError):
+    def __init__(self, report: dict, minutes: pd.Series, ids: np.ndarray):
+        super().__init__('수정할 분봉의 개별 체결이 집계 자료에 정확히 한 번씩 연결되지 않습니다.')
+        self.report, self.minutes, self.ids = report, minutes, ids
+
+
 def selected_aggregate_trades(content: bytes, date: pd.Timestamp, trades: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     header = content[:min(content.find(b'\n') + 1, 4096)].split(b',', 1)[0]
     skip = int(header in (b'agg_trade_id', b'aggregate_trade_id', b'aggregate_id'))
@@ -65,9 +71,13 @@ def verify_aggregate_coverage(trades: pd.DataFrame, aggregates: pd.DataFrame, mi
         coverage[low:high] += 1
         residual = max(residual, error)
         verified += 1
-    if not np.all(coverage[target] == 1):
-        raise ValueError('수정할 분봉의 개별 체결이 집계 자료에 정확히 한 번씩 연결되지 않습니다.')
-    return {'target_trades': int(target.sum()), 'verified_aggregates': verified,
-            'target_exactly_once': True, 'skipped_partial_edges': skipped_partial,
-            'max_quantity_residual': residual, 'quantity_absolute_tolerance': 1e-7,
-            'limit': '공개 시장 체결의 두 형식 대조. ID 공백의 개별 원인이나 비공개 거래의 인증이 아님'}
+    missing = target & (coverage == 0)
+    report = {'target_trades': int(target.sum()), 'verified_aggregates': verified,
+              'target_exactly_once': bool(np.all(coverage[target] == 1)), 'skipped_partial_edges': skipped_partial,
+              'unmatched_trades': int(missing.sum()),
+              'max_quantity_residual': residual, 'quantity_absolute_tolerance': 1e-7,
+              'limit': '공개 시장 체결의 두 형식 대조. ID 공백의 개별 원인이나 비공개 거래의 인증이 아님'}
+    if missing.any():
+        minutes = pd.to_datetime(trades.loc[missing, 'time'], unit='ms', utc=True).dt.floor('1min').drop_duplicates()
+        raise UnmatchedAggregateTrades(report, minutes, ids[missing])
+    return report

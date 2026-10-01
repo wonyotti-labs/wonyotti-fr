@@ -112,8 +112,10 @@ def main() -> None:
     paired.add_argument("--end", help="새 정규화 자료의 UTC 종료 날짜, 미포함")
     paired.add_argument("--extra-targets", type=Path, help="이미 발견한 오류의 심볼별 5분 종료 시각 JSON")
     paired.add_argument("--symbols", nargs='+', help="독립적으로 검증·복원할 입력 심볼")
+    paired.add_argument("--verify-unchanged-minutes", action='store_true', help="미연결 체결의 미수정 봉 값을 원체결·기존·일별·월별 경로로 정확 대조")
     paired.set_defaults(func=lambda a: repair_paired_market(a.market, a.feature_market, a.output, a.feature_output, a.cache,
-                                                            a.start, a.end, load_repair_targets(a.extra_targets), a.symbols))
+                                                            a.start, a.end, load_repair_targets(a.extra_targets), a.symbols,
+                                                            a.verify_unchanged_minutes))
     research = commands.add_parser("research", help="학습·검증·평가를 분리하여 모사 후보를 비교")
     research.add_argument("--audit-run", type=Path, required=True)
     research.add_argument("--market", type=Path, default=Path("data/market"))

@@ -123,6 +123,8 @@ uv run wonyotti timing-study --audit-run artifacts/감사실행ID --study-run ar
 
 한 시장의 자료 검증 실패가 다른 시장의 독립 검증을 막지 않도록 `paired-repair --symbols ETHUSDT SOLUSDT`처럼 범위를 지정할 수 있다. 출력 매니페스트는 선택한 시장만 포함한다. 제외한 시장의 실패나 전체 평가 미완료를 성공으로 바꾸지는 않는다.
 
+집계에 연결되지 않는 체결이 수정할 필요 없는 봉에만 있으면 `--verify-unchanged-minutes`로 봉 값의 추가 대조를 요청할 수 있다. 원체결 집계·기존 입력·공식 일별·월별 자료의 아홉 값이 정확히 같아야 하며 해당 분봉은 바꾸지 않는다. 수정할 분봉의 체결 검증은 그대로 필요하다. 행 단위 미연결 상태와 봉 값 검증은 결과에서 분리하며 [검증 근거와 한계](docs/EXPERIMENT_V7.md)를 보존한다.
+
 ```bash
 uv run wonyotti pullback-select --v4-selection-run <v4 선택 폴더> \
   --market <대조를 마친 1분 자료> --feature-market <기존 5분 자료>
