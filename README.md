@@ -49,6 +49,8 @@ uv run wonyotti market-repair --interval 5m --market data/market-5m --output dat
 uv run wonyotti event-study --audit-run artifacts/감사실행ID
 uv run wonyotti event-select --study-run artifacts/사건학습ID --market data/market-5m-complete
 uv run wonyotti event-evaluate --selection-run artifacts/선택실행ID --market data/market-5m-complete --period observed
+uv run wonyotti event-walkforward --study-run artifacts/사건학습ID --audit-run artifacts/감사실행ID
+uv run wonyotti event-diagnose --study-run artifacts/사건학습ID --evaluation-runs artifacts/완료한평가ID
 ```
 
 독립 주문의 진입·추가·축소·청산 의도를 학습한다. 같은 주문의 부분 체결은 새 판단으로 반복 학습하지 않는다. 원거래소의 봉 시작 가격은 이전 종가이므로 특징 계산에만 쓰고, 체결 평가는 별도 거래소 시세를 사용한다.
@@ -83,6 +85,7 @@ uv run wonyotti event-replay --selection-run artifacts/선택실행ID --market d
 | `market`, `market-repair`, `bitmex-history` | 시세·펀딩·출처·해시·누락과 보완 이력 |
 | `event-study`, `event-select` | 사건별 학습 자료·모델·시간순 모사 평가·고정 후보 선택 |
 | `event-evaluate` | 다년·다시장 성과, 위험 규칙·비용·지연 비교, 그림, 채택 판단 |
+| `event-walkforward`, `event-diagnose` | 확장 학습의 모사 성능, 원본 행동 빈도와 봇의 가격 손익·비용 분해 |
 | `event-replay` | 영속 저널, 중단·재개 상태, 단일 실행 대조 |
 | `study`, `research`, `robustness`, `replay` | v1 행동 연구·방향 모사·비용 비교·재표집·오프라인 재생 |
 
