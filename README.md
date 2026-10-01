@@ -9,6 +9,8 @@
 - [연구 방법과 단위](docs/METHODOLOGY.md)
 - [사건별 실험 사전 계획](docs/EXPERIMENT_V2.md)
 - [행동 빈도 반영 실험 계획](docs/EXPERIMENT_V3.md)
+- [노출 확대 시점·방향 분리 계획](docs/EXPERIMENT_V4.md)
+- [보유 시간·비용을 고려한 진입 계획](docs/EXPERIMENT_V5.md)
 - [요구 사항별 검증 기록](docs/VERIFICATION.md)
 - [데이터 관리 원칙](DATA_POLICY.md)
 - [보안 정책](SECURITY.md)
@@ -77,6 +79,17 @@ uv run wonyotti frequency-evaluate --selection-run artifacts/빈도선택ID --ma
 
 v3는 기존 모델의 계수에 학습 구간의 행동 빈도를 반영한 점수 후보를 비교한다. 일부 기간의 매매 비용과 손실은 줄었지만 개발·확인 조건을 통과하지 못했다. `frequency-evaluate --period new`는 선행 검증 조건을 다시 계산하며, 실패한 후보로 새 기간을 열지 않는다. v3의 `new`는 2026년 9월이며 이번 연구에서는 수집하지 않았다.
 
+## 노출 확대를 학습하는 v4 연구
+
+```sh
+uv run wonyotti execution-study --audit-run artifacts/감사실행ID --study-run artifacts/사건학습ID
+uv run wonyotti expansion-select --audit-run artifacts/감사실행ID --study-run artifacts/사건학습ID
+uv run wonyotti expansion-evaluate --selection-run artifacts/노출확대선택ID --v3-selection-run artifacts/빈도선택ID --market data/market-5m-complete --period observed
+uv run wonyotti expansion-evaluate --selection-run artifacts/노출확대선택ID --v3-selection-run artifacts/빈도선택ID --market data/market-5m-2026-new --period seen_2026
+```
+
+새 진입과 추가 진입의 시점·방향을 분리해 학습한다. 로지스틱 회귀와 경사 부스팅을 숫자 JSON으로 저장하며 실행 코드가 포함된 모델 파일은 읽지 않는다. 최초 체결 이후의 가격 분석은 설명 연구이며 신호 입력으로 사용하지 않는다. v4도 개발·2021년 조건을 통과하지 못했다. 같은 `event-replay`와 `engine-stress` 명령으로 고정 후보를 검증할 수 있다. v3·v4의 새 기간 개봉 조건은 재생 명령에도 적용한다.
+
 ## 중단과 복원이 가능한 오프라인 봇
 
 ```sh
@@ -107,6 +120,7 @@ uv run wonyotti engine-stress --selection-run artifacts/빈도선택ID
 | `event-walkforward`, `event-diagnose` | 확장 학습의 모사 성능, 원본 행동 빈도와 봇의 가격 손익·비용 분해 |
 | `context-study` | 원거래소 전체 기간의 독립 주문 맥락·지정가/유동성 비용·추가 진입별 손익 |
 | `frequency-select`, `frequency-evaluate` | 행동 빈도 반영 후보·신뢰도 진단·고정 비교·새 구간 개봉 조건 |
+| `execution-study`, `expansion-select`, `expansion-evaluate` | 최초 체결 이후 가격·비용, 노출 확대 시점·방향 모델, 다년 비교 |
 | `event-replay` | 영속 저널, 중단·재개 상태, 단일 실행 대조 |
 | `engine-stress` | 실제 프로세스 종료 복구와 급변·중복·누락·수동 중지 검사 |
 | `study`, `research`, `robustness`, `replay` | v1 행동 연구·방향 모사·비용 비교·재표집·오프라인 재생 |
