@@ -333,6 +333,12 @@ def main() -> None:
     prior_select.add_argument('--output', type=Path, default=Path('artifacts'))
     prior_select.set_defaults(func=lambda a: print(run_position_prior_selection(a.selection_run,
         a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
+    from .calibration_diagnostics import run_calibration_diagnostics
+    calibration_diagnosis = commands.add_parser('management-calibration-diagnose', help='학습·빈도 보정·진단을 세 구간으로 분리해 관리 점수 대조')
+    for name in ['selection-run', 'labels-run', 'diagnosis-run']:
+        calibration_diagnosis.add_argument(f'--{name}', type=Path, required=True)
+    calibration_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
+    calibration_diagnosis.set_defaults(func=lambda a: print(run_calibration_diagnostics(a.selection_run, a.labels_run, a.diagnosis_run, a.output)))
     from .management_diagnostics import run_management_diagnostics
     management_diagnosis = commands.add_parser('management-model-diagnose', help='원본 관리 행동의 시간순 선형·부스팅 예측 대조')
     management_diagnosis.add_argument('--selection-run', type=Path, required=True)
