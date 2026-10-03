@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -24,9 +25,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 def evaluation_period(frozen: dict, period: str) -> tuple[str, str]:
     allowed = {'observed': ('2022-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01'),
                'verified_2022_2024': ('2022-01-01', '2025-01-01')}
-    if frozen.get('protocol') == 'net_edge_v8':
+    if frozen.get('protocol') in {'net_edge_v8', 'lifecycle_v9'}:
         allowed = {'observed': ('2023-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01')}
-    if frozen.get('protocol') not in {'pullback_v7', 'net_edge_v8'} or period not in allowed:
+    if frozen.get('protocol') not in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9'} or period not in allowed:
         raise ValueError('v7·v8 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
     key = 'seen_2026_period' if period == 'seen_2026' else 'observed_evaluation_period'
     expected = allowed['observed'] if period == 'verified_2022_2024' else allowed[period]
@@ -40,6 +41,7 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                             period: str, symbols: list[str]) -> Path:
     frozen, policy = load_selection(selection)
     is_net = frozen['protocol'] == 'net_edge_v8'
+    is_lifecycle = frozen['protocol'] == 'lifecycle_v9'
     start, end = evaluation_period(frozen, period)
     if not symbols or len(symbols) != len(set(symbols)) or not set(symbols) <= {'BTCUSDT', 'ETHUSDT', 'SOLUSDT'}:
         raise ValueError('평가 심볼의 종류·중복 오류')
@@ -52,8 +54,16 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         'cost_x3': (policy, replace(config, fee_bps=15, slippage_bps=9)),
         'extra_minute_delay': (policy, replace(config, signal_delay_bars=1)),
     }
-    protocol = 'docs/EXPERIMENT_V8.md' if is_net else 'docs/EXPERIMENT_V7.md'
-    destination = new_run(output, f'{"net-edge" if is_net else "pullback"}-evaluation-{period}', {
+    if is_lifecycle:
+        previous = json.loads((selection / 'pullback_selection.json').read_text())
+        variants = {'fixed_policy': (policy, config),
+                    'ungated_v7': (PullbackPolicy(policy.base, policy.offset_bps, policy.ttl_minutes), EngineConfig(**previous['risk'])),
+                    'cash': variants['cash'], 'no_adds': (policy, replace(config, max_adds=0)),
+                    'cap_30m': (policy, replace(config, max_hold_bars=30)),
+                    **{key: variants[key] for key in ['cost_x2', 'cost_x3', 'extra_minute_delay']}}
+    protocol = 'docs/EXPERIMENT_V9.md' if is_lifecycle else ('docs/EXPERIMENT_V8.md' if is_net else 'docs/EXPERIMENT_V7.md')
+    label = 'lifecycle' if is_lifecycle else ('net-edge' if is_net else 'pullback')
+    destination = new_run(output, f'{label}-evaluation-{period}', {
         'protocol': protocol, 'protocol_sha256': sha256(Path(protocol)), 'selection_sha256': sha256(selection / 'frozen_selection.json'),
         'market_manifest_sha256': sha256(market / 'manifest-1m.json'),
         'feature_manifest_sha256': sha256(feature_market / 'manifest-5m.json'),
@@ -62,6 +72,8 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
     names = ['frozen_selection.json', 'frozen_integrity.json', 'base_selection.json', 'expansion_models.json']
     if is_net:
         names.extend(['pullback_selection.json', 'net_model.json'])
+    if is_lifecycle:
+        names.extend(['pullback_selection.json', 'management_model.json'])
     for name in names:
         (destination / name).write_bytes((selection / name).read_bytes())
     print(f'진입 대기 {period} 평가: {destination}', flush=True)
@@ -77,7 +89,11 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                 rows.append({'symbol': symbol, 'strategy': name, **metrics})
                 save_json(destination / 'results_partial.json', rows)
                 print(f'{symbol}/{name}: 수익 {metrics["total_return"]:.2%}, 낙폭 {metrics["max_drawdown"]:.2%}, 거래 {metrics["closed_trades"]}', flush=True)
-                if is_net:
+                if is_lifecycle:
+                    from .lifecycle_research import lifecycle_diagnostics
+                    details = lifecycle_diagnostics(target, bars, risk)
+                    decomposition, wait = details['decomposition'], details['waiting']
+                elif is_net:
                     from .net_edge_research import net_diagnostics
                     details = net_diagnostics(target, bars, strategy, risk)
                     decomposition, wait = details['decomposition'], details['waiting']
@@ -105,6 +121,8 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                     waiting_diagnostics(target, part, config.signal_delay_bars)
                     if is_net:
                         net_diagnostics(target, part, policy, config)
+                    if is_lifecycle:
+                        lifecycle_diagnostics(target, part, config)
                     annual.append({'symbol': symbol, 'year': year, **metrics, 'accounting_reconciled': True,
                                    'net_pnl': decomposition['net_pnl']})
                     save_json(destination / 'annual_restart.json', annual)
@@ -125,7 +143,9 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         (destination / 'REPORT.md').write_text(
             '# 고정 진입 대기 후보의 후속 비교\n\n' + scope_note + table(summary) + '\n\n'
             '활동·방향 모형, 대기 폭·만료 시간과 위험 설정을 다시 선택하지 않았다. '
-            + ('ungated_v7은 순손익 필터만 제거한 기존 대기 정책이다. ' if is_net else
+            + ('ungated_v7은 기존 30분·추가 금지 정책이며 no_adds와 cap_30m은 관리 정책의 해당 기능만 제한한다. '
+               '진입 규칙이 같아도 보유·위험 상태 때문에 실제 진입 시각은 달라진다. ' if is_lifecycle else
+               'ungated_v7은 순손익 필터만 제거한 기존 대기 정책이다. ' if is_net else
                'immediate는 같은 30분 보유와 위험 설정에서 대기만 제거한다. ')
             + '비용은 편도 수수료·슬리피지를 함께 2·3배로 늘렸다. '
             '추가 지연은 1분이며, 조건 충족 후 실제 체결 가격은 다음 시가와 슬리피지로 계산했다.\n\n'

@@ -103,7 +103,7 @@ def run_engine_stress(selection: Path, market: Path, output: Path, start: str = 
     destination = new_run(output, 'engine-stress', {**identity,
                                                    'checks': '가격 급변 시세, 실제 프로세스 종료, 중복·누락·잘못된 입력, 수동 중지'})
     try:
-        if frozen.get('protocol') in {'pullback_v7', 'net_edge_v8'}:
+        if frozen.get('protocol') in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9'}:
             bars, input_checks = prepare_minute_period(market, feature_market, 'BTCUSDT', start, end)
             save_json(destination / 'input_verification.json', input_checks)
             events = list(iter_events(bars))

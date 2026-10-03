@@ -21,6 +21,7 @@ from .expansion_evaluation import run_expansion_evaluation
 from .expansion_research import run_expansion_selection
 from .frequency_evaluation import run_frequency_evaluation
 from .frequency_research import run_frequency_selection
+from .lifecycle_research import run_lifecycle_selection
 from .market import fetch_market, repair_gaps
 from .minute_repair import repair_minute_market
 from .net_edge_research import run_net_selection
@@ -257,7 +258,19 @@ def main() -> None:
     net_select.add_argument("--output", type=Path, default=Path("artifacts"))
     net_select.set_defaults(func=lambda a: run_net_selection(a.v7_selection_run, a.market, a.feature_market,
                                                            a.confirmation_market, a.confirmation_features, a.output))
-    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate"], help="고정 v7·v8 후보의 다시장·비용·지연 비교")
+    lifecycle = commands.add_parser("lifecycle-select", help="원본 관리 행동의 시간순 학습·후보 선택")
+    lifecycle.add_argument("--v7-selection-run", type=Path, required=True)
+    lifecycle.add_argument("--audit-run", type=Path, required=True)
+    lifecycle.add_argument("--study-run", type=Path, required=True)
+    lifecycle.add_argument("--history", type=Path, default=Path("data/bitmex-history"))
+    lifecycle.add_argument("--market", type=Path, required=True)
+    lifecycle.add_argument("--feature-market", type=Path, required=True)
+    lifecycle.add_argument("--confirmation-market", type=Path, required=True)
+    lifecycle.add_argument("--confirmation-features", type=Path, required=True)
+    lifecycle.add_argument("--output", type=Path, default=Path("artifacts"))
+    lifecycle.set_defaults(func=lambda a: run_lifecycle_selection(a.v7_selection_run, a.audit_run, a.study_run,
+                           a.history, a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output))
+    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate"], help="고정 v7~v9 후보의 다시장·비용·지연 비교")
     pullback_eval.add_argument("--selection-run", type=Path, required=True)
     pullback_eval.add_argument("--market", type=Path, required=True)
     pullback_eval.add_argument("--feature-market", type=Path, required=True)
