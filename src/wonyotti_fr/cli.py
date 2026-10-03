@@ -271,10 +271,20 @@ def main() -> None:
     lifecycle.add_argument("--output", type=Path, default=Path("artifacts"))
     lifecycle.set_defaults(func=lambda a: run_lifecycle_selection(a.v7_selection_run, a.audit_run, a.study_run,
                            a.history, a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output))
+    from .management_labels import run_management_labels, run_path_labels
+    labels = commands.add_parser("action-labels", help="원본 분별 관리 정답과 연결 원장 생성")
+    for name in ['audit-run', 'study-run', 'history', 'minute-history']:
+        labels.add_argument(f'--{name}', type=Path, required=True)
+    labels.add_argument('--output', type=Path, default=Path('artifacts'))
+    labels.set_defaults(func=lambda a: print(run_management_labels(a.audit_run, a.study_run, a.history, a.minute_history, a.output)))
+    path_labels = commands.add_parser('path-labels', help='관리 정답에 과거 보유 가격 경로 추가')
+    path_labels.add_argument('--labels-run', type=Path, required=True)
+    path_labels.add_argument('--output', type=Path, default=Path('artifacts'))
+    path_labels.set_defaults(func=lambda a: print(run_path_labels(a.labels_run, a.output)))
     action = commands.add_parser("action-select", help="분별 관리 사건과 행동별 정책 선택")
     action.add_argument("--v9-selection-run", type=Path, required=True)
     action.add_argument("--labels-run", type=Path, required=True)
-    action.add_argument("--regime", choices=["original", "recent"], default="original")
+    action.add_argument("--regime", choices=["original", "recent", "path"], default="original")
     action.add_argument("--market", type=Path, required=True)
     action.add_argument("--feature-market", type=Path, required=True)
     action.add_argument("--confirmation-market", type=Path, required=True)
@@ -282,7 +292,7 @@ def main() -> None:
     action.add_argument("--output", type=Path, default=Path("artifacts"))
     action.set_defaults(func=lambda a: run_action_selection(a.v9_selection_run, a.labels_run, a.market,
         a.feature_market, a.confirmation_market, a.confirmation_features, a.output, a.regime))
-    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate", "action-evaluate"], help="고정 v7~v11 후보의 다시장·비용·지연 비교")
+    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate", "action-evaluate"], help="고정 v7~v12 후보의 다시장·비용·지연 비교")
     pullback_eval.add_argument("--selection-run", type=Path, required=True)
     pullback_eval.add_argument("--market", type=Path, required=True)
     pullback_eval.add_argument("--feature-market", type=Path, required=True)

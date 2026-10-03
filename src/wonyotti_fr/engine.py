@@ -120,6 +120,8 @@ class TradingEngine:
                 "favorable_move": direction * (price / s["entry_price"] - 1) if direction else 0.0,
                 "hold_bars": s["index"] - s["entry_index"] if direction else 0,
                 "adds": s["active_trade"]["adds"] if direction else 0,
+                "average_entry": s["entry_price"],
+                "position_entry_time": s["active_trade"]["entry_time"] if direction else None,
                 "pending": s["pending"], "halted": s["permanent_halted"] or s["manual_halt"],
                 "bar_seconds": self.config.bar_seconds,
                 "policy_state": copy.deepcopy(s.get('policy_state', {}))}

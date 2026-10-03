@@ -43,9 +43,15 @@ def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int, *, mana
                               'direction': None, 'wait_minutes': 0.})
             continue
         if waiting is None:
-            if (management_state and event.policy_event == 'cleared'
-                and set(json.loads(previous_state[event.time])) == {'management_after', 'management_direction'}):
-                continue
+            if management_state and event.policy_event == 'cleared':
+                from .path_management import PATH_STATE, validate_path_state
+                previous = json.loads(previous_state[event.time])
+                path = bool(PATH_STATE & set(previous))
+                if path:
+                    validate_path_state(previous)
+                remaining = set(previous) - PATH_STATE
+                if remaining == {'management_after', 'management_direction'} or (path and not remaining):
+                    continue
             raise ValueError('시작 없이 종료된 진입 대기')
         first = pd.Timestamp(waiting['signal_time'])
         decisions.append({'signal_time': first, 'decision_time': stamp, 'status': event.policy_event,

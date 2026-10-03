@@ -34,6 +34,9 @@ def select_threshold(labels, scores, beta):
 
 
 class ActionModels:
+    features = FEATURES
+    format = 'minute_action_v1'
+
     def __init__(self, data):
         self.data = copy.deepcopy(data)
         self.kind = data['kind']
@@ -43,13 +46,13 @@ class ActionModels:
 
     @classmethod
     def fit(cls, train, calibration, kind):
-        x = train[FEATURES].to_numpy(dtype=float)
+        x = train[cls.features].to_numpy(dtype=float)
         y = train[[f'y_{a}' for a in ACTIONS]].to_numpy(dtype=int)
         if (len(x) < 1000 or not np.isfinite(x).all() or not np.isin(y, [0, 1]).all()
             or (y.sum(axis=0) < 20).any() or ((1 - y).sum(axis=0) < 20).any()
             or train.label_end.max() >= calibration.end.min()):
             raise ValueError('행동별 학습의 특징·표본·시간 분리 오류')
-        data = {'format': 'minute_action_v1', 'features': FEATURES, 'actions': ACTIONS, 'kind': kind}
+        data = {'format': cls.format, 'features': cls.features, 'actions': ACTIONS, 'kind': kind}
         learners = []
         if kind == 'logistic':
             scaler = StandardScaler().fit(x)
@@ -80,7 +83,7 @@ class ActionModels:
         error = float(np.max(np.abs(model.probabilities(x) - expected)))
         if error > 1e-12:
             raise ValueError('행동 모델 내보내기 불일치')
-        scores = model.probabilities(calibration[FEATURES].to_numpy(dtype=float))
+        scores = model.probabilities(calibration[cls.features].to_numpy(dtype=float))
         thresholds, details = {}, {}
         for i, action in enumerate(ACTIONS):
             thresholds[action], details[action] = select_threshold(calibration[f'y_{action}'], scores[:, i], [2., 1., .5][i])
@@ -90,11 +93,12 @@ class ActionModels:
 
     @classmethod
     def from_dict(cls, data):
-        if (data.get('format') != 'minute_action_v1' or data.get('features') != FEATURES
+        if (data.get('format') != cls.format or data.get('features') != cls.features
             or data.get('actions') != ACTIONS or data.get('kind') not in ('logistic', 'tree')):
             raise ValueError('행동 모델의 형식·특징·행동 오류')
         if data['kind'] == 'logistic':
-            for name, shape in [('mean', (32,)), ('scale', (32,)), ('coef', (3, 32)), ('intercept', (3,))]:
+            count = len(cls.features)
+            for name, shape in [('mean', (count,)), ('scale', (count,)), ('coef', (3, count)), ('intercept', (3,))]:
                 value = np.asarray(data[name], dtype=float)
                 if value.shape != shape or not np.isfinite(value).all():
                     raise ValueError('행동 모델의 숫자·차원 오류')
@@ -123,7 +127,7 @@ class ActionModels:
                     if left == right == -1:
                         if feature != -2:
                             raise ValueError('행동 트리 말단 오류')
-                    elif min(left, right) < 0 or not 0 <= feature < 32:
+                    elif min(left, right) < 0 or not 0 <= feature < len(cls.features):
                         raise ValueError('행동 트리 특징 오류')
                     else:
                         pending.extend([(left, depth + 1), (right, depth + 1)])
@@ -133,7 +137,7 @@ class ActionModels:
 
     def probabilities(self, values):
         values = np.asarray(values, dtype=float)
-        if values.ndim != 2 or values.shape[1] != 32:
+        if values.ndim != 2 or values.shape[1] != len(self.features):
             raise ValueError('행동 예측 차원 오류')
         valid = np.isfinite(values).all(axis=1)
         result = np.full((len(values), 3), np.nan)
@@ -175,6 +179,10 @@ class MinuteActionPolicy(PullbackPolicy):
             raise ValueError('행동별 정책 문턱 오류')
         self.manager, self.thresholds, self.multiplier = manager, dict(thresholds), multiplier
 
+    def feature_values(self, bar, state):
+        return management_values(bar['features'], state['direction'], state['favorable_move'],
+                                 state['hold_bars'], state['adds'])
+
     def __call__(self, bar, state):
         if state['bar_seconds'] != 60:
             raise ValueError('분별 관리 정책의 실행 간격 오류')
@@ -199,8 +207,7 @@ class MinuteActionPolicy(PullbackPolicy):
             raise ValueError('보유 중 알 수 없는 관리 상태')
         if state['pending'] != 'hold':
             return PolicyDecision('hold', stored if managing else {}, 'action_pending')
-        values = management_values(bar['features'], state['direction'], state['favorable_move'],
-                                   state['hold_bars'], state['adds'])
+        values = self.feature_values(bar, state)
         scores = self.manager.probabilities(values.reshape(1, -1))[0]
         if not np.isfinite(scores).all():
             return PolicyDecision('hold', {}, 'action_unavailable')

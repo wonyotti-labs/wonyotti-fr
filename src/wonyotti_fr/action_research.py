@@ -15,7 +15,8 @@ from .event_backtest import backtest
 from .event_diagnostics import decompose_run
 from .lifecycle_research import risk_config
 from .minute_data import prepare_minute_period
-from .minute_management import ACTIONS, FEATURES, purged_window
+from .minute_management import ACTIONS, purged_window
+from .path_management import PATH_FEATURES, PathActionModels, PathActionPolicy
 from .pullback_diagnostics import waiting_diagnostics
 from .pullback_policy import PullbackPolicy
 from .pullback_research import load_pullback_selection
@@ -28,14 +29,15 @@ def candidate_plan():
 
 def load_action_selection(selection: Path, frozen: dict):
     base_path, model_path = selection / 'pullback_selection.json', selection / 'action_model.json'
-    recent = frozen.get('protocol') == 'minute_action_v11'
-    if (frozen.get('protocol') not in {'minute_action_v10', 'minute_action_v11'} or base_path.stat().st_size > 1024**2
+    path = frozen.get('protocol') == 'minute_path_v12'
+    recent = frozen.get('protocol') in {'minute_action_v11', 'minute_path_v12'}
+    if (frozen.get('protocol') not in {'minute_action_v10', 'minute_action_v11', 'minute_path_v12'} or base_path.stat().st_size > 1024**2
         or model_path.stat().st_size > 1024**2 or sha256(base_path) != frozen['pullback_selection_sha256']
         or frozen['model_sha256'] != {'action_model.json': sha256(model_path)}):
         raise ValueError('분별 관리 정책의 기반·모델 지문 오류')
     previous = json.loads(base_path.read_text())
     _, entry = load_pullback_selection(selection, previous)
-    model = ActionModels.from_dict(json.loads(model_path.read_text()))
+    model = (PathActionModels if path else ActionModels).from_dict(json.loads(model_path.read_text()))
     if ((entry.offset_bps, entry.ttl_minutes) != (16, 5) or model.kind != frozen['kind']
         or frozen['training_period'] != (['2019-01-01', '2020-07-01'] if recent else ['2018-03-01', '2020-01-01'])
         or frozen['calibration_period'] != (['2020-07-01', '2021-01-01'] if recent else ['2020-01-01', '2021-01-01'])
@@ -46,7 +48,7 @@ def load_action_selection(selection: Path, frozen: dict):
         or frozen['evaluation_end_exclusive'] != '2026-10-01' or frozen['unseen_evaluation_available'] is not False
         or frozen['risk'] != asdict(risk_config(previous, frozen['sizing'], .04))):
         raise ValueError('분별 관리 정책의 고정 기간·위험 설정 오류')
-    return frozen, MinuteActionPolicy(entry, model, frozen['thresholds'], frozen['multiplier'])
+    return frozen, (PathActionPolicy if path else MinuteActionPolicy)(entry, model, frozen['thresholds'], frozen['multiplier'])
 
 
 def action_diagnostics(directory: Path, bars: pd.DataFrame, config: EngineConfig) -> dict:
@@ -62,7 +64,7 @@ def action_diagnostics(directory: Path, bars: pd.DataFrame, config: EngineConfig
 
 
 def imitation(model, frame, thresholds, multiplier):
-    scores = model.probabilities(frame[FEATURES].to_numpy(dtype=float))
+    scores = model.probabilities(frame[model.features].to_numpy(dtype=float))
     eligible = scores >= np.asarray([thresholds[a] * multiplier for a in ACTIONS])
     predicted = np.where(eligible.any(axis=1), np.asarray(ACTIONS)[eligible.argmax(axis=1)], 'hold')
     rows = {}
@@ -83,17 +85,21 @@ def run_action_selection(reference: Path, labels: Path, market: Path, features: 
     previous, entry = load_selection(reference)
     if previous.get('protocol') != 'lifecycle_v9':
         raise ValueError('분별 관리 정책은 v9 고정 위험 기준을 사용합니다.')
-    if regime not in ('original', 'recent'):
+    if regime not in ('original', 'recent', 'path'):
         raise ValueError('관리 학습 구간 설정 오류')
-    recent = regime == 'recent'
-    protocol = 'docs/EXPERIMENT_V11.md' if recent else 'docs/EXPERIMENT_V10.md'
+    path = regime == 'path'
+    recent = regime in ('recent', 'path')
+    model_class, policy_class = (PathActionModels, PathActionPolicy) if path else (ActionModels, MinuteActionPolicy)
+    protocol = f'docs/EXPERIMENT_V{12 if path else 11 if recent else 10}.md'
     hashes = json.loads((labels / 'files.json').read_text())
     names = ['training.parquet', 'calibration.parquet', 'check_2021.parquet', 'order_ledger.parquet', 'summary.json']
     if recent:
         names.append('events.parquet')
     if any(sha256(labels / name) != hashes[name] for name in names) or not json.loads((labels / 'summary.json').read_text())['complete']:
         raise ValueError('관리 정답 자료의 무결성 오류')
-    out = new_run(output, 'action-recent-selection' if recent else 'action-selection', {
+    if path and json.loads((labels / 'summary.json').read_text()).get('path_features') != PATH_FEATURES:
+        raise ValueError('가격 경로 특징 정답의 형식 오류')
+    out = new_run(output, 'action-path-selection' if path else 'action-recent-selection' if recent else 'action-selection', {
         'labels': str(labels), 'files_sha256': sha256(labels / 'files.json'),
         'reference': str(reference), 'reference_sha256': sha256(reference / 'frozen_selection.json'),
         'protocol_sha256': sha256(Path(protocol)), 'candidate_count': 4, 'regime': regime,
@@ -119,7 +125,7 @@ def run_action_selection(reference: Path, labels: Path, market: Path, features: 
             raise ValueError('분별 관리 학습·문턱·모사 기간 오류')
         fitted = {}
         for kind in ['logistic', 'tree']:
-            model, thresholds, support = ActionModels.fit(train, calibration, kind)
+            model, thresholds, support = model_class.fit(train, calibration, kind)
             save_json(out / f'{kind}_model.json', model.to_dict())
             save_json(out / f'{kind}_thresholds.json', {'thresholds': thresholds, 'support': support})
             fitted[kind] = (model, thresholds)
@@ -132,7 +138,7 @@ def run_action_selection(reference: Path, labels: Path, market: Path, features: 
         rows = []
         for i, candidate in enumerate(candidate_plan()):
             model, thresholds = fitted[candidate['kind']]
-            policy = MinuteActionPolicy(PullbackPolicy(entry.base, 16, 5), model, thresholds, candidate['multiplier'])
+            policy = policy_class(PullbackPolicy(entry.base, 16, 5), model, thresholds, candidate['multiplier'])
             metrics = backtest(bars, policy, config, out / f'candidate-{i:02d}')
             action_diagnostics(out / f'candidate-{i:02d}', bars, config)
             rows.append({'candidate': i, **candidate, **metrics, 'eligible': metrics['closed_trades'] >= 20,
@@ -146,7 +152,7 @@ def run_action_selection(reference: Path, labels: Path, market: Path, features: 
         winner = max(eligible, key=lambda r: r['score'])
         model, thresholds = fitted[winner['kind']]
         save_json(out / 'action_model.json', model.to_dict())
-        frozen = {'protocol': 'minute_action_v11' if recent else 'minute_action_v10', 'candidate': winner['candidate'], 'kind': winner['kind'],
+        frozen = {'protocol': 'minute_path_v12' if path else 'minute_action_v11' if recent else 'minute_action_v10', 'candidate': winner['candidate'], 'kind': winner['kind'],
                   'multiplier': winner['multiplier'], 'thresholds': thresholds, 'risk': asdict(config),
                   'sizing': previous['sizing'], 'development_metrics': winner,
                   'pullback_selection_sha256': sha256(out / 'pullback_selection.json'),
