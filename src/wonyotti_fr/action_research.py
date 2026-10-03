@@ -28,6 +28,9 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'minute_inventory_v19':
+        from .inventory_research import load_inventory_selection
+        return load_inventory_selection(selection, frozen)
     if frozen.get('protocol') == 'minute_rate_reverse_v18':
         from .rate_policy import ReversalRatePolicy
         parent_path = selection / 'rate_selection.json'

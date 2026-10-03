@@ -336,3 +336,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 범용 코드와 직접 작성한 문서는 [MIT License](LICENSE)를 적용한다. 제3자 원본·서한·시장 자료·학습 모델·로컬 파생 결과는 적용 대상이 아니다. 원자료 조건은 [DATA_POLICY.md](DATA_POLICY.md)에 기록한다. 이 프로젝트는 원자료 공개자의 공식 프로젝트나 보증을 의미하지 않는다.
 
 [v19](docs/EXPERIMENT_V19.md)의 수량 진단은 `inventory-study --audit-run <원본 감사 폴더> --labels-run <action-labels 출력>`으로 실행한다. `--bot-runs <개별 봇 실행 폴더> ...`로 보유 수량 상태를 비교할 수 있다. 과거 최대 수량 대비 잔량, 축소 요청·실제 체결 크기, 겹친 주문, 원본 BTC 손익을 연결하며 새 모델이나 수익 문턱을 선택하지 않는다. 원본 수량이 적게 남았다는 이유로 회계에서 삭제하지 않는다.
+
+수량 관리 학습은 `inventory-labels --path-labels-run <path-labels 출력> --inventory-study-run <수량 진단 출력>` 뒤 `inventory-select --rate-selection-run <v14 선택> --labels-run <수량 정답 출력>`으로 진행한다. 선택 명령에는 기존과 같은 개발·확인 시장 경로가 필요하다. 관리 정답은 그대로 유지하고, 실제 체결량과 분 경계 보유량을 연결할 수 있는 주문만 축소 크기 회귀에 사용한다. 예측 축소 비율은 주문과 함께 저장하며 고정 축소 대조와 성과로 재선택하지 않는다.

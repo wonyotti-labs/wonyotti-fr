@@ -7,7 +7,7 @@ import pandas as pd
 
 def guard_replay_period(selection: Path, frozen: dict, start: str, end: str) -> None:
     protocol = frozen.get('protocol')
-    if protocol in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
+    if protocol in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
         first, last = pd.Timestamp(start, tz='UTC'), pd.Timestamp(end, tz='UTC')
         if (first >= last or first < pd.Timestamp('2021-01-01' if protocol in {'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'} else '2020-01-01', tz='UTC')
             or last > pd.Timestamp('2026-10-01', tz='UTC') or frozen['evaluation_end_exclusive'] != '2026-10-01'

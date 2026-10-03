@@ -33,8 +33,8 @@ def inventory_states(actions: pd.DataFrame) -> pd.DataFrame:
 
 
 def attach_inventory(minutes: pd.DataFrame, states: pd.DataFrame) -> pd.DataFrame:
-    right = states.drop_duplicates('time', keep='last')[['time', 'episode_id', 'remaining_fraction']].rename(
-        columns={'time': 'inventory_time', 'episode_id': 'inventory_episode_id'})
+    right = states.drop_duplicates('time', keep='last')[['time', 'episode_id', 'remaining_fraction', 'after_qty']].rename(
+        columns={'time': 'inventory_time', 'episode_id': 'inventory_episode_id', 'after_qty': 'inventory_quantity'})
     right['inventory_time'] = right.inventory_time.astype('datetime64[ns, UTC]')
     left = minutes.copy().astype({'end': 'datetime64[ns, UTC]'})
     joined = pd.merge_asof(left, right, left_on='end', right_on='inventory_time', direction='backward', allow_exact_matches=False)
