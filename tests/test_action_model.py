@@ -111,3 +111,18 @@ def test_partial_reductions_are_spaced_and_accounting_matches(tmp_path):
     assert curve.accounting_residual.abs().max() < 1e-7
     diagnostics = action_diagnostics(tmp_path/'run', bars(), EngineConfig(bar_seconds=60, max_hold_bars=0))
     assert diagnostics['waiting']['entry_fills'] > 0
+
+
+def test_delayed_entry_cancels_a_new_wait_before_managing_position(tmp_path):
+    policy = MinuteActionPolicy(PullbackPolicy(ConstantBase(), 16, 5), FixedScores([0., 0., .2]),
+                                {'exit': .1, 'reduce': .1, 'increase': .1})
+    frame = bars()
+    # 9분 경계에서 충족된 진입을 1분 지연하면 10분 경계의 새 대기가 남을 수 있다.
+    frame.loc[:7, ['open', 'high', 'low', 'close']] = [100., 100.1, 99.9, 100.]
+    frame.loc[8:, ['open', 'high', 'low', 'close']] = [99., 99.1, 98.9, 99.]
+    config = EngineConfig(bar_seconds=60, max_hold_bars=0, signal_delay_bars=1)
+    backtest(frame, policy, config, tmp_path/'delayed')
+    report = action_diagnostics(tmp_path/'delayed', frame, config)
+    curve = pd.read_parquet(tmp_path/'delayed/equity.parquet')
+    assert report['waiting']['matched_entry_fills'] > 0
+    assert ((curve.policy_event == 'cleared') & curve.quantity.ne(0)).any()

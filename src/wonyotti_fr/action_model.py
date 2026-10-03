@@ -193,6 +193,9 @@ class MinuteActionPolicy(PullbackPolicy):
             if stored['management_direction'] == state['direction'] and current < until:
                 return PolicyDecision('hold', stored, 'action_cooldown')
         elif stored:
+            if set(stored) == {'signal_time', 'expires_at', 'direction', 'reference_price'}:
+                # 지연된 진입 체결 전에 새로 생긴 대기는 보유가 시작되면 취소한다.
+                return super().__call__(bar, state)
             raise ValueError('보유 중 알 수 없는 관리 상태')
         if state['pending'] != 'hold':
             return PolicyDecision('hold', stored if managing else {}, 'action_pending')
