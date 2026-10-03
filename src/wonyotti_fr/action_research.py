@@ -28,6 +28,9 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'realized_exit_v24':
+        from .realized_exit_research import load_realized_exit_selection
+        return load_realized_exit_selection(selection, frozen)
     if frozen.get('protocol') == 'recent_entry_v23':
         from .recent_entry import load_recent_entry_selection
         return load_recent_entry_selection(selection, frozen)

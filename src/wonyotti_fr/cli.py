@@ -313,6 +313,19 @@ def main() -> None:
     addition_select.add_argument('--output', type=Path, default=Path('artifacts'))
     addition_select.set_defaults(func=lambda a: print(run_addition_selection(a.selection_run, a.labels_run,
         a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
+    from .realized_exit import run_realized_exit_labels
+    exit_labels = commands.add_parser('realized-exit-labels', help='실제 보유 종료로 청산 정답만 수정')
+    for name in ['labels-run', 'audit-run']:
+        exit_labels.add_argument(f'--{name}', type=Path, required=True)
+    exit_labels.add_argument('--output', type=Path, default=Path('artifacts'))
+    exit_labels.set_defaults(func=lambda a: print(run_realized_exit_labels(a.labels_run, a.audit_run, a.output)))
+    from .realized_exit_research import run_realized_exit_selection
+    exit_select = commands.add_parser('realized-exit-select', help='실제 종료 청산 모델의 고정 학습과 확인')
+    for name in ['selection-run', 'labels-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
+        exit_select.add_argument(f'--{name}', type=Path, required=True)
+    exit_select.add_argument('--output', type=Path, default=Path('artifacts'))
+    exit_select.set_defaults(func=lambda a: print(run_realized_exit_selection(a.selection_run, a.labels_run,
+        a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
     from .recent_entry import run_recent_entry_selection
     recent_entry = commands.add_parser('recent-entry-select', help='최근 두 해 원본으로 신규 진입만 다시 학습해 고정 비교')
     for name in ['selection-run', 'audit-run', 'study-run', 'history', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
