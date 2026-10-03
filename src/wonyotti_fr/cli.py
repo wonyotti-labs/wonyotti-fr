@@ -313,6 +313,13 @@ def main() -> None:
     addition_select.add_argument('--output', type=Path, default=Path('artifacts'))
     addition_select.set_defaults(func=lambda a: print(run_addition_selection(a.selection_run, a.labels_run,
         a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
+    from .recent_entry import run_recent_entry_selection
+    recent_entry = commands.add_parser('recent-entry-select', help='최근 두 해 원본으로 신규 진입만 다시 학습해 고정 비교')
+    for name in ['selection-run', 'audit-run', 'study-run', 'history', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
+        recent_entry.add_argument(f'--{name}', type=Path, required=True)
+    recent_entry.add_argument('--output', type=Path, default=Path('artifacts'))
+    recent_entry.set_defaults(func=lambda a: print(run_recent_entry_selection(a.selection_run, a.audit_run,
+        a.study_run, a.history, a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
     from .minute_inventory_research import run_minute_inventory_selection
     minute_select = commands.add_parser('minute-inventory-select', help='확정 분봉 입력을 추가한 관리 모델의 학습과 확인')
     for name in ['inventory-selection-run', 'labels-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:

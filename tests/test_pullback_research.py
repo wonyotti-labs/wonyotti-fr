@@ -19,7 +19,8 @@ def selection(root):
     save_json(root / 'expansion_models.json', {'activity': model, 'direction': model})
     hashes = {'expansion_models.json': sha256(root / 'expansion_models.json')}
     base = {'protocol': 'expansion_v4', 'model_sha256': hashes, 'activity_threshold': .1,
-            'direction_threshold': .65, 'min_hold_bars': 12}
+            'direction_threshold': .65, 'min_hold_bars': 12, 'kind': 'logistic',
+            'development_metrics': {'activity_quantile': .975}}
     save_json(root / 'base_selection.json', base)
     frozen = {'protocol': 'pullback_v7', 'model_sha256': hashes, 'offset_bps': 8, 'ttl_minutes': 5,
               'base_selection_sha256': sha256(root / 'base_selection.json'),

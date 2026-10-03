@@ -28,6 +28,9 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'recent_entry_v23':
+        from .recent_entry import load_recent_entry_selection
+        return load_recent_entry_selection(selection, frozen)
     if frozen.get('protocol') == 'addition_effect_v22':
         from .addition_research import load_addition_selection
         return load_addition_selection(selection, frozen)
