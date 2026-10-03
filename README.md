@@ -15,6 +15,10 @@
 - [확정 종가에 따른 진입 대기 계획](docs/EXPERIMENT_V7.md)
 - [실행 순손익에 맞춘 진입 필터 계획](docs/EXPERIMENT_V8.md)
 - [원본 수익 구조와 관리 정책 복원 계획](docs/EXPERIMENT_V9.md)
+- [분별 관리 사건과 행동별 판단](docs/EXPERIMENT_V10.md)
+- [관리 방식의 시기 변화](docs/EXPERIMENT_V11.md)
+- [보유 가격 경로 복원](docs/EXPERIMENT_V12.md)
+- [청산과 방향 반전의 의미 대조](docs/EXPERIMENT_V13.md)
 - [요구 사항별 검증 기록](docs/VERIFICATION.md)
 - [데이터 관리 원칙](DATA_POLICY.md)
 - [보안 정책](SECURITY.md)
@@ -189,6 +193,41 @@ uv run wonyotti lifecycle-evaluate --selection-run <v9 선택 폴더> \
 
 원본 수익 구조를 훼손한 단순화는 계량화했지만 새 후보도 청산·축소 모사가 약하고 2022년 확인과 일부 장기 시장에서 실패했다. 보유 정답이 대부분인 전체 정확도를 모사 성공으로 해석하지 않는다. 일부 양수 구간만으로 수익성 전략으로 채택하지 않았다. 입력 지문·실패·개별 결과는 로컬에 보존한다.
 
+## 관리 사건·가격 경로·반전 연구
+
+v10은 다음 1분의 독립 추가·축소·청산을 복수 정답으로 보존하고 행동별 모델과 별도 문턱을 학습한다. 원본 반전 주문의 청산 대상은 새 포지션이 아니라 직전 포지션이다. v11은 다른 설정을 유지한 채 최근 학습·문턱 조정 기간을 사용한다. 두 후보 모두 확인 및 전체 조건에서 수익성 기준에 미달했다.
+
+```sh
+uv run wonyotti action-labels --audit-run <감사 폴더> --study-run <사건 연구 폴더> \
+  --history <원거래소 5분 자료> --minute-history <원거래소 1분 자료>
+uv run wonyotti action-select --v9-selection-run <v9 선택 폴더> --labels-run <관리 정답 폴더> \
+  --regime recent --market <2021년 1분 자료> --feature-market <2021년 5분 자료> \
+  --confirmation-market <2022년 1분 자료> --confirmation-features <2022년 5분 자료>
+```
+
+`--regime original`은 v10, `recent`는 v11이다. v12는 과거 보유 종가의 최선·최악·반납 폭을 추가한다. `path-labels` 출력과 `--regime path`를 함께 사용한다. 모델 형식과 학습 자료는 기존 후보와 분리하며, 추가 진입으로 평균가가 바뀌면 당시까지 관찰한 극값을 새 평균가로 계산한다. 가격 경로는 관리 대기 중에도 갱신하고 저널에 저장한다.
+
+```sh
+uv run wonyotti path-labels --labels-run <관리 정답 폴더>
+uv run wonyotti action-select --v9-selection-run <v9 선택 폴더> --labels-run <가격 경로 정답 폴더> \
+  --regime path --market <2021년 1분 자료> --feature-market <2021년 5분 자료> \
+  --confirmation-market <2022년 1분 자료> --confirmation-features <2022년 5분 자료>
+uv run wonyotti reversal-select --path-selection-run <v12 선택 폴더> \
+  --market <2021년 1분 자료> --feature-market <2021년 5분 자료> \
+  --confirmation-market <2022년 1분 자료> --confirmation-features <2022년 5분 자료>
+```
+
+v13은 v12의 고정 모델·문턱·신규 진입·위험을 유지하고 모델 청산을 반대 방향 진입으로 해석하는 단일 실행 가설이다. 위험 청산은 평탄 상태를 유지한다. 원본의 소수 평탄 청산을 따로 분류하지 못한다는 한계를 함께 기록한다.
+
+```sh
+uv run wonyotti action-evaluate --selection-run <선택 폴더> \
+  --market <평가 1분 자료> --feature-market <평가 5분 자료> --period observed
+uv run wonyotti action-evaluate --selection-run <선택 폴더> \
+  --market <2026년 1분 자료> --feature-market <2026년 5분 자료> --period seen_2026
+```
+
+v12~v13의 2022년 확인이 사전 조건에 미달하면 계획에 따라 `--symbols BTCUSDT --diagnostic-only`로 고정 후보와 독립 연도 진단만 수행한다. 이 경우 다른 시장·비용 배수·추가 지연을 검사했다고 표시하지 않는다. 확인을 통과한 후보에는 이 축소 옵션을 허용하지 않는다. 이미 관찰한 시기의 반복 실험이며 수익성 문제를 해결할 때까지 다음 원인을 연구한다.
+
 ## 중단과 복원이 가능한 오프라인 봇
 
 ```sh
@@ -198,7 +237,7 @@ uv run wonyotti event-replay --selection-run artifacts/선택실행ID --market d
 
 첫 실행은 처리 봉 수만 제한하며 열린 포지션을 유지한다. 다음 실행은 같은 모델·시세·설정·소스의 저널에서 이어서 처리한다. 전체 기간 끝에서만 비용을 내고 청산한다. `--verify-memory`는 처음부터 한 번에 처리한 잔고·체결·상태와 대조한다. 긴 기간에서는 추가 시간과 메모리가 든다.
 
-v7·v8·v9는 `--market`에 1분 자료를 지정하고 `--feature-market`에 별도 5분 특징 자료를 함께 지정한다. 두 입력의 해시를 저널에 묶는다. 진입 대기·만료 상태도 재개하며, 다음처럼 실제 종료 복구를 검증할 수 있다.
+v7~v13은 `--market`에 1분 자료를 지정하고 `--feature-market`에 별도 5분 특징 자료를 함께 지정한다. 두 입력의 해시를 저널에 묶는다. 진입 대기·만료 상태도 재개하며, 다음처럼 실제 종료 복구를 검증할 수 있다.
 
 ```sh
 uv run wonyotti engine-stress --selection-run <v7 선택 폴더> \
@@ -206,7 +245,7 @@ uv run wonyotti engine-stress --selection-run <v7 선택 폴더> \
   --start 2020-03-10 --end 2020-03-14
 ```
 
-v8·v9도 같은 두 명령에 해당 선택 폴더를 지정한다. 완료한 복원 검사는 2021년 개발 구간 첫 거래의 월을 사용했으며, 신호 조건을 바꿔 대기·보유 상태를 만들지 않았다.
+v8~v13도 같은 두 명령에 해당 선택 폴더를 지정한다. 완료한 복원 검사는 2021년 개발 구간 첫 거래의 월을 사용했으며, 신호 조건을 바꿔 대기·보유 상태를 만들지 않았다.
 
 `--halt --max-bars 0`은 수동 중지 의도를 저장한다. 다음 유효 시세를 처리할 때 청산하고 재진입을 막는다. 같은 사건의 재전달은 중복 체결하지 않고, 같은 ID의 다른 시세는 거부한다. 해시 저널은 로컬 손상 탐지용이며 외부 서명이나 계정 인증은 아니다. 소스 변경 후에는 기존 저널을 다른 프로그램으로 이어서 처리하지 않고 새 실행을 만들거나 보존한 코드 스냅샷을 사용한다.
 
@@ -237,6 +276,9 @@ uv run wonyotti engine-stress --selection-run artifacts/빈도선택ID
 | `net-edge-select`, `net-edge-evaluate` | 같은 실행 엔진의 순손익 학습·시간순 선택·필터 제거·비용·지연 비교 |
 | `structure-study` | 원본 회계·추가·보유 제한·가격·비용의 여덟 설명 대조 |
 | `lifecycle-select`, `lifecycle-evaluate` | 보유·추가·축소·청산 학습·고정 후보·관리 조건 제거·다년 비교 |
+| `action-labels`, `path-labels` | 분별 복수 정답·연결 원장·과거 보유 가격 경로 |
+| `action-select`, `action-evaluate` | 행동별 문턱·시기 분리·관리 가격 경로·고정 조건 비교 |
+| `reversal-select` | 고정 v12 모델의 평탄 청산과 방향 반전 실행 대조 |
 | `event-replay` | 영속 저널, 중단·재개 상태, 단일 실행 대조 |
 | `engine-stress` | 실제 프로세스 종료 복구와 급변·중복·누락·수동 중지 검사 |
 | `study`, `research`, `robustness`, `replay` | v1 행동 연구·방향 모사·비용 비교·재표집·오프라인 재생 |
