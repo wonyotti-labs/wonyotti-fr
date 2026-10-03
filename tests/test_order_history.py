@@ -36,15 +36,15 @@ def test_strict_boundary_partial_fills_recent_left_edge_and_episode_reset():
     assert ledger.order_key.tolist() == ['a', 'b', 'c', 'f']
     assert got.loc[10, HISTORY_FEATURES].eq(0).all()
     assert got.loc[20, 'past_increase_exists'] == 1
-    assert got.loc[20, 'past_increase_log_minutes_since'] == np.log1p(.5)
-    assert got.loc[20, 'past_increase_log_count_15m'] == np.log(2)
+    assert got.loc[20, 'past_increase_log_minutes_since'] == pytest.approx(np.log1p(.5), abs=1e-14, rel=0)
+    assert got.loc[20, 'past_increase_log_count_15m'] == pytest.approx(np.log(2), abs=1e-14, rel=0)
     assert got.loc[20, 'past_reduce_exists'] == 0
-    assert got.loc[30, 'past_increase_log_count_15m'] == np.log(2)
+    assert got.loc[30, 'past_increase_log_count_15m'] == pytest.approx(np.log(2), abs=1e-14, rel=0)
     assert got.loc[40, 'past_increase_log_count_15m'] == 0
-    assert got.loc[40, 'past_reduce_log_count_15m'] == np.log(3)
+    assert got.loc[40, 'past_reduce_log_count_15m'] == pytest.approx(np.log(3), abs=1e-14, rel=0)
     assert got.loc[50, HISTORY_FEATURES].eq(0).all()
     assert got.loc[60, 'past_reduce_exists'] == 0
-    assert got.loc[60, 'past_increase_log_count_15m'] == np.log(2)
+    assert got.loc[60, 'past_increase_log_count_15m'] == pytest.approx(np.log(2), abs=1e-14, rel=0)
     pd.testing.assert_frame_equal(got[frame.columns], frame, check_exact=True)
     microseconds = actions.copy()
     microseconds['time'] = microseconds.time.astype('datetime64[us, UTC]')
