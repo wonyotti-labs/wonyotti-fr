@@ -25,10 +25,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 def evaluation_period(frozen: dict, period: str) -> tuple[str, str]:
     allowed = {'observed': ('2022-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01'),
                'verified_2022_2024': ('2022-01-01', '2025-01-01')}
-    if frozen.get('protocol') in {'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14'}:
+    if frozen.get('protocol') in {'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'lifecycle_edge_v15'}:
         allowed = {'observed': ('2023-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01')}
-    if frozen.get('protocol') not in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14'} or period not in allowed:
-        raise ValueError('v7~v14 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
+    if frozen.get('protocol') not in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'lifecycle_edge_v15'} or period not in allowed:
+        raise ValueError('v7~v15 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
     key = 'seen_2026_period' if period == 'seen_2026' else 'observed_evaluation_period'
     expected = allowed['observed'] if period == 'verified_2022_2024' else allowed[period]
     if (tuple(frozen[key]) != expected or frozen['evaluation_end_exclusive'] != '2026-10-01'
@@ -40,9 +40,10 @@ def evaluation_period(frozen: dict, period: str) -> tuple[str, str]:
 def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path, output: Path,
                             period: str, symbols: list[str], diagnostic_only: bool = False) -> Path:
     frozen, policy = load_selection(selection)
+    is_edge = frozen['protocol'] == 'lifecycle_edge_v15'
     is_net = frozen['protocol'] == 'net_edge_v8'
-    is_action = frozen['protocol'] in {'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14'}
-    is_lifecycle = frozen['protocol'] in {'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14'}
+    is_action = frozen['protocol'] in {'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'lifecycle_edge_v15'}
+    is_lifecycle = frozen['protocol'] in {'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'lifecycle_edge_v15'}
     start, end = evaluation_period(frozen, period)
     if not symbols or len(symbols) != len(set(symbols)) or not set(symbols) <= {'BTCUSDT', 'ETHUSDT', 'SOLUSDT'}:
         raise ValueError('평가 심볼의 종류·중복 오류')
@@ -62,6 +63,8 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                     'cash': variants['cash'], 'no_adds': (policy, replace(config, max_adds=0)),
                     'cap_30m': (policy, replace(config, max_hold_bars=30)),
                     **{key: variants[key] for key in ['cost_x2', 'cost_x3', 'extra_minute_delay']}}
+    if is_edge:
+        variants['unfiltered_v14'] = (policy.manager, config)
     protocol = 'docs/EXPERIMENT_V9.md' if is_lifecycle else ('docs/EXPERIMENT_V8.md' if is_net else 'docs/EXPERIMENT_V7.md')
     label = 'lifecycle' if is_lifecycle else ('net-edge' if is_net else 'pullback')
     if is_action:
@@ -72,9 +75,11 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
             protocol, label = 'docs/EXPERIMENT_V13.md', 'action-reversal'
         if frozen['protocol'] == 'minute_rate_v14':
             protocol, label = 'docs/EXPERIMENT_V14.md', 'action-rate'
+        if is_edge:
+            protocol, label = 'docs/EXPERIMENT_V15.md', 'lifecycle-edge'
     if diagnostic_only:
-        if frozen['protocol'] not in {'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14'} or symbols != ['BTCUSDT']:
-            raise ValueError('축소 진단은 v12~v14의 BTC 고정 비교만 지원합니다.')
+        if frozen['protocol'] not in {'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'lifecycle_edge_v15'} or symbols != ['BTCUSDT']:
+            raise ValueError('축소 진단은 v12~v15의 BTC 고정 비교만 지원합니다.')
         confirmation = json.loads((selection / 'confirmation-2022' / 'metrics.json').read_text())
         if confirmation['total_return'] > 0 and confirmation['closed_trades'] >= 30 and not confirmation['permanent_halt']:
             raise ValueError('확인 선행 조건을 통과한 후보는 전체 평가가 필요합니다.')
@@ -92,10 +97,12 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         names.extend(['pullback_selection.json', 'net_model.json'])
     if is_lifecycle:
         names.extend(['pullback_selection.json', 'action_model.json' if is_action else 'management_model.json'])
-    if frozen['protocol'] in {'minute_reverse_v13', 'minute_rate_v14'}:
+    if frozen['protocol'] in {'minute_reverse_v13', 'minute_rate_v14', 'lifecycle_edge_v15'}:
         names.append('path_selection.json')
-    if frozen['protocol'] == 'minute_rate_v14':
+    if frozen['protocol'] in {'minute_rate_v14', 'lifecycle_edge_v15'}:
         names.append('rate_calibration.json')
+    if is_edge:
+        names.extend(['rate_selection.json', 'net_model.json'])
     for name in names:
         (destination / name).write_bytes((selection / name).read_bytes())
     print(f'진입 대기 {period} 평가: {destination}', flush=True)
@@ -115,7 +122,11 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                     from .action_research import action_diagnostics
                     from .lifecycle_research import lifecycle_diagnostics
                     diagnose = action_diagnostics if is_action else lifecycle_diagnostics
-                    details = diagnose(target, bars, risk)
+                    if is_edge:
+                        from .lifecycle_edge_research import lifecycle_edge_diagnostics
+                        details = lifecycle_edge_diagnostics(target, bars, strategy, risk)
+                    else:
+                        details = diagnose(target, bars, risk)
                     decomposition, wait = details['decomposition'], details['waiting']
                 elif is_net:
                     from .net_edge_research import net_diagnostics
@@ -131,7 +142,7 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                 daily = curve.groupby(days).equity.last()
                 returns = (daily / daily.shift(1, fill_value=risk.initial_equity) - 1).to_numpy()
                 intervals.append({'symbol': symbol, 'strategy': name, **block_interval(returns)})
-                if name in {'fixed_policy', 'immediate', 'ungated_v7', 'cash'}:
+                if name in {'fixed_policy', 'immediate', 'ungated_v7', 'unfiltered_v14', 'cash'}:
                     axis.plot(daily.index, daily / risk.initial_equity, label=name, lw=.9)
                 save_json(destination / 'decomposition.json', decompositions)
                 save_json(destination / 'waiting.json', waiting)
@@ -145,7 +156,9 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                     waiting_diagnostics(target, part, config.signal_delay_bars, management_state=is_action)
                     if is_net:
                         net_diagnostics(target, part, policy, config)
-                    if is_lifecycle:
+                    if is_edge:
+                        lifecycle_edge_diagnostics(target, part, policy, config)
+                    elif is_lifecycle:
                         diagnose(target, part, config)
                     annual.append({'symbol': symbol, 'year': year, **metrics, 'accounting_reconciled': True,
                                    'net_pnl': decomposition['net_pnl']})
@@ -169,6 +182,7 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         (destination / 'REPORT.md').write_text(
             '# 고정 진입 대기 후보의 후속 비교\n\n' + scope_note + table(summary) + '\n\n'
             '활동·방향 모형, 대기 폭·만료 시간과 위험 설정을 다시 선택하지 않았다. '
+            + ('unfiltered_v14는 같은 관리·위험 설정에서 순손익 진입 필터만 제거한 대조다. ' if is_edge and not diagnostic_only else '')
             + ('' if diagnostic_only else 'ungated_v7은 기존 30분·추가 금지 정책이며 no_adds와 cap_30m은 관리 정책의 해당 기능만 제한한다. '
                '진입 규칙이 같아도 보유·위험 상태 때문에 실제 진입 시각은 달라진다. ' if is_lifecycle else
                'ungated_v7은 순손익 필터만 제거한 기존 대기 정책이다. ' if is_net else

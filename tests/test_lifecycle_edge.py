@@ -115,3 +115,124 @@ def test_lifecycle_label_run_keeps_censored_ledger_and_hashes(tmp_path, monkeypa
     from wonyotti_fr.common import sha256
     for name, digest in json.loads((out / 'files.json').read_text()).items():
         assert sha256(out / name) == digest
+
+
+def edge_selection(root, score=8):
+    from wonyotti_fr.common import save_json, sha256
+    frozen = rate_selection(root)
+    (root / 'rate_selection.json').write_bytes((root / 'frozen_selection.json').read_bytes())
+    save_json(root / 'net_model.json', model(score).to_dict())
+    frozen.update(protocol='lifecycle_edge_v15', candidate=0, alpha=100, margin_bps=8,
+                  net_training_period=['2021-01-01', '2022-01-01'],
+                  rate_selection_sha256=sha256(root / 'rate_selection.json'),
+                  model_sha256={**frozen['model_sha256'], 'net_model.json': sha256(root / 'net_model.json')})
+    save_json(root / 'frozen_selection.json', frozen)
+    save_json(root / 'frozen_integrity.json', {'frozen_selection_sha256': sha256(root / 'frozen_selection.json')})
+    return frozen
+
+
+@pytest.mark.parametrize('damage', ['parent', 'margin', 'model', 'management', 'risk'])
+def test_lifecycle_selection_rejects_changed_model_parent_and_fixed_settings(tmp_path, damage):
+    from wonyotti_fr.common import save_json, sha256
+    from wonyotti_fr.event_research import load_selection
+    root = tmp_path / 'selection'
+    frozen = edge_selection(root)
+    assert isinstance(load_selection(root)[1], LifecycleNetPolicy)
+    if damage in {'parent', 'model', 'management'}:
+        name = {'parent': 'rate_selection.json', 'model': 'net_model.json', 'management': 'action_model.json'}[damage]
+        (root / name).write_text('{}')
+    elif damage == 'margin':
+        frozen['margin_bps'] = 0
+    else:
+        frozen['risk']['fee_bps'] = 0
+    save_json(root / 'frozen_selection.json', frozen)
+    save_json(root / 'frozen_integrity.json', {'frozen_selection_sha256': sha256(root / 'frozen_selection.json')})
+    with pytest.raises(ValueError):
+        load_selection(root)
+
+
+@pytest.mark.parametrize('kind', ['waiting', 'position'])
+def test_lifecycle_filter_actual_crash_recovery_and_replay_period(tmp_path, kind):
+    from wonyotti_fr.engine_stress import verify_stress
+    from wonyotti_fr.period_guard import guard_replay_period
+    root = tmp_path / 'selection'
+    frozen = edge_selection(root)
+    with pytest.raises(ValueError, match='관찰한 기간'):
+        guard_replay_period(root, frozen, '2020-01-01', '2021-01-01')
+    guard_replay_period(root, frozen, '2021-01-01', '2022-01-01')
+    result = verify_stress(list(iter_events(bars())), root, tmp_path, {}, kind, True)
+    assert result['all_passed'] and result['child_process_exit_code'] == 73
+
+
+@pytest.mark.parametrize('score', [7, 8])
+def test_lifecycle_gate_diagnostics_recomputes_and_rejects_changed_predictions(tmp_path, score):
+    from wonyotti_fr.lifecycle_edge_research import lifecycle_edge_diagnostics
+    frame, config = bars(), EngineConfig(bar_seconds=60, max_hold_bars=0)
+    bot = LifecycleNetPolicy(policy([.1, .1, .1]), model(score))
+    backtest(frame, bot, config, tmp_path / 'run')
+    report = lifecycle_edge_diagnostics(tmp_path / 'run', frame, bot, config)
+    assert report['gate']['opportunities'] > 0
+    assert report['gate']['accepted' if score == 7 else 'rejected'] == 0
+    wrong = LifecycleNetPolicy(bot.manager, model(15-score))
+    with pytest.raises(ValueError, match='불일치'):
+        lifecycle_edge_diagnostics(tmp_path / 'run', frame, wrong, config)
+
+
+def test_lifecycle_evaluation_copies_frozen_chain_and_unfiltered_control(tmp_path, monkeypatch):
+    from wonyotti_fr.event_research import load_selection
+    from wonyotti_fr.pullback_evaluation import run_pullback_evaluation
+    root = tmp_path / 'selection'
+    edge_selection(root, 7)
+    for name in ['manifest-1m.json', 'manifest-5m.json']:
+        (tmp_path / name).write_text('{}')
+    monkeypatch.setattr('wonyotti_fr.pullback_evaluation.prepare_minute_period', lambda *_: (bars(), {}))
+    monkeypatch.setattr('wonyotti_fr.pullback_evaluation.block_interval', lambda _: {'synthetic_scope_test': True})
+    output = run_pullback_evaluation(root, tmp_path, tmp_path, tmp_path / 'runs', 'seen_2026', ['BTCUSDT'])
+    assert isinstance(load_selection(output)[1], LifecycleNetPolicy)
+    rows = json.loads((output / 'results.json').read_text())
+    assert len(rows) == 9
+    unfiltered = next(row for row in rows if row['strategy'] == 'unfiltered_v14')
+    fixed = next(row for row in rows if row['strategy'] == 'fixed_policy')
+    assert unfiltered['closed_trades'] > fixed['closed_trades'] == 0
+    gate = json.loads((output / 'BTCUSDT/fixed_policy/lifecycle_edge_diagnostics.json').read_text())['gate']
+    assert gate['rejected'] > 0 and gate['accepted'] == 0
+
+
+def test_lifecycle_training_uses_all_closed_labels_and_marks_in_sample(tmp_path, monkeypatch):
+    from wonyotti_fr.common import save_json, sha256
+    from wonyotti_fr.event_features import MARKET_FEATURES
+    from wonyotti_fr.event_research import load_selection
+    from wonyotti_fr.lifecycle_edge_research import run_lifecycle_edge_selection
+    root, labels = tmp_path / 'selection', tmp_path / 'labels'
+    frozen = rate_selection(root)
+    metrics = {'total_return': -.01, 'max_drawdown': -.02, 'closed_trades': 100, 'permanent_halt': False}
+    frozen['development_metrics'] = metrics
+    save_json(root / 'frozen_selection.json', frozen)
+    save_json(root / 'frozen_integrity.json', {'frozen_selection_sha256': sha256(root / 'frozen_selection.json')})
+    save_json(root / 'confirmation-2022/metrics.json', metrics)
+    for name in ['manifest-1m.json', 'manifest-5m.json']:
+        (tmp_path / name).write_text('{}')
+    labels.mkdir()
+    frame = pd.DataFrame(np.zeros((200, len(MARKET_FEATURES))), columns=MARKET_FEATURES)
+    frame['decision_time'] = pd.date_range('2021-01-02', periods=200, freq='1D', tz='UTC')
+    frame['label_end'] = frame.decision_time + pd.Timedelta(hours=1)
+    frame['order_direction'], frame['net_bps'] = np.tile([-1, 1], 100), np.tile([-10., 30.], 100)
+    frame['favorable_bps'], frame['wait_minutes'] = 20., 2
+    frame['net_pnl'], frame['entry_notional'] = frame.net_bps * .1, 1000.
+    frame['hold_minutes'], frame['label_status'] = 60, 'closed'
+    frame.to_parquet(labels / 'training_labels.parquet', index=False)
+    censored = frame.tail(1).assign(label_status='right_censored', net_bps=np.nan, net_pnl=np.nan)
+    pd.concat([frame, censored], ignore_index=True).to_parquet(labels / 'opportunity_ledger.parquet', index=False)
+    save_json(labels / 'summary.json', {'complete': True})
+    save_json(labels / 'files.json', {name: sha256(labels / name) for name in ['training_labels.parquet', 'opportunity_ledger.parquet', 'summary.json']})
+    save_json(labels / 'manifest.json', {'settings': {'reference_sha256': sha256(root / 'frozen_selection.json'),
+        'training_period': ['2021-01-01', '2022-01-01'], 'market_manifest_sha256': sha256(tmp_path / 'manifest-1m.json'),
+        'feature_manifest_sha256': sha256(tmp_path / 'manifest-5m.json')}})
+    monkeypatch.setattr('wonyotti_fr.lifecycle_edge_research.prepare_minute_period', lambda *_: (bars(), {}))
+    output = run_lifecycle_edge_selection(root, labels, tmp_path, tmp_path, tmp_path, tmp_path, tmp_path / 'runs')
+    assert isinstance(load_selection(output)[1], LifecycleNetPolicy)
+    support = json.loads((output / 'training_diagnostics.json').read_text())
+    assert support['rows'] == 200 and support['negative_labels'] == support['positive_labels'] == 100
+    assert json.loads((output / 'development.json').read_text())[0]['in_sample']
+    assert not json.loads((output / 'development.json').read_text())[0]['selected_by_pnl']
+    assert len(json.loads((output / 'comparison.json').read_text())) == 4

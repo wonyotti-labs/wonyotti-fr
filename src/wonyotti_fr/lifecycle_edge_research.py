@@ -53,3 +53,148 @@ def run_lifecycle_edge_labels(reference: Path, market: Path, features: Path, out
         save_json(out / 'failure.json', {'type': type(error).__name__, 'message': str(error)})
         raise
     return out
+
+
+def load_lifecycle_edge_selection(selection: Path, frozen: dict):
+    import json
+
+    from .action_research import load_action_selection
+    from .lifecycle_edge import LifecycleNetPolicy
+    from .net_edge_model import NetEdgeModel
+
+    parent_path, model_path = selection / 'rate_selection.json', selection / 'net_model.json'
+    if (frozen.get('protocol') != 'lifecycle_edge_v15' or parent_path.stat().st_size > 1024**2
+        or model_path.stat().st_size > 1024**2 or sha256(parent_path) != frozen['rate_selection_sha256']):
+        raise ValueError('전체 거래 순손익 정책의 기반 지문 오류')
+    parent = json.loads(parent_path.read_text())
+    if (parent.get('protocol') != 'minute_rate_v14' or frozen['candidate'] != 0
+        or frozen['net_training_period'] != ['2021-01-01', '2022-01-01']
+        or frozen['alpha'] != 100 or frozen['margin_bps'] != 8
+        or any(frozen.get(k) != v for k, v in parent.items()
+               if k not in {'protocol', 'candidate', 'development_metrics', 'model_sha256'})
+        or frozen['model_sha256'] != {**parent['model_sha256'], 'net_model.json': sha256(model_path)}):
+        raise ValueError('전체 거래 순손익 정책의 고정 설정·모델 오류')
+    _, policy = load_action_selection(selection, parent)
+    model = NetEdgeModel.from_dict(json.loads(model_path.read_text()))
+    return frozen, LifecycleNetPolicy(policy, model)
+
+
+def lifecycle_edge_diagnostics(directory, bars, policy, config):
+    import numpy as np
+    import pandas as pd
+
+    from .action_research import action_diagnostics
+    from .event_features import MARKET_FEATURES
+    from .lifecycle_edge import LifecycleNetPolicy
+    from .net_edge_model import net_values
+
+    details = action_diagnostics(directory, bars, config)
+    if isinstance(policy, LifecycleNetPolicy) and policy.enabled:
+        episodes = pd.read_parquet(directory / 'waiting_episodes.parquet')
+        selected = episodes[episodes.status.isin(['triggered', 'filtered'])].copy() if len(episodes) else episodes.copy()
+        if len(selected):
+            market = bars.set_index('end').reindex(selected.decision_time)[MARKET_FEATURES].to_numpy()
+            favorable = selected.direction.to_numpy() * np.log(selected.reference_price / selected.decision_close).to_numpy() * 10000
+            scores = policy.model.predict(net_values(market, selected.direction, favorable, selected.wait_minutes))
+            accepted = np.isfinite(scores) & (scores >= 8)
+            if not np.array_equal(accepted, selected.status.eq('triggered')) or selected.loc[~accepted, 'executed'].any():
+                raise ValueError('전체 거래 순손익 필터의 저장 결정·실행 불일치')
+            selected['predicted_net_bps'] = scores
+        selected.to_parquet(directory / 'net_gate_decisions.parquet', index=False)
+        details['gate'] = {'opportunities': len(selected), 'accepted': details['waiting']['events'].get('triggered', 0),
+                           'rejected': details['waiting']['events'].get('filtered', 0), 'decisions_recomputed': True}
+    save_json(directory / 'lifecycle_edge_diagnostics.json', details)
+    return details
+
+
+def run_lifecycle_edge_selection(reference: Path, labels: Path, market: Path, features: Path,
+                                 confirmation_market: Path, confirmation_features: Path, output: Path) -> Path:
+    import json
+
+    import numpy as np
+    import pandas as pd
+
+    from .event_backtest import backtest
+    from .lifecycle_edge import LifecycleNetPolicy
+    from .net_edge_model import NetEdgeModel
+    from .reports import table
+
+    parent, manager = load_selection(reference)
+    settings = json.loads((labels / 'manifest.json').read_text())['settings']
+    hashes = json.loads((labels / 'files.json').read_text())
+    if (parent['protocol'] != 'minute_rate_v14' or settings['reference_sha256'] != sha256(reference / 'frozen_selection.json')
+        or settings['training_period'] != ['2021-01-01', '2022-01-01']
+        or settings['market_manifest_sha256'] != sha256(market / 'manifest-1m.json')
+        or settings['feature_manifest_sha256'] != sha256(features / 'manifest-5m.json')
+        or any(sha256(labels / name) != hashes[name] for name in ['training_labels.parquet', 'opportunity_ledger.parquet', 'summary.json'])
+        or json.loads((labels / 'summary.json').read_text())['complete'] is not True):
+        raise ValueError('전체 거래 순손익 학습의 고정 기반·정답 지문 오류')
+    out = new_run(output, 'lifecycle-edge-selection', {'reference': str(reference), 'labels': str(labels),
+        'reference_sha256': sha256(reference / 'frozen_selection.json'), 'labels_files_sha256': sha256(labels / 'files.json'),
+        'protocol_sha256': sha256(Path('docs/EXPERIMENT_V15.md')), 'candidate_count': 1, 'alpha': 100, 'margin_bps': 8,
+        'in_sample_period': ['2021-01-01', '2022-01-01'], 'all_periods_already_observed': True,
+        'input_manifests': {str(p / n): sha256(p / n) for p, n in [(market, 'manifest-1m.json'),
+            (features, 'manifest-5m.json'), (confirmation_market, 'manifest-1m.json'), (confirmation_features, 'manifest-5m.json')]}})
+    print(f'전체 거래 순손익 필터 학습: {out}', flush=True)
+    try:
+        train = pd.read_parquet(labels / 'training_labels.parquet')
+        ledger = pd.read_parquet(labels / 'opportunity_ledger.parquet')
+        pd.testing.assert_frame_equal(train.reset_index(drop=True),
+            ledger.loc[ledger.label_status.eq('closed'), train.columns].reset_index(drop=True), check_exact=True, check_dtype=False)
+        if (train.empty or train.decision_time.min() < pd.Timestamp('2021-01-01', tz='UTC')
+            or train.label_end.max() >= pd.Timestamp('2021-12-31', tz='UTC')
+            or train.decision_time.ge(train.label_end).any() or train.entry_notional.le(0).any()
+            or not np.allclose(train.net_bps, train.net_pnl / train.entry_notional * 10000, rtol=0, atol=1e-8)):
+            raise ValueError('전체 거래 순손익 정답의 시간·명목액·값 오류')
+        model, support = NetEdgeModel.fit(train, 100)
+        support.update(negative_labels=int(train.net_bps.lt(0).sum()), positive_labels=int(train.net_bps.gt(0).sum()),
+                       overlapping_previous_labels=int(train.decision_time.lt(train.label_end.cummax().shift()).sum()),
+                       median_hold_minutes=float(train.hold_minutes.median()),
+                       monthly_counts=train.decision_time.dt.strftime('%Y-%m').value_counts().sort_index().to_dict())
+        save_json(out / 'training_diagnostics.json', support)
+        save_json(out / 'net_model.json', model.to_dict())
+        train.to_parquet(out / 'training_used.parquet', index=False)
+        for name in ['path_selection.json', 'rate_calibration.json', 'action_model.json', 'pullback_selection.json',
+                     'base_selection.json', 'expansion_models.json']:
+            (out / name).write_bytes((reference / name).read_bytes())
+        (out / 'rate_selection.json').write_bytes((reference / 'frozen_selection.json').read_bytes())
+        config = EngineConfig(**parent['risk'])
+        policy = LifecycleNetPolicy(manager, model)
+        bars, checks = prepare_minute_period(market, features, 'BTCUSDT', '2021-01-01', '2022-01-01')
+        save_json(out / 'in_sample_input.json', checks)
+        metrics = backtest(bars, policy, config, out / 'candidate-00')
+        lifecycle_edge_diagnostics(out / 'candidate-00', bars, policy, config)
+        save_json(out / 'development.json', [{'candidate': 0, 'in_sample': True, 'selected_by_pnl': False, **metrics}])
+        frozen = {**parent, 'protocol': 'lifecycle_edge_v15', 'candidate': 0, 'development_metrics': metrics,
+                  'rate_selection_sha256': sha256(out / 'rate_selection.json'), 'net_training_period': ['2021-01-01', '2022-01-01'],
+                  'alpha': 100, 'margin_bps': 8, 'net_training_labels_sha256': hashes['training_labels.parquet'],
+                  'model_sha256': {**parent['model_sha256'], 'net_model.json': sha256(out / 'net_model.json')}}
+        save_json(out / 'frozen_selection.json', frozen)
+        save_json(out / 'frozen_integrity.json', {'frozen_selection_sha256': sha256(out / 'frozen_selection.json')})
+        _, policy = load_lifecycle_edge_selection(out, frozen)
+        print(f'2021년 학습 구간: {metrics["total_return"]:.2%}, {metrics["closed_trades"]}거래', flush=True)
+        del bars
+        bars, checks = prepare_minute_period(confirmation_market, confirmation_features, 'BTCUSDT', '2022-01-01', '2023-01-01')
+        save_json(out / 'confirmation_input.json', checks)
+        confirmation = backtest(bars, policy, config, out / 'confirmation-2022')
+        lifecycle_edge_diagnostics(out / 'confirmation-2022', bars, policy, config)
+        save_json(out / 'confirmation_checks.json', {'positive': confirmation['total_return'] > 0,
+            'at_least_30_trades': confirmation['closed_trades'] >= 30, 'no_halt': not confirmation['permanent_halt'],
+            'profitability_accepted': False, 'all_periods_already_observed': True})
+        rows = [{'period': '2021_in_sample', 'policy': 'unfiltered_v14', **parent['development_metrics']},
+                {'period': '2021_in_sample', 'policy': 'fixed_v15', **metrics},
+                {'period': '2022_confirmation', 'policy': 'unfiltered_v14', **json.loads((reference / 'confirmation-2022/metrics.json').read_text())},
+                {'period': '2022_confirmation', 'policy': 'fixed_v15', **confirmation}]
+        save_json(out / 'comparison.json', rows)
+        (out / 'REPORT.md').write_text('# 전체 거래 순손익 진입 필터\n\n' + table(pd.DataFrame(rows)[
+            ['period', 'policy', 'total_return', 'max_drawdown', 'closed_trades', 'permanent_halt']])
+            + '\n\n2021년은 전체 시스템 학습 구간이며 같은 구간의 재생은 일반화 성과가 아니다. '
+            '독립 초기 계좌의 전체 관리 결과로 alpha 100·8bp 단일 필터를 학습했다. 손실과 경계 미확정 원장을 보존했다. '
+            '겹친 기회의 표본 의존성과 실제 연속 계좌의 위험 상태 차이가 남는다. 2022년 이후도 이전에 관찰한 기간이다. '
+            '수익성 기준과 전체 goal 완료는 별도 검증한다.\n')
+        save_json(out / 'summary.json', {'complete': True, 'profitability_accepted': False, 'in_sample_reported': True})
+        print(f'2022년 확인: {confirmation["total_return"]:.2%}, {confirmation["closed_trades"]}거래', flush=True)
+    except Exception as error:
+        save_json(out / 'failure.json', {'type': type(error).__name__, 'message': str(error)})
+        raise
+    return out
