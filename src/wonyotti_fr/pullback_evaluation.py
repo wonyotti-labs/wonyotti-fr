@@ -25,10 +25,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 def evaluation_period(frozen: dict, period: str) -> tuple[str, str]:
     allowed = {'observed': ('2022-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01'),
                'verified_2022_2024': ('2022-01-01', '2025-01-01')}
-    if frozen.get('protocol') in {'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
+    if frozen.get('protocol') in {'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
         allowed = {'observed': ('2023-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01')}
-    if frozen.get('protocol') not in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'} or period not in allowed:
-        raise ValueError('v7~v17 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
+    if frozen.get('protocol') not in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'} or period not in allowed:
+        raise ValueError('v7~v18 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
     key = 'seen_2026_period' if period == 'seen_2026' else 'observed_evaluation_period'
     expected = allowed['observed'] if period == 'verified_2022_2024' else allowed[period]
     if (tuple(frozen[key]) != expected or frozen['evaluation_end_exclusive'] != '2026-10-01'
@@ -42,8 +42,8 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
     frozen, policy = load_selection(selection)
     is_edge = frozen['protocol'] in {'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}
     is_net = frozen['protocol'] == 'net_edge_v8'
-    is_action = frozen['protocol'] in {'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}
-    is_lifecycle = frozen['protocol'] in {'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}
+    is_action = frozen['protocol'] in {'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}
+    is_lifecycle = frozen['protocol'] in {'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}
     start, end = evaluation_period(frozen, period)
     if not symbols or len(symbols) != len(set(symbols)) or not set(symbols) <= {'BTCUSDT', 'ETHUSDT', 'SOLUSDT'}:
         raise ValueError('평가 심볼의 종류·중복 오류')
@@ -63,6 +63,10 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                     'cash': variants['cash'], 'no_adds': (policy, replace(config, max_adds=0)),
                     'cap_30m': (policy, replace(config, max_hold_bars=30)),
                     **{key: variants[key] for key in ['cost_x2', 'cost_x3', 'extra_minute_delay']}}
+    if frozen['protocol'] == 'minute_rate_reverse_v18':
+        from .action_research import load_action_selection
+        _, original_manager = load_action_selection(selection, json.loads((selection / 'rate_selection.json').read_text()))
+        variants['unfiltered_v14'] = (original_manager, config)
     if is_edge:
         variants['unfiltered_v14'] = (policy.manager, config)
     if frozen['protocol'] == 'lifecycle_edge_v17':
@@ -83,14 +87,16 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
             protocol, label = 'docs/EXPERIMENT_V13.md', 'action-reversal'
         if frozen['protocol'] == 'minute_rate_v14':
             protocol, label = 'docs/EXPERIMENT_V14.md', 'action-rate'
+        if frozen['protocol'] == 'minute_rate_reverse_v18':
+            protocol, label = 'docs/EXPERIMENT_V18.md', 'action-rate-reversal'
         if is_edge:
             protocol, label = (('docs/EXPERIMENT_V16.md', 'lifecycle-weighted') if frozen['protocol'] == 'lifecycle_edge_v16'
                                else ('docs/EXPERIMENT_V15.md', 'lifecycle-edge'))
             if frozen['protocol'] == 'lifecycle_edge_v17':
                 protocol, label = 'docs/EXPERIMENT_V17.md', 'direction-edge'
     if diagnostic_only:
-        if frozen['protocol'] not in {'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'} or symbols != ['BTCUSDT']:
-            raise ValueError('축소 진단은 v12~v17의 BTC 고정 비교만 지원합니다.')
+        if frozen['protocol'] not in {'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'} or symbols != ['BTCUSDT']:
+            raise ValueError('축소 진단은 v12~v18의 BTC 고정 비교만 지원합니다.')
         confirmation = json.loads((selection / 'confirmation-2022' / 'metrics.json').read_text())
         if confirmation['total_return'] > 0 and confirmation['closed_trades'] >= 30 and not confirmation['permanent_halt']:
             raise ValueError('확인 선행 조건을 통과한 후보는 전체 평가가 필요합니다.')
@@ -108,10 +114,12 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         names.extend(['pullback_selection.json', 'net_model.json'])
     if is_lifecycle:
         names.extend(['pullback_selection.json', 'action_model.json' if is_action else 'management_model.json'])
-    if frozen['protocol'] in {'minute_reverse_v13', 'minute_rate_v14', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
+    if frozen['protocol'] in {'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
         names.append('path_selection.json')
-    if frozen['protocol'] in {'minute_rate_v14', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
+    if frozen['protocol'] in {'minute_rate_v14', 'minute_rate_reverse_v18', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
         names.append('rate_calibration.json')
+    if frozen['protocol'] == 'minute_rate_reverse_v18':
+        names.append('rate_selection.json')
     if is_edge:
         names.extend(['rate_selection.json', 'net_model.json'])
     if frozen['protocol'] in {'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
@@ -195,6 +203,7 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         (destination / 'REPORT.md').write_text(
             '# 고정 진입 대기 후보의 후속 비교\n\n' + scope_note + table(summary) + '\n\n'
             '활동·방향 모형, 대기 폭·만료 시간과 위험 설정을 다시 선택하지 않았다. '
+            + ('unfiltered_v14는 같은 누적 빈도·관리 모델에서 반전만 평탄 청산으로 되돌린 원래 v14다. ' if frozen['protocol'] == 'minute_rate_reverse_v18' and not diagnostic_only else '')
             + (('unfiltered_v14·ungated_v7은 원래 활동 관문을 보존한 정책이다. unfiltered_direction_only는 새 기회 집합에서 순손익 필터만 제거한다. '
                 if frozen['protocol'] == 'lifecycle_edge_v17' else 'unfiltered_v14는 같은 관리·위험 설정에서 순손익 진입 필터만 제거한 대조다. ') if is_edge and not diagnostic_only else '')
             + ('' if diagnostic_only else 'ungated_v7은 기존 30분·추가 금지 정책이며 no_adds와 cap_30m은 관리 정책의 해당 기능만 제한한다. '

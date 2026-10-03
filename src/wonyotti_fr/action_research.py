@@ -28,6 +28,18 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'minute_rate_reverse_v18':
+        from .rate_policy import ReversalRatePolicy
+        parent_path = selection / 'rate_selection.json'
+        if parent_path.stat().st_size > 1024**2 or sha256(parent_path) != frozen['rate_selection_sha256']:
+            raise ValueError('누적 반전 정책의 기반 선택 지문 오류')
+        parent = json.loads(parent_path.read_text())
+        if (parent.get('protocol') != 'minute_rate_v14' or frozen['candidate'] != 0
+            or any(frozen.get(key) != value for key, value in parent.items()
+                   if key not in {'protocol', 'candidate', 'development_metrics'})):
+            raise ValueError('누적 반전 정책의 고정 기반 설정 오류')
+        _, policy = load_action_selection(selection, parent)
+        return frozen, ReversalRatePolicy(policy, policy.manager, policy.thresholds, policy.multiplier, policy.scales)
     if frozen.get('protocol') in {'minute_reverse_v13', 'minute_rate_v14'}:
         parent_path = selection / 'path_selection.json'
         if parent_path.stat().st_size > 1024**2 or sha256(parent_path) != frozen['path_selection_sha256']:

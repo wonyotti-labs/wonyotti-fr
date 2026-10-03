@@ -299,6 +299,12 @@ def main() -> None:
     reverse.add_argument('--output', type=Path, default=Path('artifacts'))
     reverse.set_defaults(func=lambda a: run_reversal_selection(a.path_selection_run, a.market, a.feature_market,
         a.confirmation_market, a.confirmation_features, a.output))
+    rate_reverse = commands.add_parser('rate-reversal-select', help='고정 v14 누적 관리 청산의 반전 실행 대조')
+    for name in ['rate-selection-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
+        rate_reverse.add_argument(f'--{name}', type=Path, required=True)
+    rate_reverse.add_argument('--output', type=Path, default=Path('artifacts'))
+    rate_reverse.set_defaults(func=lambda a: run_reversal_selection(a.rate_selection_run, a.market, a.feature_market,
+        a.confirmation_market, a.confirmation_features, a.output, rate_based=True))
     from .rate_research import run_rate_selection
     rate = commands.add_parser('rate-select', help='고정 v12 모델의 사건 빈도 누적 대조')
     for name in ['path-selection-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
@@ -322,14 +328,14 @@ def main() -> None:
     lifecycle_select.add_argument('--output', type=Path, default=Path('artifacts'))
     lifecycle_select.set_defaults(func=lambda a: print(run_lifecycle_edge_selection(a.rate_selection_run, a.labels_run,
         a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output, overlap_weighted=a.overlap_weighted, direction_only=a.direction_only)))
-    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate", "action-evaluate"], help="고정 v7~v17 후보의 다시장·비용·지연 비교")
+    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate", "action-evaluate"], help="고정 v7~v18 후보의 다시장·비용·지연 비교")
     pullback_eval.add_argument("--selection-run", type=Path, required=True)
     pullback_eval.add_argument("--market", type=Path, required=True)
     pullback_eval.add_argument("--feature-market", type=Path, required=True)
     pullback_eval.add_argument("--period", choices=['observed', 'seen_2026', 'verified_2022_2024'], required=True)
     pullback_eval.add_argument("--symbols", nargs='+', choices=['BTCUSDT', 'ETHUSDT', 'SOLUSDT'], default=['BTCUSDT', 'ETHUSDT', 'SOLUSDT'])
     pullback_eval.add_argument("--output", type=Path, default=Path("artifacts"))
-    pullback_eval.add_argument("--diagnostic-only", action="store_true", help="v12~v17 확인 실패 후 사전 계획한 BTC 고정·연간 비교")
+    pullback_eval.add_argument("--diagnostic-only", action="store_true", help="v12~v18 확인 실패 후 사전 계획한 BTC 고정·연간 비교")
     pullback_eval.set_defaults(func=lambda a: run_pullback_evaluation(a.selection_run, a.market, a.feature_market, a.output, a.period, a.symbols, a.diagnostic_only))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)

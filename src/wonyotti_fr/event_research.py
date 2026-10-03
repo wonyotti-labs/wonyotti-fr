@@ -83,7 +83,7 @@ def load_selection(selection: Path) -> tuple[dict, EventPolicy]:
     if frozen.get('protocol') in {'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
         from .lifecycle_edge_research import load_lifecycle_edge_selection
         return load_lifecycle_edge_selection(selection, frozen)
-    if frozen.get('protocol') in {'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14'}:
+    if frozen.get('protocol') in {'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18'}:
         from .action_research import load_action_selection
         return load_action_selection(selection, frozen)
     if frozen.get('protocol') == 'lifecycle_v9':

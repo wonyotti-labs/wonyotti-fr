@@ -100,3 +100,15 @@ class RateActionPolicy(PathActionPolicy):
                            'management_direction': state['direction']}
                 return decide(a, control, f'action_{a}')
         return decide('hold', {}, 'action_rate_hold')
+
+
+class ReversalRatePolicy(RateActionPolicy):
+    def __call__(self, bar, state):
+        decision = super().__call__(bar, state)
+        if decision.intent != 'exit':
+            return decision
+        direction = -state['direction']
+        intent = 'enter_long' if direction > 0 else 'enter_short'
+        # 누적량과 경로는 실제 반전 체결 후 새 포지션 식별 시각으로 초기화한다.
+        stored = {**decision.state, 'management_direction': direction}
+        return PolicyDecision(intent, stored, f'action_reverse_{"long" if direction > 0 else "short"}')
