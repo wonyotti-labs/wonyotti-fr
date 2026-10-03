@@ -2,7 +2,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from wonyotti_fr.minute_management import FEATURES, management_events, management_values
+from wonyotti_fr.minute_management import (
+    FEATURES,
+    management_events,
+    management_orders,
+    management_values,
+)
 
 
 def inputs():
@@ -19,7 +24,8 @@ def inputs():
     orders = pd.DataFrame({'order_key': ['a', 'b', 'c', 'd', 'e'],
                            'target_time': [start, start + pd.Timedelta(seconds=10), start + pd.Timedelta(seconds=20),
                                            start + pd.Timedelta(seconds=30), start + pd.Timedelta(minutes=1)],
-                           'before_qty': [10, -10, 10, 0, -10], 'target_episode_id': [1, 2, 1, 2, 2],
+                           'before_qty': [10, -10, 10, 0, -10], 'target_episode_id': [2, 2, 1, 2, 2],
+                           'before_episode_id': [1, 2, 1, 0, 2],
                            'target': ['enter_short', 'increase', 'reduce', 'enter_short', 'increase']})
     return minute, five, states, orders
 
@@ -73,3 +79,14 @@ def test_online_values_match_training_feature_order():
     actual = management_values(row[FEATURES[:14]], row.direction, row.favorable_move,
                                (row.end - row.entry_time).total_seconds() / 60, row['adds'])
     np.testing.assert_allclose(actual, row[FEATURES].to_numpy(dtype=float))
+
+
+def test_reverse_order_keeps_previous_episode_as_management_target():
+    times = pd.date_range('2020-01-01', periods=3, freq='s', tz='UTC').as_unit('ns')
+    actions = pd.DataFrame({'time': times, 'order_key': ['a', 'b', 'c'],
+                            'action': ['open', 'reverse', 'reduce'], 'before_qty': [0, 10, -5], 'episode_id': [1, 2, 2]})
+    executions = pd.DataFrame({'time': times, 'order_key': ['a', 'b', 'c'], 'symbol': 'XBTUSD',
+                               'exectype': 'Trade', 'orderqty': [10, 15, 2], 'side': ['Buy', 'Sell', 'Buy']})
+    result = management_orders(executions, actions)
+    assert result.before_episode_id.tolist() == [0, 1, 2]
+    assert result.target_episode_id.tolist() == [1, 2, 2]

@@ -3,10 +3,21 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from .event_features import MARKET_FEATURES, STATE_FEATURES, event_features
+from .event_features import MARKET_FEATURES, STATE_FEATURES, event_features, independent_orders
 
 ACTIONS = ['exit', 'reduce', 'increase']
 FEATURES = MARKET_FEATURES + [f'directional_{name}' for name in MARKET_FEATURES] + STATE_FEATURES
+
+
+def management_orders(executions: pd.DataFrame, actions: pd.DataFrame) -> pd.DataFrame:
+    orders = independent_orders(executions, actions)
+    # 반전 행의 episode_id는 새 포지션이므로 청산 대상은 직전 행의 포지션이다.
+    before = actions.assign(before_episode_id=np.where(actions.before_qty.ne(0), actions.episode_id.shift(fill_value=0), 0))
+    first = before[before.action.ne('funding')].drop_duplicates('order_key', keep='first')
+    result = orders.merge(first[['order_key', 'before_episode_id']], on='order_key', how='left', validate='one_to_one')
+    if result.before_episode_id.isna().any() or (result.before_qty.ne(0) & result.before_episode_id.le(0)).any():
+        raise ValueError('관리 주문의 직전 포지션 연결 오류')
+    return result
 
 
 def management_values(market, direction, favorable_move, hold_minutes, adds):
@@ -48,7 +59,7 @@ def management_events(minute: pd.DataFrame, five: pd.DataFrame, states: pd.DataF
     # 분 안의 새 진입 이후 관리는 경계에서 이미 보유한 포지션의 정답과 구분한다.
     ledger['reason'] = np.select([
         ledger.end.isna(), ledger.before_qty.eq(0), ledger.direction.ne(np.sign(ledger.before_qty)),
-        ledger.episode_id.ne(ledger.target_episode_id), ledger.usable.ne(True),
+        ledger.episode_id.ne(ledger.before_episode_id), ledger.usable.ne(True),
     ], ['outside_minutes', 'new_entry', 'different_direction', 'different_episode', 'unusable_features_or_range'], default='linked')
     selected = ledger[ledger.reason.eq('linked')]
     if not selected.action.isin(ACTIONS).all():
