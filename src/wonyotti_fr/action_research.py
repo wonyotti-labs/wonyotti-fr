@@ -28,6 +28,9 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'current_state_v31':
+        from .current_state import load_current_selection
+        return load_current_selection(selection, frozen)
     if frozen.get('protocol') == 'probe_entry_v29':
         from .probe_entry import load_probe_entry_selection
         return load_probe_entry_selection(selection, frozen)

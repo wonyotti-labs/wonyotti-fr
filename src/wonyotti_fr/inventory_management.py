@@ -93,6 +93,9 @@ class InventoryRatePolicy(RateActionPolicy):
 
     def __call__(self, bar, state):
         decision = super().__call__(bar, state)
+        return self.size_reduction(bar, state, decision)
+
+    def size_reduction(self, bar, state, decision):
         if decision.intent != 'reduce' or self.size_model is None:
             return decision
         # 행동 판단 때 이미 갱신한 과거 가격 경로로 같은 입력을 구성한다.

@@ -345,6 +345,13 @@ def main() -> None:
         direction_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     direction_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     direction_diagnosis.set_defaults(func=lambda a: print(run_direction_diagnostics(a.audit_run, a.study_run, a.history, a.output)))
+    from .current_state_research import run_current_state_selection
+    current_select = commands.add_parser('current-state-select', help='누적량 대신 현재 점수와 기존 문턱으로 관리 판단 비교')
+    for name in ['selection-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
+        current_select.add_argument(f'--{name}', type=Path, required=True)
+    current_select.add_argument('--output', type=Path, default=Path('artifacts'))
+    current_select.set_defaults(func=lambda a: print(run_current_state_selection(a.selection_run,
+        a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
     from .probe_entry_research import run_probe_entry_selection
     probe_select = commands.add_parser('probe-entry-select', help='최초 노출만 줄인 단일 후보와 비례 위험 축소 대조')
     for name in ['selection-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
