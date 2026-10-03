@@ -29,7 +29,7 @@ def verify_stress(events: list[dict], selection: Path, directory: Path, identity
                   interruption_kind: str = 'position', require_state: bool = False) -> dict:
     if len(events) < 4:
         raise ValueError('장애 검증 사건이 부족합니다.')
-    if interruption_kind not in {'position', 'waiting', 'liquidity'}:
+    if interruption_kind not in {'position', 'waiting', 'liquidity', 'addition'}:
         raise ValueError('지원하지 않는 중단 상태')
     frozen, policy = load_selection(selection)
     config = EngineConfig(**frozen['risk'])
@@ -38,8 +38,10 @@ def verify_stress(events: list[dict], selection: Path, directory: Path, identity
     candidates = [index + 1 for index, result in enumerate(expected[:-2])
                   if (result['quantity'] != 0 if interruption_kind == 'position' else
                       ('market_no_trades' in result['rejected'] and result['next_intent'] != 'hold')
-                      if interruption_kind == 'liquidity' else bool(json.loads(result.get('policy_state', '{}'))))]
-    if not candidates and (require_state or interruption_kind in {'waiting', 'liquidity'}):
+                      if interruption_kind == 'liquidity' else
+                      result.get('policy_event') in {'action_increase', 'action_add_rejected'}
+                      if interruption_kind == 'addition' else bool(json.loads(result.get('policy_state', '{}'))))]
+    if not candidates and (require_state or interruption_kind in {'waiting', 'liquidity', 'addition'}):
         raise ValueError(f'요청한 {interruption_kind} 상태가 없어 장애 검증을 실행할 수 없습니다.')
     cut = candidates[0] if candidates else min(24, len(events) - 2)
     journal_path = directory / 'crash.sqlite'
@@ -106,9 +108,9 @@ def run_engine_stress(selection: Path, market: Path, output: Path, start: str = 
     destination = new_run(output, 'engine-stress', {**identity,
                                                    'checks': '가격 급변 시세, 실제 프로세스 종료, 중복·누락·잘못된 입력, 수동 중지'})
     try:
-        if frozen.get('protocol') in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
+        if frozen.get('protocol') in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
             bars, input_checks = prepare_minute_period(market, feature_market, 'BTCUSDT', start, end,
-                **({'minute_inputs': True} if frozen['protocol'] == 'minute_inventory_micro_v21' else {}))
+                **({'minute_inputs': True} if frozen['protocol'] in {'minute_inventory_micro_v21', 'addition_effect_v22'} else {}))
             save_json(destination / 'input_verification.json', input_checks)
             events = list(iter_events(bars))
             cases = {}

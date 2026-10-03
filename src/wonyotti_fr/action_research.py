@@ -28,6 +28,9 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'addition_effect_v22':
+        from .addition_research import load_addition_selection
+        return load_addition_selection(selection, frozen)
     if frozen.get('protocol') == 'minute_inventory_micro_v21':
         from .minute_inventory_research import load_minute_inventory_selection
         return load_minute_inventory_selection(selection, frozen)
