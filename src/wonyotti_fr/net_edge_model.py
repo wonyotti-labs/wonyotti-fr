@@ -29,7 +29,7 @@ class NetEdgeModel:
     data: dict
 
     @classmethod
-    def fit(cls, frame: pd.DataFrame, alpha: int) -> tuple[NetEdgeModel, dict]:
+    def fit(cls, frame: pd.DataFrame, alpha: int, *, sample_weight=None) -> tuple[NetEdgeModel, dict]:
         counts = frame.order_direction.value_counts()
         if (len(frame) < 200 or any(counts.get(side, 0) < 20 for side in [-1, 1])
             or frame.decision_time.max() - frame.decision_time.min() < pd.Timedelta(days=180)
@@ -40,8 +40,14 @@ class NetEdgeModel:
         target = frame.net_bps.to_numpy(dtype=float)
         if not np.isfinite(values).all() or not np.isfinite(target).all():
             raise ValueError('순손익 학습의 비유한 값')
-        scaler = StandardScaler().fit(values)
-        learner = Ridge(alpha=alpha).fit(scaler.transform(values), target)
+        fit_options = {}
+        if sample_weight is not None:
+            weights = np.asarray(sample_weight, dtype=float)
+            if weights.shape != (len(frame),) or not np.isfinite(weights).all() or (weights <= 0).any():
+                raise ValueError('순손익 학습의 양수 표본 가중치 오류')
+            fit_options['sample_weight'] = weights
+        scaler = StandardScaler().fit(values, **fit_options)
+        learner = Ridge(alpha=alpha).fit(scaler.transform(values), target, **fit_options)
         model = cls.from_dict({'format': 'net_edge_ridge_v1', 'features': NET_FEATURES, 'alpha': alpha,
                               'mean': scaler.mean_.tolist(), 'scale': scaler.scale_.tolist(),
                               'coefficients': learner.coef_.tolist(), 'intercept': float(learner.intercept_)})
@@ -49,10 +55,14 @@ class NetEdgeModel:
         error = float(np.max(np.abs(predicted - learner.predict(scaler.transform(values)))))
         if error > 1e-10:
             raise ValueError('순손익 모델의 내보내기 예측 불일치')
-        return model, {'rows': len(frame), 'directions': {str(k): int(v) for k, v in counts.items()},
+        support = {'rows': len(frame), 'directions': {str(k): int(v) for k, v in counts.items()},
                        'export_max_error': error, 'mean_net_bps': float(target.mean()),
                        'last_label_end': frame.label_end.max(), 'training_mse': float(np.mean((target-predicted)**2)),
                        'constant_mean_mse': float(np.mean((target-target.mean())**2))}
+        if sample_weight is not None:
+            support.update(weighted_target_mean_bps=float(np.average(target, weights=weights)),
+                           weighted_training_mse=float(np.average((target-predicted)**2, weights=weights)))
+        return model, support
 
     @classmethod
     def from_dict(cls, data: dict) -> NetEdgeModel:

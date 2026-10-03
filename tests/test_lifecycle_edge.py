@@ -117,7 +117,7 @@ def test_lifecycle_label_run_keeps_censored_ledger_and_hashes(tmp_path, monkeypa
         assert sha256(out / name) == digest
 
 
-def edge_selection(root, score=8):
+def edge_selection(root, score=8, weighted=False):
     from wonyotti_fr.common import save_json, sha256
     frozen = rate_selection(root)
     (root / 'rate_selection.json').write_bytes((root / 'frozen_selection.json').read_bytes())
@@ -126,6 +126,16 @@ def edge_selection(root, score=8):
                   net_training_period=['2021-01-01', '2022-01-01'],
                   rate_selection_sha256=sha256(root / 'rate_selection.json'),
                   model_sha256={**frozen['model_sha256'], 'net_model.json': sha256(root / 'net_model.json')})
+    if weighted:
+        from test_label_weighting import intervals
+
+        from wonyotti_fr.label_weighting import WEIGHTING, lifecycle_weights
+        _, ledger, report = lifecycle_weights(intervals())
+        ledger.to_parquet(root / 'training_weights.parquet', index=False)
+        save_json(root / 'weighting.json', report)
+        frozen.update(protocol='lifecycle_edge_v16', sample_weighting=WEIGHTING,
+                      training_weights_sha256=sha256(root / 'training_weights.parquet'),
+                      weighting_sha256=sha256(root / 'weighting.json'))
     save_json(root / 'frozen_selection.json', frozen)
     save_json(root / 'frozen_integrity.json', {'frozen_selection_sha256': sha256(root / 'frozen_selection.json')})
     return frozen
@@ -151,12 +161,13 @@ def test_lifecycle_selection_rejects_changed_model_parent_and_fixed_settings(tmp
         load_selection(root)
 
 
+@pytest.mark.parametrize('weighted', [False, True])
 @pytest.mark.parametrize('kind', ['waiting', 'position'])
-def test_lifecycle_filter_actual_crash_recovery_and_replay_period(tmp_path, kind):
+def test_lifecycle_filter_actual_crash_recovery_and_replay_period(tmp_path, kind, weighted):
     from wonyotti_fr.engine_stress import verify_stress
     from wonyotti_fr.period_guard import guard_replay_period
     root = tmp_path / 'selection'
-    frozen = edge_selection(root)
+    frozen = edge_selection(root, weighted=weighted)
     with pytest.raises(ValueError, match='관찰한 기간'):
         guard_replay_period(root, frozen, '2020-01-01', '2021-01-01')
     guard_replay_period(root, frozen, '2021-01-01', '2022-01-01')
@@ -178,11 +189,12 @@ def test_lifecycle_gate_diagnostics_recomputes_and_rejects_changed_predictions(t
         lifecycle_edge_diagnostics(tmp_path / 'run', frame, wrong, config)
 
 
-def test_lifecycle_evaluation_copies_frozen_chain_and_unfiltered_control(tmp_path, monkeypatch):
+@pytest.mark.parametrize('weighted', [False, True])
+def test_lifecycle_evaluation_copies_frozen_chain_and_unfiltered_control(tmp_path, monkeypatch, weighted):
     from wonyotti_fr.event_research import load_selection
     from wonyotti_fr.pullback_evaluation import run_pullback_evaluation
     root = tmp_path / 'selection'
-    edge_selection(root, 7)
+    edge_selection(root, 7, weighted=weighted)
     for name in ['manifest-1m.json', 'manifest-5m.json']:
         (tmp_path / name).write_text('{}')
     monkeypatch.setattr('wonyotti_fr.pullback_evaluation.prepare_minute_period', lambda *_: (bars(), {}))
@@ -198,7 +210,8 @@ def test_lifecycle_evaluation_copies_frozen_chain_and_unfiltered_control(tmp_pat
     assert gate['rejected'] > 0 and gate['accepted'] == 0
 
 
-def test_lifecycle_training_uses_all_closed_labels_and_marks_in_sample(tmp_path, monkeypatch):
+@pytest.mark.parametrize('weighted', [False, True])
+def test_lifecycle_training_uses_all_closed_labels_and_marks_in_sample(tmp_path, monkeypatch, weighted):
     from wonyotti_fr.common import save_json, sha256
     from wonyotti_fr.event_features import MARKET_FEATURES
     from wonyotti_fr.event_research import load_selection
@@ -229,10 +242,16 @@ def test_lifecycle_training_uses_all_closed_labels_and_marks_in_sample(tmp_path,
         'training_period': ['2021-01-01', '2022-01-01'], 'market_manifest_sha256': sha256(tmp_path / 'manifest-1m.json'),
         'feature_manifest_sha256': sha256(tmp_path / 'manifest-5m.json')}})
     monkeypatch.setattr('wonyotti_fr.lifecycle_edge_research.prepare_minute_period', lambda *_: (bars(), {}))
-    output = run_lifecycle_edge_selection(root, labels, tmp_path, tmp_path, tmp_path, tmp_path, tmp_path / 'runs')
+    output = run_lifecycle_edge_selection(root, labels, tmp_path, tmp_path, tmp_path, tmp_path, tmp_path / 'runs', overlap_weighted=weighted)
     assert isinstance(load_selection(output)[1], LifecycleNetPolicy)
     support = json.loads((output / 'training_diagnostics.json').read_text())
     assert support['rows'] == 200 and support['negative_labels'] == support['positive_labels'] == 100
     assert json.loads((output / 'development.json').read_text())[0]['in_sample']
     assert not json.loads((output / 'development.json').read_text())[0]['selected_by_pnl']
     assert len(json.loads((output / 'comparison.json').read_text())) == 4
+    if weighted:
+        weights = pd.read_parquet(output / 'training_weights.parquet')
+        assert len(weights) == 200 and weights.sample_weight.eq(1).all()
+        (output / 'weighting.json').write_text('{}')
+        with pytest.raises(ValueError, match='가중치'):
+            load_selection(output)

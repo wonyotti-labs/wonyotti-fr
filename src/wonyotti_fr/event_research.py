@@ -80,7 +80,7 @@ def load_selection(selection: Path) -> tuple[dict, EventPolicy]:
     if sha256(frozen_path) != integrity['frozen_selection_sha256']:
         raise ValueError('고정 선택 파일이 변경됐습니다.')
     frozen = json.loads(frozen_path.read_text())
-    if frozen.get('protocol') == 'lifecycle_edge_v15':
+    if frozen.get('protocol') in {'lifecycle_edge_v15', 'lifecycle_edge_v16'}:
         from .lifecycle_edge_research import load_lifecycle_edge_selection
         return load_lifecycle_edge_selection(selection, frozen)
     if frozen.get('protocol') in {'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14'}:

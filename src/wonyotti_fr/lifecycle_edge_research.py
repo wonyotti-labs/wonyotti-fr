@@ -63,7 +63,7 @@ def load_lifecycle_edge_selection(selection: Path, frozen: dict):
     from .net_edge_model import NetEdgeModel
 
     parent_path, model_path = selection / 'rate_selection.json', selection / 'net_model.json'
-    if (frozen.get('protocol') != 'lifecycle_edge_v15' or parent_path.stat().st_size > 1024**2
+    if (frozen.get('protocol') not in {'lifecycle_edge_v15', 'lifecycle_edge_v16'} or parent_path.stat().st_size > 1024**2
         or model_path.stat().st_size > 1024**2 or sha256(parent_path) != frozen['rate_selection_sha256']):
         raise ValueError('전체 거래 순손익 정책의 기반 지문 오류')
     parent = json.loads(parent_path.read_text())
@@ -74,6 +74,13 @@ def load_lifecycle_edge_selection(selection: Path, frozen: dict):
                if k not in {'protocol', 'candidate', 'development_metrics', 'model_sha256'})
         or frozen['model_sha256'] != {**parent['model_sha256'], 'net_model.json': sha256(model_path)}):
         raise ValueError('전체 거래 순손익 정책의 고정 설정·모델 오류')
+    if frozen['protocol'] == 'lifecycle_edge_v16':
+        from .label_weighting import WEIGHTING
+        if frozen.get('sample_weighting') != WEIGHTING:
+            raise ValueError('중첩 가중치의 고정 방식 오류')
+        for name, key in [('training_weights.parquet', 'training_weights_sha256'), ('weighting.json', 'weighting_sha256')]:
+            if (selection / name).stat().st_size > 1024**2 or sha256(selection / name) != frozen[key]:
+                raise ValueError('중첩 가중치의 원장·설정 지문 오류')
     _, policy = load_action_selection(selection, parent)
     model = NetEdgeModel.from_dict(json.loads(model_path.read_text()))
     return frozen, LifecycleNetPolicy(policy, model)
@@ -108,7 +115,7 @@ def lifecycle_edge_diagnostics(directory, bars, policy, config):
 
 
 def run_lifecycle_edge_selection(reference: Path, labels: Path, market: Path, features: Path,
-                                 confirmation_market: Path, confirmation_features: Path, output: Path) -> Path:
+                                 confirmation_market: Path, confirmation_features: Path, output: Path, *, overlap_weighted: bool = False) -> Path:
     import json
 
     import numpy as np
@@ -129,9 +136,12 @@ def run_lifecycle_edge_selection(reference: Path, labels: Path, market: Path, fe
         or any(sha256(labels / name) != hashes[name] for name in ['training_labels.parquet', 'opportunity_ledger.parquet', 'summary.json'])
         or json.loads((labels / 'summary.json').read_text())['complete'] is not True):
         raise ValueError('전체 거래 순손익 학습의 고정 기반·정답 지문 오류')
-    out = new_run(output, 'lifecycle-edge-selection', {'reference': str(reference), 'labels': str(labels),
+    if type(overlap_weighted) is not bool:
+        raise ValueError('중첩 가중치 선택의 형식 오류')
+    version = 16 if overlap_weighted else 15
+    out = new_run(output, 'lifecycle-weighted-selection' if overlap_weighted else 'lifecycle-edge-selection', {'reference': str(reference), 'labels': str(labels),
         'reference_sha256': sha256(reference / 'frozen_selection.json'), 'labels_files_sha256': sha256(labels / 'files.json'),
-        'protocol_sha256': sha256(Path('docs/EXPERIMENT_V15.md')), 'candidate_count': 1, 'alpha': 100, 'margin_bps': 8,
+        'protocol_sha256': sha256(Path(f'docs/EXPERIMENT_V{version}.md')), 'overlap_weighted': overlap_weighted, 'candidate_count': 1, 'alpha': 100, 'margin_bps': 8,
         'in_sample_period': ['2021-01-01', '2022-01-01'], 'all_periods_already_observed': True,
         'input_manifests': {str(p / n): sha256(p / n) for p, n in [(market, 'manifest-1m.json'),
             (features, 'manifest-5m.json'), (confirmation_market, 'manifest-1m.json'), (confirmation_features, 'manifest-5m.json')]}})
@@ -146,7 +156,16 @@ def run_lifecycle_edge_selection(reference: Path, labels: Path, market: Path, fe
             or train.decision_time.ge(train.label_end).any() or train.entry_notional.le(0).any()
             or not np.allclose(train.net_bps, train.net_pnl / train.entry_notional * 10000, rtol=0, atol=1e-8)):
             raise ValueError('전체 거래 순손익 정답의 시간·명목액·값 오류')
-        model, support = NetEdgeModel.fit(train, 100)
+        weight_options, weight_frozen = {}, {}
+        if overlap_weighted:
+            from .label_weighting import WEIGHTING, lifecycle_weights
+            weights, weight_ledger, weight_report = lifecycle_weights(train)
+            weight_ledger.to_parquet(out / 'training_weights.parquet', index=False)
+            save_json(out / 'weighting.json', weight_report)
+            weight_options['sample_weight'] = weights
+            weight_frozen = {'sample_weighting': WEIGHTING, 'training_weights_sha256': sha256(out / 'training_weights.parquet'),
+                             'weighting_sha256': sha256(out / 'weighting.json')}
+        model, support = NetEdgeModel.fit(train, 100, **weight_options)
         support.update(negative_labels=int(train.net_bps.lt(0).sum()), positive_labels=int(train.net_bps.gt(0).sum()),
                        overlapping_previous_labels=int(train.decision_time.lt(train.label_end.cummax().shift()).sum()),
                        median_hold_minutes=float(train.hold_minutes.median()),
@@ -165,7 +184,7 @@ def run_lifecycle_edge_selection(reference: Path, labels: Path, market: Path, fe
         metrics = backtest(bars, policy, config, out / 'candidate-00')
         lifecycle_edge_diagnostics(out / 'candidate-00', bars, policy, config)
         save_json(out / 'development.json', [{'candidate': 0, 'in_sample': True, 'selected_by_pnl': False, **metrics}])
-        frozen = {**parent, 'protocol': 'lifecycle_edge_v15', 'candidate': 0, 'development_metrics': metrics,
+        frozen = {**parent, **weight_frozen, 'protocol': f'lifecycle_edge_v{version}', 'candidate': 0, 'development_metrics': metrics,
                   'rate_selection_sha256': sha256(out / 'rate_selection.json'), 'net_training_period': ['2021-01-01', '2022-01-01'],
                   'alpha': 100, 'margin_bps': 8, 'net_training_labels_sha256': hashes['training_labels.parquet'],
                   'model_sha256': {**parent['model_sha256'], 'net_model.json': sha256(out / 'net_model.json')}}
@@ -182,12 +201,13 @@ def run_lifecycle_edge_selection(reference: Path, labels: Path, market: Path, fe
             'at_least_30_trades': confirmation['closed_trades'] >= 30, 'no_halt': not confirmation['permanent_halt'],
             'profitability_accepted': False, 'all_periods_already_observed': True})
         rows = [{'period': '2021_in_sample', 'policy': 'unfiltered_v14', **parent['development_metrics']},
-                {'period': '2021_in_sample', 'policy': 'fixed_v15', **metrics},
+                {'period': '2021_in_sample', 'policy': f'fixed_v{version}', **metrics},
                 {'period': '2022_confirmation', 'policy': 'unfiltered_v14', **json.loads((reference / 'confirmation-2022/metrics.json').read_text())},
-                {'period': '2022_confirmation', 'policy': 'fixed_v15', **confirmation}]
+                {'period': '2022_confirmation', 'policy': f'fixed_v{version}', **confirmation}]
         save_json(out / 'comparison.json', rows)
         (out / 'REPORT.md').write_text('# 전체 거래 순손익 진입 필터\n\n' + table(pd.DataFrame(rows)[
             ['period', 'policy', 'total_return', 'max_drawdown', 'closed_trades', 'permanent_halt']])
+            + ('\n\n동시 정답 수 역수의 구간 평균을 정규화해 표준화·Ridge에 같은 가중치를 적용했다. ' if overlap_weighted else '')
             + '\n\n2021년은 전체 시스템 학습 구간이며 같은 구간의 재생은 일반화 성과가 아니다. '
             '독립 초기 계좌의 전체 관리 결과로 alpha 100·8bp 단일 필터를 학습했다. 손실과 경계 미확정 원장을 보존했다. '
             '겹친 기회의 표본 의존성과 실제 연속 계좌의 위험 상태 차이가 남는다. 2022년 이후도 이전에 관찰한 기간이다. '
