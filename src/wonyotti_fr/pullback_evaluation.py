@@ -25,10 +25,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 def evaluation_period(frozen: dict, period: str) -> tuple[str, str]:
     allowed = {'observed': ('2022-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01'),
                'verified_2022_2024': ('2022-01-01', '2025-01-01')}
-    if frozen.get('protocol') in {'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12'}:
+    if frozen.get('protocol') in {'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13'}:
         allowed = {'observed': ('2023-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01')}
-    if frozen.get('protocol') not in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12'} or period not in allowed:
-        raise ValueError('v7~v12 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
+    if frozen.get('protocol') not in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13'} or period not in allowed:
+        raise ValueError('v7~v13 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
     key = 'seen_2026_period' if period == 'seen_2026' else 'observed_evaluation_period'
     expected = allowed['observed'] if period == 'verified_2022_2024' else allowed[period]
     if (tuple(frozen[key]) != expected or frozen['evaluation_end_exclusive'] != '2026-10-01'
@@ -41,8 +41,8 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                             period: str, symbols: list[str], diagnostic_only: bool = False) -> Path:
     frozen, policy = load_selection(selection)
     is_net = frozen['protocol'] == 'net_edge_v8'
-    is_action = frozen['protocol'] in {'minute_action_v10', 'minute_action_v11', 'minute_path_v12'}
-    is_lifecycle = frozen['protocol'] in {'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12'}
+    is_action = frozen['protocol'] in {'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13'}
+    is_lifecycle = frozen['protocol'] in {'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13'}
     start, end = evaluation_period(frozen, period)
     if not symbols or len(symbols) != len(set(symbols)) or not set(symbols) <= {'BTCUSDT', 'ETHUSDT', 'SOLUSDT'}:
         raise ValueError('평가 심볼의 종류·중복 오류')
@@ -68,9 +68,11 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         protocol, label = ('docs/EXPERIMENT_V11.md', 'action-recent') if frozen['protocol'] == 'minute_action_v11' else ('docs/EXPERIMENT_V10.md', 'action')
         if frozen['protocol'] == 'minute_path_v12':
             protocol, label = 'docs/EXPERIMENT_V12.md', 'action-path'
+        if frozen['protocol'] == 'minute_reverse_v13':
+            protocol, label = 'docs/EXPERIMENT_V13.md', 'action-reversal'
     if diagnostic_only:
-        if frozen['protocol'] != 'minute_path_v12' or symbols != ['BTCUSDT']:
-            raise ValueError('축소 진단은 v12의 BTC 고정 비교만 지원합니다.')
+        if frozen['protocol'] not in {'minute_path_v12', 'minute_reverse_v13'} or symbols != ['BTCUSDT']:
+            raise ValueError('축소 진단은 v12~v13의 BTC 고정 비교만 지원합니다.')
         confirmation = json.loads((selection / 'confirmation-2022' / 'metrics.json').read_text())
         if confirmation['total_return'] > 0 and confirmation['closed_trades'] >= 30 and not confirmation['permanent_halt']:
             raise ValueError('확인 선행 조건을 통과한 후보는 전체 평가가 필요합니다.')
@@ -88,6 +90,8 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         names.extend(['pullback_selection.json', 'net_model.json'])
     if is_lifecycle:
         names.extend(['pullback_selection.json', 'action_model.json' if is_action else 'management_model.json'])
+    if frozen['protocol'] == 'minute_reverse_v13':
+        names.append('path_selection.json')
     for name in names:
         (destination / name).write_bytes((selection / name).read_bytes())
     print(f'진입 대기 {period} 평가: {destination}', flush=True)

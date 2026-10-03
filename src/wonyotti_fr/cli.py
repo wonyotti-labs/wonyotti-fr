@@ -292,14 +292,21 @@ def main() -> None:
     action.add_argument("--output", type=Path, default=Path("artifacts"))
     action.set_defaults(func=lambda a: run_action_selection(a.v9_selection_run, a.labels_run, a.market,
         a.feature_market, a.confirmation_market, a.confirmation_features, a.output, a.regime))
-    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate", "action-evaluate"], help="고정 v7~v12 후보의 다시장·비용·지연 비교")
+    from .reversal_research import run_reversal_selection
+    reverse = commands.add_parser('reversal-select', help='고정 v12 모델 청산의 반전 실행 대조')
+    for name in ['path-selection-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
+        reverse.add_argument(f'--{name}', type=Path, required=True)
+    reverse.add_argument('--output', type=Path, default=Path('artifacts'))
+    reverse.set_defaults(func=lambda a: run_reversal_selection(a.path_selection_run, a.market, a.feature_market,
+        a.confirmation_market, a.confirmation_features, a.output))
+    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate", "action-evaluate"], help="고정 v7~v13 후보의 다시장·비용·지연 비교")
     pullback_eval.add_argument("--selection-run", type=Path, required=True)
     pullback_eval.add_argument("--market", type=Path, required=True)
     pullback_eval.add_argument("--feature-market", type=Path, required=True)
     pullback_eval.add_argument("--period", choices=['observed', 'seen_2026', 'verified_2022_2024'], required=True)
     pullback_eval.add_argument("--symbols", nargs='+', choices=['BTCUSDT', 'ETHUSDT', 'SOLUSDT'], default=['BTCUSDT', 'ETHUSDT', 'SOLUSDT'])
     pullback_eval.add_argument("--output", type=Path, default=Path("artifacts"))
-    pullback_eval.add_argument("--diagnostic-only", action="store_true", help="v12 확인 실패 후 사전 계획한 BTC 고정·연간 비교")
+    pullback_eval.add_argument("--diagnostic-only", action="store_true", help="v12~v13 확인 실패 후 사전 계획한 BTC 고정·연간 비교")
     pullback_eval.set_defaults(func=lambda a: run_pullback_evaluation(a.selection_run, a.market, a.feature_market, a.output, a.period, a.symbols, a.diagnostic_only))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)

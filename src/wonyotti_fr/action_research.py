@@ -16,7 +16,7 @@ from .event_diagnostics import decompose_run
 from .lifecycle_research import risk_config
 from .minute_data import prepare_minute_period
 from .minute_management import ACTIONS, purged_window
-from .path_management import PATH_FEATURES, PathActionModels, PathActionPolicy
+from .path_management import PATH_FEATURES, PathActionModels, PathActionPolicy, ReversalPathPolicy
 from .pullback_diagnostics import waiting_diagnostics
 from .pullback_policy import PullbackPolicy
 from .pullback_research import load_pullback_selection
@@ -28,6 +28,17 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'minute_reverse_v13':
+        parent_path = selection / 'path_selection.json'
+        if parent_path.stat().st_size > 1024**2 or sha256(parent_path) != frozen['path_selection_sha256']:
+            raise ValueError('반전 정책의 기반 선택 지문 오류')
+        parent = json.loads(parent_path.read_text())
+        if (parent.get('protocol') != 'minute_path_v12' or frozen['candidate'] != 0
+            or any(frozen.get(key) != value for key, value in parent.items()
+                   if key not in {'protocol', 'candidate', 'development_metrics'})):
+            raise ValueError('반전 정책의 고정 기반 설정 오류')
+        _, policy = load_action_selection(selection, parent)
+        return frozen, ReversalPathPolicy(policy, policy.manager, policy.thresholds, policy.multiplier)
     base_path, model_path = selection / 'pullback_selection.json', selection / 'action_model.json'
     path = frozen.get('protocol') == 'minute_path_v12'
     recent = frozen.get('protocol') in {'minute_action_v11', 'minute_path_v12'}

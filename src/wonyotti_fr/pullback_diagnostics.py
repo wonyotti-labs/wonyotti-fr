@@ -28,8 +28,16 @@ def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int, *, mana
     activity = verify_fill_activity(fills, bars)
     close = bars.set_index('end').close
     decisions, waiting = [], None
-    for event in curve[curve.policy_event.isin(['armed', 'triggered', 'expired', 'cleared', 'immediate', 'filtered'])].itertuples(index=False):
+    for event in curve[curve.policy_event.isin(['armed', 'triggered', 'expired', 'cleared', 'immediate', 'filtered',
+                                               'action_reverse_long', 'action_reverse_short'])].itertuples(index=False):
         stamp = pd.Timestamp(event.time)
+        if event.policy_event in {'action_reverse_long', 'action_reverse_short'}:
+            if not management_state or waiting is not None:
+                raise ValueError('반전 관리와 신규 진입 대기의 상태 충돌')
+            decisions.append({'signal_time': stamp, 'decision_time': stamp, 'status': 'reversal',
+                              'reference_price': float(close.loc[stamp]), 'decision_close': float(close.loc[stamp]),
+                              'direction': 1 if event.policy_event.endswith('_long') else -1, 'wait_minutes': 0.})
+            continue
         if event.policy_event == 'armed':
             if waiting is not None:
                 raise ValueError('진입 대기가 겹쳤습니다.')
@@ -70,7 +78,7 @@ def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int, *, mana
     matched = set()
     for row in decisions:
         expected = row['decision_time'] + pd.Timedelta(minutes=delay)
-        entry = entry_by_time.get(expected) if row['status'] in ('triggered', 'immediate') else None
+        entry = entry_by_time.get(expected) if row['status'] in ('triggered', 'immediate', 'reversal') else None
         row.update(executed=entry is not None, expected_entry_time=expected, entry_price=None,
                    favorable_at_decision_bps=None, favorable_at_fill_bps=None, fill_vs_decision_bps=None)
         if entry is not None:
@@ -91,7 +99,9 @@ def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int, *, mana
     counts = {str(key): int(value) for key, value in curve.policy_event.value_counts().items()}
     executed = [row for row in decisions if row['executed']]
     result = {'events': counts, 'fill_activity': activity,
-              'completed_waits': sum(row['status'] != 'immediate' for row in decisions),
+              'completed_waits': sum(row['status'] not in ('immediate', 'reversal') for row in decisions),
+              'reversal_decisions': sum(row['status'] == 'reversal' for row in decisions),
+              'reversal_entries': sum(row['status'] == 'reversal' and row['executed'] for row in decisions),
               'entry_fills': len(entries), 'matched_entry_fills': len(matched),
               'trigger_fraction': counts.get('triggered', 0) / counts['armed'] if counts.get('armed') else None,
               'triggered_without_fill': sum(row['status'] == 'triggered' and not row['executed'] for row in decisions),

@@ -91,3 +91,15 @@ class PathActionPolicy(MinuteActionPolicy):
         base_state['_path_bounds'] = low, high
         decision = super().__call__(bar, base_state)
         return PolicyDecision(decision.intent, {**decision.state, **path}, decision.event)
+
+
+class ReversalPathPolicy(PathActionPolicy):
+    def __call__(self, bar, state):
+        decision = super().__call__(bar, state)
+        if decision.intent != 'exit':
+            return decision
+        direction = -state['direction']
+        intent = 'enter_long' if direction > 0 else 'enter_short'
+        # 반전 체결 이후의 새 방향에도 중복 관리 대기를 유지한다.
+        stored = {**decision.state, 'management_direction': direction}
+        return PolicyDecision(intent, stored, f'action_reverse_{"long" if direction > 0 else "short"}')
