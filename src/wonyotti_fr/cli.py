@@ -333,6 +333,13 @@ def main() -> None:
     prior_select.add_argument('--output', type=Path, default=Path('artifacts'))
     prior_select.set_defaults(func=lambda a: print(run_position_prior_selection(a.selection_run,
         a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
+    from .position_direction_research import run_position_direction_selection
+    direction_select = commands.add_parser('position-direction-select', help='전체 원본의 실제 신규 포지션 방향만 직접 학습')
+    for name in ['selection-run', 'audit-run', 'study-run', 'history', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
+        direction_select.add_argument(f'--{name}', type=Path, required=True)
+    direction_select.add_argument('--output', type=Path, default=Path('artifacts'))
+    direction_select.set_defaults(func=lambda a: print(run_position_direction_selection(a.selection_run, a.audit_run,
+        a.study_run, a.history, a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
     from .new_position_research import run_new_position_selection
     new_position = commands.add_parser('new-position-select', help='새 포지션 시작으로 진입 활동만 다시 학습해 고정 비교')
     for name in ['selection-run', 'audit-run', 'study-run', 'history', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:

@@ -28,6 +28,9 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'position_direction_v27':
+        from .position_direction import load_position_direction_selection
+        return load_position_direction_selection(selection, frozen)
     if frozen.get('protocol') == 'position_prior_v26':
         from .position_prior import load_position_prior_selection
         return load_position_prior_selection(selection, frozen)
