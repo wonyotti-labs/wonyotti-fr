@@ -19,6 +19,8 @@
 - [관리 방식의 시기 변화](docs/EXPERIMENT_V11.md)
 - [보유 가격 경로 복원](docs/EXPERIMENT_V12.md)
 - [청산과 방향 반전의 의미 대조](docs/EXPERIMENT_V13.md)
+- [행동 빈도 누적 대조](docs/EXPERIMENT_V14.md)
+- [전체 거래 순손익 진입 필터](docs/EXPERIMENT_V15.md)
 - [요구 사항별 검증 기록](docs/VERIFICATION.md)
 - [데이터 관리 원칙](DATA_POLICY.md)
 - [보안 정책](SECURITY.md)
@@ -226,7 +228,28 @@ uv run wonyotti action-evaluate --selection-run <선택 폴더> \
   --market <2026년 1분 자료> --feature-market <2026년 5분 자료> --period seen_2026
 ```
 
-v12~v13의 2022년 확인이 사전 조건에 미달하면 계획에 따라 `--symbols BTCUSDT --diagnostic-only`로 고정 후보와 독립 연도 진단만 수행한다. 이 경우 다른 시장·비용 배수·추가 지연을 검사했다고 표시하지 않는다. 확인을 통과한 후보에는 이 축소 옵션을 허용하지 않는다. 이미 관찰한 시기의 반복 실험이며 수익성 문제를 해결할 때까지 다음 원인을 연구한다.
+v14는 고정 관리 모델의 행동 점수를 시간에 걸쳐 누적한다. 행동별 누적 배율은 2020년 보정 구간의 실제 사건 수와 점수 합으로 고정한다. 청산·축소·추가의 빈도 조절만으로 수익성을 확보하지 못했다.
+
+```sh
+uv run wonyotti rate-select --path-selection-run <v12 선택 폴더> \
+  --market <2021년 1분 자료> --feature-market <2021년 5분 자료> \
+  --confirmation-market <2022년 1분 자료> --confirmation-features <2022년 5분 자료>
+```
+
+v15는 같은 v14 관리로 진입부터 자연 청산까지 재생한 순손익을 학습한다. 손실과 미확정 거래를 원장에 보존한다. 단일 Ridge alpha 100·8bp 진입 기준이며 관리 중에는 필터를 적용하지 않는다. 2021년은 전체 시스템 학습 구간이고 같은 기간의 재생은 일반화 성과가 아니다. 2022년 확인 기준 통과 후 전체 후속 평가를 진행 중이며 수익성 전략으로 채택하지 않았다.
+
+```sh
+uv run wonyotti lifecycle-edge-labels --rate-selection-run <v14 선택 폴더> \
+  --market <2021년 1분 자료> --feature-market <2021년 5분 자료>
+uv run wonyotti lifecycle-edge-select --rate-selection-run <v14 선택 폴더> \
+  --labels-run <전체 거래 정답 폴더> \
+  --market <2021년 1분 자료> --feature-market <2021년 5분 자료> \
+  --confirmation-market <2022년 1분 자료> --confirmation-features <2022년 5분 자료>
+```
+
+v15 후속 평가는 같은 `action-evaluate` 명령을 사용한다. 기존 여덟 조건에 진입 필터만 제거한 `unfiltered_v14`를 추가한다. 독립 초기 계좌의 학습 정답과 연속 계좌의 실행 결과, 겹친 기회와 독립 표본을 구분한다.
+
+v12~v15의 2022년 확인이 사전 조건에 미달하면 계획에 따라 `--symbols BTCUSDT --diagnostic-only`로 고정 후보와 독립 연도 진단만 수행한다. 이 경우 다른 시장·비용 배수·추가 지연을 검사했다고 표시하지 않는다. 확인을 통과한 후보에는 이 축소 옵션을 허용하지 않는다. 이미 관찰한 시기의 반복 실험이며 수익성 문제를 해결할 때까지 다음 원인을 연구한다.
 
 ## 중단과 복원이 가능한 오프라인 봇
 
@@ -237,7 +260,7 @@ uv run wonyotti event-replay --selection-run artifacts/선택실행ID --market d
 
 첫 실행은 처리 봉 수만 제한하며 열린 포지션을 유지한다. 다음 실행은 같은 모델·시세·설정·소스의 저널에서 이어서 처리한다. 전체 기간 끝에서만 비용을 내고 청산한다. `--verify-memory`는 처음부터 한 번에 처리한 잔고·체결·상태와 대조한다. 긴 기간에서는 추가 시간과 메모리가 든다.
 
-v7~v13은 `--market`에 1분 자료를 지정하고 `--feature-market`에 별도 5분 특징 자료를 함께 지정한다. 두 입력의 해시를 저널에 묶는다. 진입 대기·만료 상태도 재개하며, 다음처럼 실제 종료 복구를 검증할 수 있다.
+v7~v15은 `--market`에 1분 자료를 지정하고 `--feature-market`에 별도 5분 특징 자료를 함께 지정한다. 두 입력의 해시를 저널에 묶는다. 진입 대기·만료 상태도 재개하며, 다음처럼 실제 종료 복구를 검증할 수 있다.
 
 ```sh
 uv run wonyotti engine-stress --selection-run <v7 선택 폴더> \
@@ -245,7 +268,7 @@ uv run wonyotti engine-stress --selection-run <v7 선택 폴더> \
   --start 2020-03-10 --end 2020-03-14
 ```
 
-v8~v13도 같은 두 명령에 해당 선택 폴더를 지정한다. 완료한 복원 검사는 2021년 개발 구간 첫 거래의 월을 사용했으며, 신호 조건을 바꿔 대기·보유 상태를 만들지 않았다.
+v8~v15도 같은 두 명령에 해당 선택 폴더를 지정한다. 완료한 복원 검사는 2021년 개발 구간 첫 거래의 월을 사용했으며, 신호 조건을 바꿔 대기·보유 상태를 만들지 않았다.
 
 `--halt --max-bars 0`은 수동 중지 의도를 저장한다. 다음 유효 시세를 처리할 때 청산하고 재진입을 막는다. 같은 사건의 재전달은 중복 체결하지 않고, 같은 ID의 다른 시세는 거부한다. 해시 저널은 로컬 손상 탐지용이며 외부 서명이나 계정 인증은 아니다. 소스 변경 후에는 기존 저널을 다른 프로그램으로 이어서 처리하지 않고 새 실행을 만들거나 보존한 코드 스냅샷을 사용한다.
 
@@ -279,6 +302,8 @@ uv run wonyotti engine-stress --selection-run artifacts/빈도선택ID
 | `action-labels`, `path-labels` | 분별 복수 정답·연결 원장·과거 보유 가격 경로 |
 | `action-select`, `action-evaluate` | 행동별 문턱·시기 분리·관리 가격 경로·고정 조건 비교 |
 | `reversal-select` | 고정 v12 모델의 평탄 청산과 방향 반전 실행 대조 |
+| `rate-select` | 고정 관리 모델의 행동별 빈도 누적 대조 |
+| `lifecycle-edge-labels`, `lifecycle-edge-select` | 전체 거래 순손익 정답·손실 원장·고정 진입 필터 학습과 확인 |
 | `event-replay` | 영속 저널, 중단·재개 상태, 단일 실행 대조 |
 | `engine-stress` | 실제 프로세스 종료 복구와 급변·중복·누락·수동 중지 검사 |
 | `study`, `research`, `robustness`, `replay` | v1 행동 연구·방향 모사·비용 비교·재표집·오프라인 재생 |
