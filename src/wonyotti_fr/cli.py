@@ -333,6 +333,12 @@ def main() -> None:
     prior_select.add_argument('--output', type=Path, default=Path('artifacts'))
     prior_select.set_defaults(func=lambda a: print(run_position_prior_selection(a.selection_run,
         a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
+    from .direction_diagnostics import run_direction_diagnostics
+    direction_diagnosis = commands.add_parser('direction-model-diagnose', help='원본 신규 방향의 시간순 선형·부스팅 예측 대조')
+    for name in ['audit-run', 'study-run', 'history']:
+        direction_diagnosis.add_argument(f'--{name}', type=Path, required=True)
+    direction_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
+    direction_diagnosis.set_defaults(func=lambda a: print(run_direction_diagnostics(a.audit_run, a.study_run, a.history, a.output)))
     from .position_direction_research import run_position_direction_selection
     direction_select = commands.add_parser('position-direction-select', help='전체 원본의 실제 신규 포지션 방향만 직접 학습')
     for name in ['selection-run', 'audit-run', 'study-run', 'history', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
