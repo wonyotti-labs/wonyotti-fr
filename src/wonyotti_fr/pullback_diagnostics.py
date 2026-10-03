@@ -21,8 +21,9 @@ def verify_fill_activity(fills: pd.DataFrame, bars: pd.DataFrame) -> dict:
     return {'available': True, 'checked_fills': len(fills), 'zero_trade_fills': 0}
 
 
-def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int) -> dict:
+def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int, *, management_state: bool = False) -> dict:
     curve = pd.read_parquet(directory / 'equity.parquet', columns=['time', 'policy_event', 'policy_state'])
+    previous_state = dict(zip(curve.time, curve.policy_state.shift(fill_value='{}'), strict=True)) if management_state else {}
     fills = pd.read_parquet(directory / 'fills.parquet')
     activity = verify_fill_activity(fills, bars)
     close = bars.set_index('end').close
@@ -42,6 +43,9 @@ def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int) -> dict
                               'direction': None, 'wait_minutes': 0.})
             continue
         if waiting is None:
+            if (management_state and event.policy_event == 'cleared'
+                and set(json.loads(previous_state[event.time])) == {'management_after', 'management_direction'}):
+                continue
             raise ValueError('시작 없이 종료된 진입 대기')
         first = pd.Timestamp(waiting['signal_time'])
         decisions.append({'signal_time': first, 'decision_time': stamp, 'status': event.policy_event,

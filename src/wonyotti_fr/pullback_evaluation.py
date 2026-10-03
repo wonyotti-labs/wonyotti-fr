@@ -25,10 +25,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 def evaluation_period(frozen: dict, period: str) -> tuple[str, str]:
     allowed = {'observed': ('2022-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01'),
                'verified_2022_2024': ('2022-01-01', '2025-01-01')}
-    if frozen.get('protocol') in {'net_edge_v8', 'lifecycle_v9'}:
+    if frozen.get('protocol') in {'net_edge_v8', 'lifecycle_v9', 'minute_action_v10'}:
         allowed = {'observed': ('2023-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01')}
-    if frozen.get('protocol') not in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9'} or period not in allowed:
-        raise ValueError('v7·v8 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
+    if frozen.get('protocol') not in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10'} or period not in allowed:
+        raise ValueError('v7~v10 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
     key = 'seen_2026_period' if period == 'seen_2026' else 'observed_evaluation_period'
     expected = allowed['observed'] if period == 'verified_2022_2024' else allowed[period]
     if (tuple(frozen[key]) != expected or frozen['evaluation_end_exclusive'] != '2026-10-01'
@@ -41,7 +41,8 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                             period: str, symbols: list[str]) -> Path:
     frozen, policy = load_selection(selection)
     is_net = frozen['protocol'] == 'net_edge_v8'
-    is_lifecycle = frozen['protocol'] == 'lifecycle_v9'
+    is_action = frozen['protocol'] == 'minute_action_v10'
+    is_lifecycle = frozen['protocol'] in {'lifecycle_v9', 'minute_action_v10'}
     start, end = evaluation_period(frozen, period)
     if not symbols or len(symbols) != len(set(symbols)) or not set(symbols) <= {'BTCUSDT', 'ETHUSDT', 'SOLUSDT'}:
         raise ValueError('평가 심볼의 종류·중복 오류')
@@ -63,6 +64,8 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                     **{key: variants[key] for key in ['cost_x2', 'cost_x3', 'extra_minute_delay']}}
     protocol = 'docs/EXPERIMENT_V9.md' if is_lifecycle else ('docs/EXPERIMENT_V8.md' if is_net else 'docs/EXPERIMENT_V7.md')
     label = 'lifecycle' if is_lifecycle else ('net-edge' if is_net else 'pullback')
+    if is_action:
+        protocol, label = 'docs/EXPERIMENT_V10.md', 'action'
     destination = new_run(output, f'{label}-evaluation-{period}', {
         'protocol': protocol, 'protocol_sha256': sha256(Path(protocol)), 'selection_sha256': sha256(selection / 'frozen_selection.json'),
         'market_manifest_sha256': sha256(market / 'manifest-1m.json'),
@@ -73,7 +76,7 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
     if is_net:
         names.extend(['pullback_selection.json', 'net_model.json'])
     if is_lifecycle:
-        names.extend(['pullback_selection.json', 'management_model.json'])
+        names.extend(['pullback_selection.json', 'action_model.json' if is_action else 'management_model.json'])
     for name in names:
         (destination / name).write_bytes((selection / name).read_bytes())
     print(f'진입 대기 {period} 평가: {destination}', flush=True)
@@ -90,8 +93,10 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                 save_json(destination / 'results_partial.json', rows)
                 print(f'{symbol}/{name}: 수익 {metrics["total_return"]:.2%}, 낙폭 {metrics["max_drawdown"]:.2%}, 거래 {metrics["closed_trades"]}', flush=True)
                 if is_lifecycle:
+                    from .action_research import action_diagnostics
                     from .lifecycle_research import lifecycle_diagnostics
-                    details = lifecycle_diagnostics(target, bars, risk)
+                    diagnose = action_diagnostics if is_action else lifecycle_diagnostics
+                    details = diagnose(target, bars, risk)
                     decomposition, wait = details['decomposition'], details['waiting']
                 elif is_net:
                     from .net_edge_research import net_diagnostics
@@ -118,11 +123,11 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                     target = destination / symbol / f'restart-{year}'
                     metrics = backtest(part, policy, config, target)
                     decomposition = decompose_run(target, config.initial_equity)
-                    waiting_diagnostics(target, part, config.signal_delay_bars)
+                    waiting_diagnostics(target, part, config.signal_delay_bars, management_state=is_action)
                     if is_net:
                         net_diagnostics(target, part, policy, config)
                     if is_lifecycle:
-                        lifecycle_diagnostics(target, part, config)
+                        diagnose(target, part, config)
                     annual.append({'symbol': symbol, 'year': year, **metrics, 'accounting_reconciled': True,
                                    'net_pnl': decomposition['net_pnl']})
                     save_json(destination / 'annual_restart.json', annual)

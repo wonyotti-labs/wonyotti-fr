@@ -80,6 +80,9 @@ def load_selection(selection: Path) -> tuple[dict, EventPolicy]:
     if sha256(frozen_path) != integrity['frozen_selection_sha256']:
         raise ValueError('고정 선택 파일이 변경됐습니다.')
     frozen = json.loads(frozen_path.read_text())
+    if frozen.get('protocol') == 'minute_action_v10':
+        from .action_research import load_action_selection
+        return load_action_selection(selection, frozen)
     if frozen.get('protocol') == 'lifecycle_v9':
         from .lifecycle_research import load_lifecycle_selection
         return load_lifecycle_selection(selection, frozen)

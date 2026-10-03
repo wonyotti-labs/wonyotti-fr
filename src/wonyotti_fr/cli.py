@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from .action_research import run_action_selection
 from .audit import aggregate_events, write_audit
 from .bitmex_history import fetch_bitmex_history
 from .common import new_run, save_json
@@ -270,7 +271,17 @@ def main() -> None:
     lifecycle.add_argument("--output", type=Path, default=Path("artifacts"))
     lifecycle.set_defaults(func=lambda a: run_lifecycle_selection(a.v7_selection_run, a.audit_run, a.study_run,
                            a.history, a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output))
-    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate"], help="고정 v7~v9 후보의 다시장·비용·지연 비교")
+    action = commands.add_parser("action-select", help="분별 관리 사건과 행동별 정책 선택")
+    action.add_argument("--v9-selection-run", type=Path, required=True)
+    action.add_argument("--labels-run", type=Path, required=True)
+    action.add_argument("--market", type=Path, required=True)
+    action.add_argument("--feature-market", type=Path, required=True)
+    action.add_argument("--confirmation-market", type=Path, required=True)
+    action.add_argument("--confirmation-features", type=Path, required=True)
+    action.add_argument("--output", type=Path, default=Path("artifacts"))
+    action.set_defaults(func=lambda a: run_action_selection(a.v9_selection_run, a.labels_run, a.market,
+        a.feature_market, a.confirmation_market, a.confirmation_features, a.output))
+    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate", "action-evaluate"], help="고정 v7~v10 후보의 다시장·비용·지연 비교")
     pullback_eval.add_argument("--selection-run", type=Path, required=True)
     pullback_eval.add_argument("--market", type=Path, required=True)
     pullback_eval.add_argument("--feature-market", type=Path, required=True)
