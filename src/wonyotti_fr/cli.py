@@ -317,11 +317,12 @@ def main() -> None:
     lifecycle_select = commands.add_parser('lifecycle-edge-select', help='전체 거래 정답의 고정 진입 필터 학습·확인')
     for name in ['rate-selection-run', 'labels-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
         lifecycle_select.add_argument(f'--{name}', type=Path, required=True)
+    lifecycle_select.add_argument('--direction-only', action='store_true', help='v17의 방향 기반 기회와 중첩 가중치 학습')
     lifecycle_select.add_argument('--overlap-weighted', action='store_true', help='v16의 고정 중첩 가중치 적용')
     lifecycle_select.add_argument('--output', type=Path, default=Path('artifacts'))
     lifecycle_select.set_defaults(func=lambda a: print(run_lifecycle_edge_selection(a.rate_selection_run, a.labels_run,
-        a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output, overlap_weighted=a.overlap_weighted)))
-    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate", "action-evaluate"], help="고정 v7~v16 후보의 다시장·비용·지연 비교")
+        a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output, overlap_weighted=a.overlap_weighted, direction_only=a.direction_only)))
+    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate", "action-evaluate"], help="고정 v7~v17 후보의 다시장·비용·지연 비교")
     pullback_eval.add_argument("--selection-run", type=Path, required=True)
     pullback_eval.add_argument("--market", type=Path, required=True)
     pullback_eval.add_argument("--feature-market", type=Path, required=True)

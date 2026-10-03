@@ -60,3 +60,31 @@ def test_broader_opportunities_keep_direction_wait_and_past_input_invariance():
     import pandas as pd
     pd.testing.assert_frame_equal(found[found.decision_time < frame.time.iloc[30]].reset_index(drop=True),
         again[again.decision_time < frame.time.iloc[30]].reset_index(drop=True), check_exact=True)
+
+
+def test_direction_selection_rejects_wrong_opportunity_scope_and_fixed_setting(tmp_path):
+    import json
+
+    from test_lifecycle_edge import edge_selection
+
+    from wonyotti_fr.common import save_json, sha256
+    from wonyotti_fr.event_research import load_selection
+    from wonyotti_fr.lifecycle_edge_research import run_lifecycle_edge_selection
+    root = tmp_path / 'selection'
+    frozen = edge_selection(root, weighted=True, direction_only=True)
+    frozen['entry_activity_gate'] = True
+    save_json(root / 'frozen_selection.json', frozen)
+    save_json(root / 'frozen_integrity.json', {'frozen_selection_sha256': sha256(root / 'frozen_selection.json')})
+    with pytest.raises(ValueError, match='관문'):
+        load_selection(root)
+    parent = tmp_path / 'parent'
+    from test_rate_policy import rate_selection
+    rate_selection(parent)
+    labels = tmp_path / 'labels'
+    labels.mkdir()
+    save_json(labels / 'manifest.json', {'settings': {'reference_sha256': sha256(parent / 'frozen_selection.json'),
+                                                     'entry_activity_gate': True}})
+    (labels / 'files.json').write_text(json.dumps({}))
+    with pytest.raises(ValueError, match='정답 지문'):
+        run_lifecycle_edge_selection(parent, labels, tmp_path, tmp_path, tmp_path, tmp_path,
+                                     tmp_path / 'runs', overlap_weighted=True, direction_only=True)

@@ -69,7 +69,7 @@ def load_lifecycle_edge_selection(selection: Path, frozen: dict):
     from .net_edge_model import NetEdgeModel
 
     parent_path, model_path = selection / 'rate_selection.json', selection / 'net_model.json'
-    if (frozen.get('protocol') not in {'lifecycle_edge_v15', 'lifecycle_edge_v16'} or parent_path.stat().st_size > 1024**2
+    if (frozen.get('protocol') not in {'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'} or parent_path.stat().st_size > 1024**2
         or model_path.stat().st_size > 1024**2 or sha256(parent_path) != frozen['rate_selection_sha256']):
         raise ValueError('전체 거래 순손익 정책의 기반 지문 오류')
     parent = json.loads(parent_path.read_text())
@@ -80,7 +80,7 @@ def load_lifecycle_edge_selection(selection: Path, frozen: dict):
                if k not in {'protocol', 'candidate', 'development_metrics', 'model_sha256'})
         or frozen['model_sha256'] != {**parent['model_sha256'], 'net_model.json': sha256(model_path)}):
         raise ValueError('전체 거래 순손익 정책의 고정 설정·모델 오류')
-    if frozen['protocol'] == 'lifecycle_edge_v16':
+    if frozen['protocol'] in {'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
         from .label_weighting import WEIGHTING
         if frozen.get('sample_weighting') != WEIGHTING:
             raise ValueError('중첩 가중치의 고정 방식 오류')
@@ -88,6 +88,13 @@ def load_lifecycle_edge_selection(selection: Path, frozen: dict):
             if (selection / name).stat().st_size > 1024**2 or sha256(selection / name) != frozen[key]:
                 raise ValueError('중첩 가중치의 원장·설정 지문 오류')
     _, policy = load_action_selection(selection, parent)
+    if frozen['protocol'] == 'lifecycle_edge_v17':
+        from .entry_scope import direction_only_manager
+        if frozen.get('entry_activity_gate') is not False:
+            raise ValueError('방향 기반 진입의 고정 활동 관문 오류')
+        policy = direction_only_manager(policy)
+    elif frozen.get('entry_activity_gate', True) is not True:
+        raise ValueError('기존 진입 정책의 활동 관문 오류')
     model = NetEdgeModel.from_dict(json.loads(model_path.read_text()))
     return frozen, LifecycleNetPolicy(policy, model)
 
@@ -121,7 +128,7 @@ def lifecycle_edge_diagnostics(directory, bars, policy, config):
 
 
 def run_lifecycle_edge_selection(reference: Path, labels: Path, market: Path, features: Path,
-                                 confirmation_market: Path, confirmation_features: Path, output: Path, *, overlap_weighted: bool = False) -> Path:
+                                 confirmation_market: Path, confirmation_features: Path, output: Path, *, overlap_weighted: bool = False, direction_only: bool = False) -> Path:
     import json
 
     import numpy as np
@@ -136,18 +143,22 @@ def run_lifecycle_edge_selection(reference: Path, labels: Path, market: Path, fe
     settings = json.loads((labels / 'manifest.json').read_text())['settings']
     hashes = json.loads((labels / 'files.json').read_text())
     if (parent['protocol'] != 'minute_rate_v14' or settings['reference_sha256'] != sha256(reference / 'frozen_selection.json')
+        or settings.get('entry_activity_gate', True) is not (not direction_only)
         or settings['training_period'] != ['2021-01-01', '2022-01-01']
         or settings['market_manifest_sha256'] != sha256(market / 'manifest-1m.json')
         or settings['feature_manifest_sha256'] != sha256(features / 'manifest-5m.json')
         or any(sha256(labels / name) != hashes[name] for name in ['training_labels.parquet', 'opportunity_ledger.parquet', 'summary.json'])
         or json.loads((labels / 'summary.json').read_text())['complete'] is not True):
         raise ValueError('전체 거래 순손익 학습의 고정 기반·정답 지문 오류')
-    if type(overlap_weighted) is not bool:
-        raise ValueError('중첩 가중치 선택의 형식 오류')
-    version = 16 if overlap_weighted else 15
-    out = new_run(output, 'lifecycle-weighted-selection' if overlap_weighted else 'lifecycle-edge-selection', {'reference': str(reference), 'labels': str(labels),
+    if type(overlap_weighted) is not bool or type(direction_only) is not bool or (direction_only and not overlap_weighted):
+        raise ValueError('기회·중첩 가중치 선택의 형식 오류')
+    if direction_only:
+        from .entry_scope import direction_only_manager
+        manager = direction_only_manager(manager)
+    version = 17 if direction_only else (16 if overlap_weighted else 15)
+    out = new_run(output, 'direction-edge-selection' if direction_only else ('lifecycle-weighted-selection' if overlap_weighted else 'lifecycle-edge-selection'), {'reference': str(reference), 'labels': str(labels),
         'reference_sha256': sha256(reference / 'frozen_selection.json'), 'labels_files_sha256': sha256(labels / 'files.json'),
-        'protocol_sha256': sha256(Path(f'docs/EXPERIMENT_V{version}.md')), 'overlap_weighted': overlap_weighted, 'candidate_count': 1, 'alpha': 100, 'margin_bps': 8,
+        'protocol_sha256': sha256(Path(f'docs/EXPERIMENT_V{version}.md')), 'overlap_weighted': overlap_weighted, 'entry_activity_gate': not direction_only, 'candidate_count': 1, 'alpha': 100, 'margin_bps': 8,
         'in_sample_period': ['2021-01-01', '2022-01-01'], 'all_periods_already_observed': True,
         'input_manifests': {str(p / n): sha256(p / n) for p, n in [(market, 'manifest-1m.json'),
             (features, 'manifest-5m.json'), (confirmation_market, 'manifest-1m.json'), (confirmation_features, 'manifest-5m.json')]}})
@@ -190,7 +201,7 @@ def run_lifecycle_edge_selection(reference: Path, labels: Path, market: Path, fe
         metrics = backtest(bars, policy, config, out / 'candidate-00')
         lifecycle_edge_diagnostics(out / 'candidate-00', bars, policy, config)
         save_json(out / 'development.json', [{'candidate': 0, 'in_sample': True, 'selected_by_pnl': False, **metrics}])
-        frozen = {**parent, **weight_frozen, 'protocol': f'lifecycle_edge_v{version}', 'candidate': 0, 'development_metrics': metrics,
+        frozen = {**parent, **weight_frozen, 'protocol': f'lifecycle_edge_v{version}', 'entry_activity_gate': not direction_only, 'candidate': 0, 'development_metrics': metrics,
                   'rate_selection_sha256': sha256(out / 'rate_selection.json'), 'net_training_period': ['2021-01-01', '2022-01-01'],
                   'alpha': 100, 'margin_bps': 8, 'net_training_labels_sha256': hashes['training_labels.parquet'],
                   'model_sha256': {**parent['model_sha256'], 'net_model.json': sha256(out / 'net_model.json')}}
@@ -213,6 +224,7 @@ def run_lifecycle_edge_selection(reference: Path, labels: Path, market: Path, fe
         save_json(out / 'comparison.json', rows)
         (out / 'REPORT.md').write_text('# 전체 거래 순손익 진입 필터\n\n' + table(pd.DataFrame(rows)[
             ['period', 'policy', 'total_return', 'max_drawdown', 'closed_trades', 'permanent_halt']])
+            + ('\n\n방향·대기는 유지하고 활동 관문을 제거한 별도 전체 기회에서 학습했다. 기존 v14 비교에는 원래 활동 관문이 남는다. ' if direction_only else '')
             + ('\n\n동시 정답 수 역수의 구간 평균을 정규화해 표준화·Ridge에 같은 가중치를 적용했다. ' if overlap_weighted else '')
             + '\n\n2021년은 전체 시스템 학습 구간이며 같은 구간의 재생은 일반화 성과가 아니다. '
             '독립 초기 계좌의 전체 관리 결과로 alpha 100·8bp 단일 필터를 학습했다. 손실과 경계 미확정 원장을 보존했다. '
