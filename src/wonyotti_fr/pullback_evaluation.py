@@ -24,8 +24,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 def evaluation_period(frozen: dict, period: str) -> tuple[str, str]:
     allowed = {'observed': ('2022-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01'),
                'verified_2022_2024': ('2022-01-01', '2025-01-01')}
-    if frozen.get('protocol') != 'pullback_v7' or period not in allowed:
-        raise ValueError('v7 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
+    if frozen.get('protocol') == 'net_edge_v8':
+        allowed = {'observed': ('2023-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01')}
+    if frozen.get('protocol') not in {'pullback_v7', 'net_edge_v8'} or period not in allowed:
+        raise ValueError('v7·v8 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
     key = 'seen_2026_period' if period == 'seen_2026' else 'observed_evaluation_period'
     expected = allowed['observed'] if period == 'verified_2022_2024' else allowed[period]
     if (tuple(frozen[key]) != expected or frozen['evaluation_end_exclusive'] != '2026-10-01'
@@ -37,25 +39,30 @@ def evaluation_period(frozen: dict, period: str) -> tuple[str, str]:
 def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path, output: Path,
                             period: str, symbols: list[str]) -> Path:
     frozen, policy = load_selection(selection)
+    is_net = frozen['protocol'] == 'net_edge_v8'
     start, end = evaluation_period(frozen, period)
     if not symbols or len(symbols) != len(set(symbols)) or not set(symbols) <= {'BTCUSDT', 'ETHUSDT', 'SOLUSDT'}:
         raise ValueError('평가 심볼의 종류·중복 오류')
     config = EngineConfig(**frozen['risk'])
     variants = {
         'fixed_policy': (policy, config),
-        'immediate': (PullbackPolicy(policy.base, policy.offset_bps, policy.ttl_minutes, 'immediate'), config),
+        ('ungated_v7' if is_net else 'immediate'): (PullbackPolicy(policy.base, policy.offset_bps, policy.ttl_minutes, None if is_net else 'immediate'), config),
         'cash': (PullbackPolicy(policy.base, policy.offset_bps, policy.ttl_minutes, 'cash'), config),
         'cost_x2': (policy, replace(config, fee_bps=10, slippage_bps=6)),
         'cost_x3': (policy, replace(config, fee_bps=15, slippage_bps=9)),
         'extra_minute_delay': (policy, replace(config, signal_delay_bars=1)),
     }
-    destination = new_run(output, f'pullback-evaluation-{period}', {
-        'protocol': 'docs/EXPERIMENT_V7.md', 'selection_sha256': sha256(selection / 'frozen_selection.json'),
+    protocol = 'docs/EXPERIMENT_V8.md' if is_net else 'docs/EXPERIMENT_V7.md'
+    destination = new_run(output, f'{"net-edge" if is_net else "pullback"}-evaluation-{period}', {
+        'protocol': protocol, 'protocol_sha256': sha256(Path(protocol)), 'selection_sha256': sha256(selection / 'frozen_selection.json'),
         'market_manifest_sha256': sha256(market / 'manifest-1m.json'),
         'feature_manifest_sha256': sha256(feature_market / 'manifest-5m.json'),
         'period': [start, end], 'symbols': symbols, 'all_periods_already_observed': True, 'retuning': False,
         'variants': {name: risk.__dict__ for name, (_, risk) in variants.items()}, 'bootstrap': '30-day circular blocks, 1000, seed 41'})
-    for name in ['frozen_selection.json', 'frozen_integrity.json', 'base_selection.json', 'expansion_models.json']:
+    names = ['frozen_selection.json', 'frozen_integrity.json', 'base_selection.json', 'expansion_models.json']
+    if is_net:
+        names.extend(['pullback_selection.json', 'net_model.json'])
+    for name in names:
         (destination / name).write_bytes((selection / name).read_bytes())
     print(f'진입 대기 {period} 평가: {destination}', flush=True)
     rows, annual, intervals, decompositions, waiting = [], [], [], [], []
@@ -70,25 +77,34 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
                 rows.append({'symbol': symbol, 'strategy': name, **metrics})
                 save_json(destination / 'results_partial.json', rows)
                 print(f'{symbol}/{name}: 수익 {metrics["total_return"]:.2%}, 낙폭 {metrics["max_drawdown"]:.2%}, 거래 {metrics["closed_trades"]}', flush=True)
-                decompositions.append({'symbol': symbol, 'strategy': name, **decompose_run(target, risk.initial_equity)})
-                waiting.append({'symbol': symbol, 'strategy': name, **waiting_diagnostics(target, bars, risk.signal_delay_bars)})
+                if is_net:
+                    from .net_edge_research import net_diagnostics
+                    details = net_diagnostics(target, bars, strategy, risk)
+                    decomposition, wait = details['decomposition'], details['waiting']
+                else:
+                    decomposition = decompose_run(target, risk.initial_equity)
+                    wait = waiting_diagnostics(target, bars, risk.signal_delay_bars)
+                decompositions.append({'symbol': symbol, 'strategy': name, **decomposition})
+                waiting.append({'symbol': symbol, 'strategy': name, **wait})
                 curve = pd.read_parquet(target / 'equity.parquet', columns=['time', 'equity'])
                 days = (pd.to_datetime(curve.time, utc=True) - pd.Timedelta(nanoseconds=1)).dt.floor('1D')
                 daily = curve.groupby(days).equity.last()
                 returns = (daily / daily.shift(1, fill_value=risk.initial_equity) - 1).to_numpy()
                 intervals.append({'symbol': symbol, 'strategy': name, **block_interval(returns)})
-                if name in {'fixed_policy', 'immediate', 'cash'}:
+                if name in {'fixed_policy', 'immediate', 'ungated_v7', 'cash'}:
                     axis.plot(daily.index, daily / risk.initial_equity, label=name, lw=.9)
                 save_json(destination / 'decomposition.json', decompositions)
                 save_json(destination / 'waiting.json', waiting)
                 save_json(destination / 'bootstrap.json', intervals)
             if period in {'observed', 'verified_2022_2024'}:
-                for year in range(2022, int(end[:4])):
+                for year in range(int(start[:4]), int(end[:4])):
                     part = bars[(bars.time >= f'{year}-01-01') & (bars.time < f'{year+1}-01-01')]
                     target = destination / symbol / f'restart-{year}'
                     metrics = backtest(part, policy, config, target)
                     decomposition = decompose_run(target, config.initial_equity)
                     waiting_diagnostics(target, part, config.signal_delay_bars)
+                    if is_net:
+                        net_diagnostics(target, part, policy, config)
                     annual.append({'symbol': symbol, 'year': year, **metrics, 'accounting_reconciled': True,
                                    'net_pnl': decomposition['net_pnl']})
                     save_json(destination / 'annual_restart.json', annual)
@@ -100,7 +116,7 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         save_json(destination / 'results.json', rows)
         pd.DataFrame(rows).drop(columns='rejected').to_csv(destination / 'results.csv', index=False)
         decision = {'profitability_review_candidate': False, 'live_trading_approved': False,
-                    'reason': '이미 관찰한 기간의 고정 후보 비교이며 개발·확인 실패와 선택 불확실성 보존'}
+                    'reason': '이미 관찰한 기간의 고정 후보 비교이며 선행 조건 및 선택 불확실성 보존'}
         save_json(destination / 'decision.json', decision)
         summary = pd.DataFrame(rows)[['symbol', 'strategy', 'total_return', 'max_drawdown', 'closed_trades', 'fees', 'permanent_halt']]
         scope_note = ('2025년 입력 검증 실패 이후 결과 개봉 전에 고정한 2022~2024년 추가 비교다. '
@@ -109,7 +125,9 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         (destination / 'REPORT.md').write_text(
             '# 고정 진입 대기 후보의 후속 비교\n\n' + scope_note + table(summary) + '\n\n'
             '활동·방향 모형, 대기 폭·만료 시간과 위험 설정을 다시 선택하지 않았다. '
-            'immediate는 같은 30분 보유와 위험 설정에서 대기만 제거한다. 비용은 편도 수수료·슬리피지를 함께 2·3배로 늘렸다. '
+            + ('ungated_v7은 순손익 필터만 제거한 기존 대기 정책이다. ' if is_net else
+               'immediate는 같은 30분 보유와 위험 설정에서 대기만 제거한다. ')
+            + '비용은 편도 수수료·슬리피지를 함께 2·3배로 늘렸다. '
             '추가 지연은 1분이며, 조건 충족 후 실제 체결 가격은 다음 시가와 슬리피지로 계산했다.\n\n'
             '대기 시작·충족·만료·취소와 실제 체결까지의 가격 변화는 waiting.json과 각 waiting_episodes.parquet에 보존했다. '
             '가격 변화는 왕복 비용을 차감한 실현 수익률과 다르다. 거래·비용·펀딩·최종 잔고 회계를 모두 대조했다.\n\n'

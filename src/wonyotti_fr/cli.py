@@ -23,6 +23,7 @@ from .frequency_evaluation import run_frequency_evaluation
 from .frequency_research import run_frequency_selection
 from .market import fetch_market, repair_gaps
 from .minute_repair import repair_minute_market
+from .net_edge_research import run_net_selection
 from .offline import demo, replay
 from .paired_repair import load_repair_targets, repair_paired_market
 from .portfolio import reconstruct_portfolio
@@ -239,7 +240,16 @@ def main() -> None:
     pullback.add_argument("--feature-market", type=Path, required=True)
     pullback.add_argument("--output", type=Path, default=Path("artifacts"))
     pullback.set_defaults(func=lambda a: run_pullback_selection(a.v4_selection_run, a.market, a.feature_market, a.output))
-    pullback_eval = commands.add_parser("pullback-evaluate", help="고정 진입 대기 후보의 다시장·비용·지연 비교")
+    net_select = commands.add_parser("net-edge-select", help="실행 순손익 필터의 학습·시간순 후보 선택")
+    net_select.add_argument("--v7-selection-run", type=Path, required=True)
+    net_select.add_argument("--market", type=Path, required=True)
+    net_select.add_argument("--feature-market", type=Path, required=True)
+    net_select.add_argument("--confirmation-market", type=Path, required=True)
+    net_select.add_argument("--confirmation-features", type=Path, required=True)
+    net_select.add_argument("--output", type=Path, default=Path("artifacts"))
+    net_select.set_defaults(func=lambda a: run_net_selection(a.v7_selection_run, a.market, a.feature_market,
+                                                           a.confirmation_market, a.confirmation_features, a.output))
+    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate"], help="고정 v7·v8 후보의 다시장·비용·지연 비교")
     pullback_eval.add_argument("--selection-run", type=Path, required=True)
     pullback_eval.add_argument("--market", type=Path, required=True)
     pullback_eval.add_argument("--feature-market", type=Path, required=True)

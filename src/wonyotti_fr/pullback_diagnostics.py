@@ -27,7 +27,7 @@ def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int) -> dict
     activity = verify_fill_activity(fills, bars)
     close = bars.set_index('end').close
     decisions, waiting = [], None
-    for event in curve[curve.policy_event.isin(['armed', 'triggered', 'expired', 'cleared', 'immediate'])].itertuples(index=False):
+    for event in curve[curve.policy_event.isin(['armed', 'triggered', 'expired', 'cleared', 'immediate', 'filtered'])].itertuples(index=False):
         stamp = pd.Timestamp(event.time)
         if event.policy_event == 'armed':
             if waiting is not None:
