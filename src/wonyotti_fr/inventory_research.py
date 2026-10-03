@@ -59,7 +59,7 @@ def load_inventory_selection(selection, frozen):
 
 
 def fixed_size_control(policy):
-    return InventoryRatePolicy(policy, policy.manager, policy.thresholds, policy.multiplier, policy.scales)
+    return type(policy)(policy, policy.manager, policy.thresholds, policy.multiplier, policy.scales)
 
 
 def run_inventory_selection(reference: Path, labels: Path, market: Path, features: Path,

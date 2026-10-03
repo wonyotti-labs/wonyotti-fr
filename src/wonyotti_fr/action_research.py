@@ -28,6 +28,9 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'minute_inventory_micro_v21':
+        from .minute_inventory_research import load_minute_inventory_selection
+        return load_minute_inventory_selection(selection, frozen)
     if frozen.get('protocol') in {'minute_inventory_v19', 'minute_inventory_recent_v20'}:
         from .inventory_research import load_inventory_selection
         return load_inventory_selection(selection, frozen)

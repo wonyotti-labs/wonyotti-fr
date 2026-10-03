@@ -342,3 +342,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v20](docs/EXPERIMENT_V20.md)은 같은 `inventory-select` 명령에 `--latest-source`를 추가한다. 관리·축소 크기 학습을 2020년~2021년 상반기, 빈도 보정을 2021년 하반기로 옮긴다. 이 경우 2021년 재생은 학습 적합 진단이며 시간순 성과로 보고하지 않는다.
 
 [v21](docs/EXPERIMENT_V21.md)의 입력 준비는 `minute-inventory-labels --labels-run <수량 정답 출력> --minute-history <원본 1분 시세> --history <원본 5분 시세>`로 실행한다. 현재까지 확정된 1분·3분 수익률, 1분 가격 범위, 직전 60분 대비 거래량을 기존 관리 정답에 연결한다. 원본 정답과 시간순 학습·보정 행은 보존한다.
+
+분봉 입력 모델의 고정 비교는 `minute-inventory-select --inventory-selection-run <v20 선택> --labels-run <분봉 입력 정답>`과 개발·확인 시장 경로로 실행한다. 기존 v20을 별도 고정 모델로 보존하며, 확인을 통과하면 원래 v14·v20과 고정 축소 대조를 포함한 열한 조건을 평가한다.
