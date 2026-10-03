@@ -15,9 +15,9 @@ from .period_guard import guard_replay_period
 def replay_identity(selection: Path, market: Path, symbol: str, start: str, end: str,
                     feature_market: Path | None = None) -> dict:
     source = Path(__file__).parent
-    minute = json.loads((selection / 'frozen_selection.json').read_text()).get('protocol') in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}
+    minute = json.loads((selection / 'frozen_selection.json').read_text()).get('protocol') in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}
     if minute != (feature_market is not None):
-        raise ValueError('v7~v24 분봉 실행에만 별도 5분 특징 자료가 필요합니다.')
+        raise ValueError('v7~v25 분봉 실행에만 별도 5분 특징 자료가 필요합니다.')
     identity = {'selection_sha256': sha256(selection / 'frozen_selection.json'),
             'market_manifest_sha256': sha256(market / ('manifest-1m.json' if minute else 'manifest-5m.json')),
             'symbol': symbol, 'start': start, 'end_exclusive': end,
@@ -37,9 +37,9 @@ def run_event_replay(selection: Path, market: Path, symbol: str, start: str, end
     guard_replay_period(selection, frozen, start, end)
     identity = replay_identity(selection, market, symbol, start, end, feature_market)
     config = EngineConfig(**frozen['risk'])
-    if frozen.get('protocol') in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
+    if frozen.get('protocol') in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
         bars, _ = prepare_minute_period(market, feature_market, symbol, start, end,
-            **({'minute_inputs': True} if frozen['protocol'] in {'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24'} else {}))
+            **({'minute_inputs': True} if frozen['protocol'] in {'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25'} else {}))
     else:
         bars = prepare_period(market, symbol, start, end)
     if hasattr(policy, 'prepare'):

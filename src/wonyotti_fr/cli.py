@@ -326,6 +326,13 @@ def main() -> None:
     exit_select.add_argument('--output', type=Path, default=Path('artifacts'))
     exit_select.set_defaults(func=lambda a: print(run_realized_exit_selection(a.selection_run, a.labels_run,
         a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
+    from .new_position_research import run_new_position_selection
+    new_position = commands.add_parser('new-position-select', help='새 포지션 시작으로 진입 활동만 다시 학습해 고정 비교')
+    for name in ['selection-run', 'audit-run', 'study-run', 'history', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
+        new_position.add_argument(f'--{name}', type=Path, required=True)
+    new_position.add_argument('--output', type=Path, default=Path('artifacts'))
+    new_position.set_defaults(func=lambda a: print(run_new_position_selection(a.selection_run, a.audit_run,
+        a.study_run, a.history, a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
     from .recent_entry import run_recent_entry_selection
     recent_entry = commands.add_parser('recent-entry-select', help='최근 두 해 원본으로 신규 진입만 다시 학습해 고정 비교')
     for name in ['selection-run', 'audit-run', 'study-run', 'history', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
