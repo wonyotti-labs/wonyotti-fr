@@ -38,7 +38,7 @@ def evaluation_period(frozen: dict, period: str) -> tuple[str, str]:
 
 
 def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path, output: Path,
-                            period: str, symbols: list[str]) -> Path:
+                            period: str, symbols: list[str], diagnostic_only: bool = False) -> Path:
     frozen, policy = load_selection(selection)
     is_net = frozen['protocol'] == 'net_edge_v8'
     is_action = frozen['protocol'] in {'minute_action_v10', 'minute_action_v11', 'minute_path_v12'}
@@ -68,11 +68,20 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         protocol, label = ('docs/EXPERIMENT_V11.md', 'action-recent') if frozen['protocol'] == 'minute_action_v11' else ('docs/EXPERIMENT_V10.md', 'action')
         if frozen['protocol'] == 'minute_path_v12':
             protocol, label = 'docs/EXPERIMENT_V12.md', 'action-path'
+    if diagnostic_only:
+        if frozen['protocol'] != 'minute_path_v12' or symbols != ['BTCUSDT']:
+            raise ValueError('축소 진단은 v12의 BTC 고정 비교만 지원합니다.')
+        confirmation = json.loads((selection / 'confirmation-2022' / 'metrics.json').read_text())
+        if confirmation['total_return'] > 0 and confirmation['closed_trades'] >= 30 and not confirmation['permanent_halt']:
+            raise ValueError('확인 선행 조건을 통과한 후보는 전체 평가가 필요합니다.')
+        variants = {'fixed_policy': variants['fixed_policy']}
+        label += '-diagnostic'
     destination = new_run(output, f'{label}-evaluation-{period}', {
         'protocol': protocol, 'protocol_sha256': sha256(Path(protocol)), 'selection_sha256': sha256(selection / 'frozen_selection.json'),
         'market_manifest_sha256': sha256(market / 'manifest-1m.json'),
         'feature_manifest_sha256': sha256(feature_market / 'manifest-5m.json'),
         'period': [start, end], 'symbols': symbols, 'all_periods_already_observed': True, 'retuning': False,
+        'diagnostic_only': diagnostic_only, 'all_variants_requested': not diagnostic_only,
         'variants': {name: risk.__dict__ for name, (_, risk) in variants.items()}, 'bootstrap': '30-day circular blocks, 1000, seed 41'})
     names = ['frozen_selection.json', 'frozen_integrity.json', 'base_selection.json', 'expansion_models.json']
     if is_net:
@@ -147,21 +156,27 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         scope_note = ('2025년 입력 검증 실패 이후 결과 개봉 전에 고정한 2022~2024년 추가 비교다. '
                       '2022~2025년 전체 연속 평가 및 2025년 연간 평가는 완료하지 못했다.\n\n'
                       if period == 'verified_2022_2024' else '')
+        if diagnostic_only:
+            scope_note = '확인 선행 조건 실패 후 사전 계획한 BTC 고정·연간 진단이다. 다른 시장·조건 제거·비용 배수·추가 지연은 이 실행에서 평가하지 않았다.\n\n'
         (destination / 'REPORT.md').write_text(
             '# 고정 진입 대기 후보의 후속 비교\n\n' + scope_note + table(summary) + '\n\n'
             '활동·방향 모형, 대기 폭·만료 시간과 위험 설정을 다시 선택하지 않았다. '
-            + ('ungated_v7은 기존 30분·추가 금지 정책이며 no_adds와 cap_30m은 관리 정책의 해당 기능만 제한한다. '
+            + ('' if diagnostic_only else 'ungated_v7은 기존 30분·추가 금지 정책이며 no_adds와 cap_30m은 관리 정책의 해당 기능만 제한한다. '
                '진입 규칙이 같아도 보유·위험 상태 때문에 실제 진입 시각은 달라진다. ' if is_lifecycle else
                'ungated_v7은 순손익 필터만 제거한 기존 대기 정책이다. ' if is_net else
                'immediate는 같은 30분 보유와 위험 설정에서 대기만 제거한다. ')
-            + '비용은 편도 수수료·슬리피지를 함께 2·3배로 늘렸다. '
-            '추가 지연은 1분이며, 조건 충족 후 실제 체결 가격은 다음 시가와 슬리피지로 계산했다.\n\n'
+            + ('기본 비용과 다음 시가 체결 조건을 유지했다.\n\n' if diagnostic_only else
+               '비용은 편도 수수료·슬리피지를 함께 2·3배로 늘렸다. '
+               '추가 지연은 1분이며, 조건 충족 후 실제 체결 가격은 다음 시가와 슬리피지로 계산했다.\n\n')
+            +
             '대기 시작·충족·만료·취소와 실제 체결까지의 가격 변화는 waiting.json과 각 waiting_episodes.parquet에 보존했다. '
             '가격 변화는 왕복 비용을 차감한 실현 수익률과 다르다. 거래·비용·펀딩·최종 잔고 회계를 모두 대조했다.\n\n'
             '해당 기간의 연도별 초기화는 재학습이나 연속 운용이 아니다. 30일 블록의 95% 분위 구간은 관찰 경로에 조건부이며 '
             '여러 후보를 선택한 불확실성이나 시장 구조 변화를 포함하지 않는다. 현금과 영구 중지 뒤 기간도 포함한다. '
             '2026년 9월까지 이미 관찰한 구간이며 새 최종 평가·수익성 승인·실거래 준비 완료를 뜻하지 않는다.\n', encoding='utf-8')
-        save_json(destination / 'summary.json', {'complete': True, 'period': period, 'symbols': symbols, 'decision': decision})
+        save_json(destination / 'summary.json', {'complete': True, 'period': period, 'symbols': symbols, 'decision': decision,
+            'diagnostic_only': diagnostic_only, 'all_variant_conditions_completed': not diagnostic_only,
+            'condition_runs': len(rows), 'annual_runs': len(annual)})
     except Exception as error:
         save_json(destination / 'failure.json', {'type': type(error).__name__, 'message': str(error)})
         raise

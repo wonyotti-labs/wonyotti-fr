@@ -23,6 +23,7 @@ from wonyotti_fr.path_management import (
     PathActionPolicy,
     add_price_path,
 )
+from wonyotti_fr.pullback_evaluation import run_pullback_evaluation
 from wonyotti_fr.pullback_policy import PullbackPolicy
 
 
@@ -134,3 +135,26 @@ def test_path_state_accounting_and_waiting_diagnostics_with_delayed_entry(tmp_pa
     curve = pd.read_parquet(tmp_path / 'run/equity.parquet')
     held = curve[curve.quantity.ne(0)]
     assert held.policy_state.map(lambda s: PATH_STATE <= set(json.loads(s))).all()
+
+
+def test_diagnostic_scope_requires_failed_confirmation_and_records_omitted_conditions(tmp_path, monkeypatch):
+    root = tmp_path / 'selection'
+    path_selection(root)
+    confirmation = root / 'confirmation-2022' / 'metrics.json'
+    save_json(confirmation, {'total_return': .1, 'closed_trades': 30, 'permanent_halt': False})
+    args = (root, tmp_path, tmp_path, tmp_path / 'out', 'seen_2026', ['BTCUSDT'])
+    with pytest.raises(ValueError, match='전체 평가'):
+        run_pullback_evaluation(*args, diagnostic_only=True)
+    with pytest.raises(ValueError, match='BTC'):
+        run_pullback_evaluation(*args[:-1], ['ETHUSDT'], diagnostic_only=True)
+    save_json(confirmation, {'total_return': -.1, 'closed_trades': 30, 'permanent_halt': False})
+    for name in ['manifest-1m.json', 'manifest-5m.json']:
+        (tmp_path / name).write_text('{}')
+    monkeypatch.setattr('wonyotti_fr.pullback_evaluation.prepare_minute_period', lambda *_: (bars(), {}))
+    monkeypatch.setattr('wonyotti_fr.pullback_evaluation.block_interval', lambda _: {'synthetic_scope_test': True})
+    out = run_pullback_evaluation(*args, diagnostic_only=True)
+    import json
+    summary = json.loads((out / 'summary.json').read_text())
+    assert summary['diagnostic_only'] and not summary['all_variant_conditions_completed']
+    assert summary['condition_runs'] == 1 and summary['annual_runs'] == 0
+    assert '평가하지 않았다' in (out / 'REPORT.md').read_text()
