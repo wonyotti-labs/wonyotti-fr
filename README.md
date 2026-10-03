@@ -374,3 +374,6 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 
 
 [v33](docs/EXPERIMENT_V33.md)의 과거 주문 맥락은 `order-history-diagnose --selection-run <v21 선택> --labels-run <v21 정답> --audit-run <원본 감사>`로 진단한다. 같은 포지션에서 판단 시각보다 앞선 독립 증가·축소 첫 체결만 이용해 여섯 입력을 추가한다. 기존 행·정답·모형 종류·시간 구간을 보존하며 세 행동 전체의 개선 조건을 요구한다. 이 단계에는 매매 실행이 없다.
+
+
+[v34](docs/EXPERIMENT_V34.md)는 `order-history-boost-diagnose --history-run <v33 진단>`으로 실행한다. v33의 50개 입력과 모든 학습·진단 행을 유지하고 고정 부스팅 하나를 기존 두 로지스틱과 비교한다. v33 재학습·기준 예측을 먼저 재현하며 세 행동 모두 두 기준의 개선 조건을 통과해야 한다.

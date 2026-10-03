@@ -333,6 +333,11 @@ def main() -> None:
     prior_select.add_argument('--output', type=Path, default=Path('artifacts'))
     prior_select.set_defaults(func=lambda a: print(run_position_prior_selection(a.selection_run,
         a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
+    from .order_history_boost import run_order_history_boost_diagnostics
+    history_boost = commands.add_parser('order-history-boost-diagnose', help='고정 과거 주문 입력의 선형·비선형 시간순 대조')
+    history_boost.add_argument('--history-run', type=Path, required=True)
+    history_boost.add_argument('--output', type=Path, default=Path('artifacts'))
+    history_boost.set_defaults(func=lambda a: print(run_order_history_boost_diagnostics(a.history_run, a.output)))
     from .order_history_diagnostics import run_order_history_diagnostics
     history_diagnosis = commands.add_parser('order-history-diagnose', help='과거 독립 증가·축소 주문 맥락의 예측 진단')
     for name in ['selection-run', 'labels-run', 'audit-run']:
