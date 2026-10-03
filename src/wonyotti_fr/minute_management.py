@@ -9,6 +9,16 @@ ACTIONS = ['exit', 'reduce', 'increase']
 FEATURES = MARKET_FEATURES + [f'directional_{name}' for name in MARKET_FEATURES] + STATE_FEATURES
 
 
+def purged_window(data: pd.DataFrame, start: str, stop: str) -> pd.DataFrame:
+    first, last = pd.Timestamp(start, tz='UTC'), pd.Timestamp(stop, tz='UTC')
+    if first >= last or last - first <= pd.Timedelta(days=2):
+        raise ValueError('관리 학습 창의 시작·종료 오류')
+    # 경계를 넘는 포지션의 앞부분도 제거해 같은 보유 이력이 양쪽에 섞이지 않게 한다.
+    crossing = data.loc[data.entry_time.lt(last) & data.end.ge(last), 'episode_id'].unique()
+    return data[data.usable & data.end.ge(first + pd.Timedelta(days=1)) & data.entry_time.ge(first)
+                & data.label_end.lt(last - pd.Timedelta(days=1)) & ~data.episode_id.isin(crossing)].copy()
+
+
 def management_orders(executions: pd.DataFrame, actions: pd.DataFrame) -> pd.DataFrame:
     orders = independent_orders(executions, actions)
     # 반전 행의 episode_id는 새 포지션이므로 청산 대상은 직전 행의 포지션이다.

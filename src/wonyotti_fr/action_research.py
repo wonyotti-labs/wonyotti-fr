@@ -15,7 +15,7 @@ from .event_backtest import backtest
 from .event_diagnostics import decompose_run
 from .lifecycle_research import risk_config
 from .minute_data import prepare_minute_period
-from .minute_management import ACTIONS, FEATURES
+from .minute_management import ACTIONS, FEATURES, purged_window
 from .pullback_diagnostics import waiting_diagnostics
 from .pullback_policy import PullbackPolicy
 from .pullback_research import load_pullback_selection
@@ -28,7 +28,8 @@ def candidate_plan():
 
 def load_action_selection(selection: Path, frozen: dict):
     base_path, model_path = selection / 'pullback_selection.json', selection / 'action_model.json'
-    if (frozen.get('protocol') != 'minute_action_v10' or base_path.stat().st_size > 1024**2
+    recent = frozen.get('protocol') == 'minute_action_v11'
+    if (frozen.get('protocol') not in {'minute_action_v10', 'minute_action_v11'} or base_path.stat().st_size > 1024**2
         or model_path.stat().st_size > 1024**2 or sha256(base_path) != frozen['pullback_selection_sha256']
         or frozen['model_sha256'] != {'action_model.json': sha256(model_path)}):
         raise ValueError('분별 관리 정책의 기반·모델 지문 오류')
@@ -36,8 +37,8 @@ def load_action_selection(selection: Path, frozen: dict):
     _, entry = load_pullback_selection(selection, previous)
     model = ActionModels.from_dict(json.loads(model_path.read_text()))
     if ((entry.offset_bps, entry.ttl_minutes) != (16, 5) or model.kind != frozen['kind']
-        or frozen['training_period'] != ['2018-03-01', '2020-01-01']
-        or frozen['calibration_period'] != ['2020-01-01', '2021-01-01']
+        or frozen['training_period'] != (['2019-01-01', '2020-07-01'] if recent else ['2018-03-01', '2020-01-01'])
+        or frozen['calibration_period'] != (['2020-07-01', '2021-01-01'] if recent else ['2020-01-01', '2021-01-01'])
         or frozen['selection_period'] != ['2021-01-01', '2022-01-01']
         or frozen['confirmation_period'] != ['2022-01-01', '2023-01-01']
         or frozen['observed_evaluation_period'] != ['2023-01-01', '2026-01-01']
@@ -76,19 +77,26 @@ def imitation(model, frame, thresholds, multiplier):
 
 
 def run_action_selection(reference: Path, labels: Path, market: Path, features: Path,
-                         confirmation_market: Path, confirmation_features: Path, output: Path) -> Path:
+                         confirmation_market: Path, confirmation_features: Path, output: Path,
+                         regime: str = 'original') -> Path:
     from .event_research import load_selection
     previous, entry = load_selection(reference)
     if previous.get('protocol') != 'lifecycle_v9':
         raise ValueError('분별 관리 정책은 v9 고정 위험 기준을 사용합니다.')
+    if regime not in ('original', 'recent'):
+        raise ValueError('관리 학습 구간 설정 오류')
+    recent = regime == 'recent'
+    protocol = 'docs/EXPERIMENT_V11.md' if recent else 'docs/EXPERIMENT_V10.md'
     hashes = json.loads((labels / 'files.json').read_text())
     names = ['training.parquet', 'calibration.parquet', 'check_2021.parquet', 'order_ledger.parquet', 'summary.json']
+    if recent:
+        names.append('events.parquet')
     if any(sha256(labels / name) != hashes[name] for name in names) or not json.loads((labels / 'summary.json').read_text())['complete']:
         raise ValueError('관리 정답 자료의 무결성 오류')
-    out = new_run(output, 'action-selection', {
+    out = new_run(output, 'action-recent-selection' if recent else 'action-selection', {
         'labels': str(labels), 'files_sha256': sha256(labels / 'files.json'),
         'reference': str(reference), 'reference_sha256': sha256(reference / 'frozen_selection.json'),
-        'protocol_sha256': sha256(Path('docs/EXPERIMENT_V10.md')), 'candidate_count': 4,
+        'protocol_sha256': sha256(Path(protocol)), 'candidate_count': 4, 'regime': regime,
         'input_manifests': {str(p / n): sha256(p / n) for p, n in [(market, 'manifest-1m.json'),
             (features, 'manifest-5m.json'), (confirmation_market, 'manifest-1m.json'), (confirmation_features, 'manifest-5m.json')]}})
     print(f'분별 행동 정책 선택: {out}', flush=True)
@@ -97,8 +105,15 @@ def run_action_selection(reference: Path, labels: Path, market: Path, features: 
     save_json(out / 'candidate_plan.json', candidate_plan())
     try:
         train, calibration, check = (pd.read_parquet(labels / f'{name}.parquet') for name in ['training', 'calibration', 'check_2021'])
-        if (train.label_end.max() >= pd.Timestamp('2020-01-01', tz='UTC') - pd.Timedelta(days=1)
-            or calibration.end.min() < pd.Timestamp('2020-01-02', tz='UTC')
+        if recent:
+            all_events = pd.read_parquet(labels / 'events.parquet')
+            train = purged_window(all_events, '2019-01-01', '2020-07-01')
+            calibration = purged_window(all_events, '2020-07-01', '2021-01-01')
+            del all_events
+        train.to_parquet(out / 'training_used.parquet', index=False)
+        calibration.to_parquet(out / 'calibration_used.parquet', index=False)
+        if (train.label_end.max() >= pd.Timestamp('2020-07-01' if recent else '2020-01-01', tz='UTC') - pd.Timedelta(days=1)
+            or calibration.end.min() < pd.Timestamp('2020-07-02' if recent else '2020-01-02', tz='UTC')
             or calibration.label_end.max() >= pd.Timestamp('2021-01-01', tz='UTC') - pd.Timedelta(days=1)
             or check.end.min() < pd.Timestamp('2021-01-01', tz='UTC')):
             raise ValueError('분별 관리 학습·문턱·모사 기간 오류')
@@ -131,12 +146,13 @@ def run_action_selection(reference: Path, labels: Path, market: Path, features: 
         winner = max(eligible, key=lambda r: r['score'])
         model, thresholds = fitted[winner['kind']]
         save_json(out / 'action_model.json', model.to_dict())
-        frozen = {'protocol': 'minute_action_v10', 'candidate': winner['candidate'], 'kind': winner['kind'],
+        frozen = {'protocol': 'minute_action_v11' if recent else 'minute_action_v10', 'candidate': winner['candidate'], 'kind': winner['kind'],
                   'multiplier': winner['multiplier'], 'thresholds': thresholds, 'risk': asdict(config),
                   'sizing': previous['sizing'], 'development_metrics': winner,
                   'pullback_selection_sha256': sha256(out / 'pullback_selection.json'),
                   'model_sha256': {'action_model.json': sha256(out / 'action_model.json')},
-                  'training_period': ['2018-03-01', '2020-01-01'], 'calibration_period': ['2020-01-01', '2021-01-01'],
+                  'training_period': ['2019-01-01', '2020-07-01'] if recent else ['2018-03-01', '2020-01-01'],
+                  'calibration_period': ['2020-07-01', '2021-01-01'] if recent else ['2020-01-01', '2021-01-01'],
                   'selection_period': ['2021-01-01', '2022-01-01'], 'confirmation_period': ['2022-01-01', '2023-01-01'],
                   'observed_evaluation_period': ['2023-01-01', '2026-01-01'], 'seen_2026_period': ['2026-01-01', '2026-10-01'],
                   'evaluation_end_exclusive': '2026-10-01', 'unseen_evaluation_available': False}

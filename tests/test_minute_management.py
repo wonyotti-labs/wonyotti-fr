@@ -7,6 +7,7 @@ from wonyotti_fr.minute_management import (
     management_events,
     management_orders,
     management_values,
+    purged_window,
 )
 
 
@@ -90,3 +91,14 @@ def test_reverse_order_keeps_previous_episode_as_management_target():
     result = management_orders(executions, actions)
     assert result.before_episode_id.tolist() == [0, 1, 2]
     assert result.target_episode_id.tolist() == [1, 2, 2]
+
+
+def test_recent_window_purges_both_boundary_positions_and_last_day():
+    ends = pd.to_datetime(['2019-01-03', '2019-02-01', '2020-06-28', '2020-06-30', '2020-07-01'], utc=True)
+    frame = pd.DataFrame({'end': ends, 'label_end': ends + pd.Timedelta(minutes=1), 'usable': True,
+                          'entry_time': pd.to_datetime(['2018-12-01', '2019-01-20', '2020-06-20', '2020-06-30', '2020-06-20'], utc=True),
+                          'episode_id': [1, 2, 3, 4, 3]})
+    result = purged_window(frame, '2019-01-01', '2020-07-01')
+    assert result.episode_id.tolist() == [2]
+    with pytest.raises(ValueError, match='시작'):
+        purged_window(frame, '2020-07-01', '2020-01-01')

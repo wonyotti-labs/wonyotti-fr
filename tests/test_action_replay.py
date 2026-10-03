@@ -14,7 +14,7 @@ from wonyotti_fr.period_guard import guard_replay_period
 from wonyotti_fr.pullback_evaluation import evaluation_period
 
 
-def selection(root):
+def selection(root, recent=False):
     frozen = frozen_selection(root)
     payload = {'format': 'minute_action_v1', 'features': FEATURES, 'actions': ACTIONS, 'kind': 'logistic',
                'mean': [0.]*32, 'scale': [1.]*32, 'coef': [[0.]*32 for _ in ACTIONS], 'intercept': [-10., -10., 10.]}
@@ -23,6 +23,9 @@ def selection(root):
                   thresholds={'exit': .9, 'reduce': .9, 'increase': .1},
                   model_sha256={'action_model.json': sha256(root/'action_model.json')},
                   training_period=['2018-03-01', '2020-01-01'], calibration_period=['2020-01-01', '2021-01-01'])
+    if recent:
+        frozen.update(protocol='minute_action_v11', training_period=['2019-01-01', '2020-07-01'],
+                      calibration_period=['2020-07-01', '2021-01-01'])
     save_json(root/'frozen_selection.json', frozen)
     save_json(root/'frozen_integrity.json', {'frozen_selection_sha256': sha256(root/'frozen_selection.json')})
     return frozen
@@ -56,3 +59,17 @@ def test_action_policy_journal_management_state_and_tamper(monkeypatch, tmp_path
     (root/'action_model.json').write_text('{}')
     with pytest.raises(ValueError, match='지문'):
         load_selection(root)
+
+
+def test_recent_protocol_keeps_frozen_periods_and_rejects_changed_training_window(tmp_path):
+    tmp_path = tmp_path/'selection'
+    frozen = selection(tmp_path, recent=True)
+    assert load_selection(tmp_path)[0] == frozen
+    assert evaluation_period(frozen, 'observed') == ('2023-01-01', '2026-01-01')
+    with pytest.raises(ValueError):
+        guard_replay_period(tmp_path, frozen, '2026-10-01', '2026-11-01')
+    frozen['training_period'] = ['2018-01-01', '2020-07-01']
+    save_json(tmp_path/'frozen_selection.json', frozen)
+    save_json(tmp_path/'frozen_integrity.json', {'frozen_selection_sha256': sha256(tmp_path/'frozen_selection.json')})
+    with pytest.raises(ValueError, match='기간'):
+        load_selection(tmp_path)
