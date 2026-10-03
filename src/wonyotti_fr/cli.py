@@ -310,9 +310,10 @@ def main() -> None:
     lifecycle_labels = commands.add_parser('lifecycle-edge-labels', help='고정 v14 관리의 전체 거래 순손익 정답 생성')
     for name in ['rate-selection-run', 'market', 'feature-market']:
         lifecycle_labels.add_argument(f'--{name}', type=Path, required=True)
+    lifecycle_labels.add_argument('--direction-only', action='store_true', help='v17의 활동 관문을 제거한 진입 기회')
     lifecycle_labels.add_argument('--output', type=Path, default=Path('artifacts'))
     lifecycle_labels.set_defaults(func=lambda a: print(run_lifecycle_edge_labels(a.rate_selection_run,
-        a.market, a.feature_market, a.output)))
+        a.market, a.feature_market, a.output, direction_only=a.direction_only)))
     lifecycle_select = commands.add_parser('lifecycle-edge-select', help='전체 거래 정답의 고정 진입 필터 학습·확인')
     for name in ['rate-selection-run', 'labels-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
         lifecycle_select.add_argument(f'--{name}', type=Path, required=True)

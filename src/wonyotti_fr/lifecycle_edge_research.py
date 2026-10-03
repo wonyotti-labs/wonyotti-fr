@@ -10,13 +10,19 @@ from .minute_data import prepare_minute_period
 from .net_edge_labels import potential_entries
 
 
-def run_lifecycle_edge_labels(reference: Path, market: Path, features: Path, output: Path) -> Path:
+def run_lifecycle_edge_labels(reference: Path, market: Path, features: Path, output: Path, *, direction_only: bool = False) -> Path:
     frozen, policy = load_selection(reference)
     if frozen['protocol'] != 'minute_rate_v14':
         raise ValueError('전체 거래 정답은 고정 v14 관리 정책이 필요합니다.')
-    out = new_run(output, 'lifecycle-edge-labels', {'reference': str(reference),
+    if type(direction_only) is not bool:
+        raise ValueError('진입 활동 관문 선택의 형식 오류')
+    if direction_only:
+        from .entry_scope import direction_only_manager
+        policy = direction_only_manager(policy)
+    out = new_run(output, 'direction-edge-labels' if direction_only else 'lifecycle-edge-labels', {'reference': str(reference),
         'reference_sha256': sha256(reference / 'frozen_selection.json'),
-        'protocol_sha256': sha256(Path('docs/EXPERIMENT_V15.md')),
+        'protocol_sha256': sha256(Path('docs/EXPERIMENT_V17.md' if direction_only else 'docs/EXPERIMENT_V15.md')),
+        'entry_activity_gate': not direction_only,
         'market_manifest_sha256': sha256(market / 'manifest-1m.json'),
         'feature_manifest_sha256': sha256(features / 'manifest-5m.json'),
         'training_period': ['2021-01-01', '2022-01-01'], 'forced_boundary_closes': False})

@@ -99,14 +99,17 @@ def test_entry_filter_rejects_whole_wait_and_does_not_change_existing_management
     assert np.isfinite(events.equity).all()
 
 
-def test_lifecycle_label_run_keeps_censored_ledger_and_hashes(tmp_path, monkeypatch):
+@pytest.mark.parametrize('direction_only', [False, True])
+def test_lifecycle_label_run_keeps_censored_ledger_and_hashes(tmp_path, monkeypatch, direction_only):
     root = tmp_path / 'selection'
     rate_selection(root)
     for name in ['manifest-1m.json', 'manifest-5m.json']:
         (tmp_path / name).write_text('{}')
     monkeypatch.setattr('wonyotti_fr.lifecycle_edge_research.prepare_minute_period',
                         lambda *_: (bars().assign(volume=100., count=10), {}))
-    out = run_lifecycle_edge_labels(root, tmp_path, tmp_path, tmp_path / 'runs')
+    out = run_lifecycle_edge_labels(root, tmp_path, tmp_path, tmp_path / 'runs', direction_only=direction_only)
+    settings = json.loads((out / 'manifest.json').read_text())['settings']
+    assert settings['entry_activity_gate'] is not direction_only
     summary = json.loads((out / 'summary.json').read_text())
     ledger = pd.read_parquet(out / 'opportunity_ledger.parquet')
     assert summary['complete'] and len(ledger) == summary['labels']['opportunities'] > 0
