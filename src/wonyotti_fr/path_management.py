@@ -68,7 +68,7 @@ class PathActionPolicy(MinuteActionPolicy):
         return np.r_[super().feature_values(bar, state), price_path_values(
             state['direction'], state['average_entry'], bar['close'], low, high)]
 
-    def __call__(self, bar, state):
+    def path_context(self, bar, state):
         stored = state['policy_state']
         has_path = bool(PATH_STATE & set(stored))
         if has_path:
@@ -76,7 +76,7 @@ class PathActionPolicy(MinuteActionPolicy):
         clean = {k: v for k, v in stored.items() if k not in PATH_STATE}
         base_state = {**state, 'policy_state': clean}
         if not state['direction'] or state['halted'] or self.baseline == 'cash':
-            return super().__call__(bar, base_state)
+            return base_state, {}
         entry, end = pd.Timestamp(state['position_entry_time']), pd.Timestamp(bar['end'])
         if (pd.isna(entry) or entry.tzinfo is None or entry.utcoffset().total_seconds() or entry >= end
             or not np.isfinite(state['average_entry']) or state['average_entry'] <= 0):
@@ -89,6 +89,10 @@ class PathActionPolicy(MinuteActionPolicy):
         path = {'path_entry_time': entry.isoformat(), 'path_direction': state['direction'],
                 'path_low': float(low), 'path_high': float(high), 'path_end': end.isoformat()}
         base_state['_path_bounds'] = low, high
+        return base_state, path
+
+    def __call__(self, bar, state):
+        base_state, path = self.path_context(bar, state)
         decision = super().__call__(bar, base_state)
         return PolicyDecision(decision.intent, {**decision.state, **path}, decision.event)
 

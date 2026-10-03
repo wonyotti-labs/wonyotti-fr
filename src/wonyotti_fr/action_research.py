@@ -28,7 +28,7 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
-    if frozen.get('protocol') == 'minute_reverse_v13':
+    if frozen.get('protocol') in {'minute_reverse_v13', 'minute_rate_v14'}:
         parent_path = selection / 'path_selection.json'
         if parent_path.stat().st_size > 1024**2 or sha256(parent_path) != frozen['path_selection_sha256']:
             raise ValueError('반전 정책의 기반 선택 지문 오류')
@@ -38,6 +38,15 @@ def load_action_selection(selection: Path, frozen: dict):
                    if key not in {'protocol', 'candidate', 'development_metrics'})):
             raise ValueError('반전 정책의 고정 기반 설정 오류')
         _, policy = load_action_selection(selection, parent)
+        if frozen['protocol'] == 'minute_rate_v14':
+            from .rate_policy import RateActionPolicy
+            rate_path = selection / 'rate_calibration.json'
+            if rate_path.stat().st_size > 1024**2 or sha256(rate_path) != frozen['rate_calibration_sha256']:
+                raise ValueError('누적 정책의 빈도 보정 지문 오류')
+            calibration = json.loads(rate_path.read_text())
+            if calibration['scales'] != frozen['rate_scales']:
+                raise ValueError('누적 정책의 고정 빈도 배율 불일치')
+            return frozen, RateActionPolicy(policy, policy.manager, policy.thresholds, policy.multiplier, frozen['rate_scales'])
         return frozen, ReversalPathPolicy(policy, policy.manager, policy.thresholds, policy.multiplier)
     base_path, model_path = selection / 'pullback_selection.json', selection / 'action_model.json'
     path = frozen.get('protocol') == 'minute_path_v12'

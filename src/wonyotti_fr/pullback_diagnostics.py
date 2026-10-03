@@ -53,7 +53,11 @@ def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int, *, mana
         if waiting is None:
             if management_state and event.policy_event == 'cleared':
                 from .path_management import PATH_STATE, validate_path_state
+                from .rate_policy import RATE_STATE, validate_rate_state
                 previous = json.loads(previous_state[event.time])
+                if RATE_STATE & set(previous):
+                    validate_rate_state(previous)
+                    previous = {k: v for k, v in previous.items() if k not in RATE_STATE}
                 path = bool(PATH_STATE & set(previous))
                 if path:
                     validate_path_state(previous)
