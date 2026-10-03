@@ -149,7 +149,7 @@ class ActionModels:
                 for i, tree in enumerate(self.data['trees']):
                     node = 0
                     while tree['left'][node] != -1:
-                        node = tree['left'][node] if matrix[0, tree['feature'][node]] <= tree['threshold'][node] else tree['right'][node]
+                        node = tree['left'][node] if float(matrix[0, tree['feature'][node]]) <= tree['threshold'][node] else tree['right'][node]
                     result[0, i] = tree['probability'][node]
                 return result
             for i, tree in enumerate(self.data['trees']):

@@ -55,6 +55,20 @@ def test_threshold_uses_scores_and_labels_with_ties_and_minimum_support():
         select_threshold(labels[:99], scores[:99], 2.)
 
 
+def test_scalar_tree_keeps_double_precision_split_between_adjacent_float32_values():
+    low = np.nextafter(np.float32(1), np.float32(2))
+    high = np.nextafter(low, np.float32(2))
+    threshold = (float(low) + float(high)) / 2
+    tree = {'left': [1, -1, -1], 'right': [2, -1, -1], 'feature': [0, -2, -2],
+            'threshold': [threshold, -2., -2.], 'probability': [.5, .1, .9]}
+    model = ActionModels.from_dict({'format': 'minute_action_v1', 'features': FEATURES, 'actions': ACTIONS,
+                                   'kind': 'tree', 'trees': [tree, tree, tree]})
+    values = np.zeros((2, 32))
+    values[:, 0] = [low, high]
+    np.testing.assert_array_equal(model.probabilities(values), [[.1]*3, [.9]*3])
+    np.testing.assert_array_equal(model.probabilities(values[1:]), [[.9]*3])
+
+
 class FixedScores:
     def __init__(self, values):
         self.values = values
