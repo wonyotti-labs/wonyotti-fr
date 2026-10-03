@@ -13,6 +13,7 @@
 - [보유 시간·비용을 고려한 진입 계획](docs/EXPERIMENT_V5.md)
 - [최초 체결 시점 해상도 연구](docs/EXPERIMENT_V6.md)
 - [확정 종가에 따른 진입 대기 계획](docs/EXPERIMENT_V7.md)
+- [실행 순손익에 맞춘 진입 필터 계획](docs/EXPERIMENT_V8.md)
 - [요구 사항별 검증 기록](docs/VERIFICATION.md)
 - [데이터 관리 원칙](DATA_POLICY.md)
 - [보안 정책](SECURITY.md)
@@ -147,6 +148,24 @@ uv run wonyotti pullback-evaluate --selection-run <v7 선택 폴더> \
 `verified_2022_2024`는 자료 검증 실패 뒤 성과 확인 전에 고정했던 추가 범위다. 이 결과와 원래 전체 기간 결과를 각각 보존한다. 고정 후보·즉시 진입·현금·비용 2·3배·추가 1분 지연과 거래 회계·진입 대기·조건부 재표집을 기록한다. 기간별 자료를 만들 때는 `paired-repair --start 2021-12-01 --end 2025-01-01`과 이미 발견한 오류의 `--extra-targets`를 사용한다.
 
 
+## 실행 순손익을 학습하는 v8 연구
+
+```sh
+uv run wonyotti net-edge-select --v7-selection-run <v7 선택 폴더> \
+  --market <2020~2021년 1분 자료> --feature-market <2020~2021년 5분 자료> \
+  --confirmation-market <2022년 1분 자료> --confirmation-features <2022년 5분 자료>
+uv run wonyotti net-edge-evaluate --selection-run <v8 선택 폴더> \
+  --market <전체 기간 1분 자료> --feature-market <전체 기간 5분 자료> --period observed
+uv run wonyotti net-edge-evaluate --selection-run <v8 선택 폴더> \
+  --market <2026년 1분 자료> --feature-market <2026년 5분 자료> --period seen_2026
+```
+
+확정 종가로 제시된 기회를 같은 실행 엔진의 다음 시가·손절·수수료·슬리피지·펀딩으로 평가해 순손익을 학습한다. 기존 v7 신호·대기·위험 설정은 고정한다. 2020년 학습, 네 후보의 2021년 선택, 선택 후 2022년 확인 순서다. 기회마다 독립 자본을 가정하므로 겹치는 기회 수를 독립 거래 표본 수로 해석하지 않는다. 손실 정답도 보존한다.
+
+v8의 `observed`는 **2023~2025년**이며 v7과 시작 연도가 다르다. `seen_2026`은 2026년 1~9월이다. 명령은 공통 평가기를 사용하며 `verified_2022_2024`는 v8에서 거부한다. 시장별 입력 폴더가 다르면 `--symbols`로 분리한다. 두 기간·세 시장의 여섯 조건과 아홉 연간 초기화를 완료했다. BTC 일부 기본 조건은 양수였지만 비용 증가·표본 부족과 다른 시장의 장기 손실로 채택하지 않았다. 모든 구간은 이미 관찰했으며 새 미사용 평가가 아니다.
+
+필터는 판단 시점의 확정 특징으로 예상 순손익을 계산한다. 거절하면 해당 대기를 끝낸다. 필터 제거 비교는 기존 v7이며 최근 세 시장의 전체 실행 결과가 이전 v7과 정확히 같다. 영속 재생과 대기·보유 중 실제 프로세스 종료 복원도 검증했다.
+
 ## 중단과 복원이 가능한 오프라인 봇
 
 ```sh
@@ -156,13 +175,15 @@ uv run wonyotti event-replay --selection-run artifacts/선택실행ID --market d
 
 첫 실행은 처리 봉 수만 제한하며 열린 포지션을 유지한다. 다음 실행은 같은 모델·시세·설정·소스의 저널에서 이어서 처리한다. 전체 기간 끝에서만 비용을 내고 청산한다. `--verify-memory`는 처음부터 한 번에 처리한 잔고·체결·상태와 대조한다. 긴 기간에서는 추가 시간과 메모리가 든다.
 
-v7은 `--market`에 1분 자료를 지정하고 `--feature-market`에 별도 5분 특징 자료를 함께 지정한다. 두 입력의 해시를 저널에 묶는다. 진입 대기·만료 상태도 재개하며, 다음처럼 실제 종료 복구를 검증할 수 있다.
+v7·v8은 `--market`에 1분 자료를 지정하고 `--feature-market`에 별도 5분 특징 자료를 함께 지정한다. 두 입력의 해시를 저널에 묶는다. 진입 대기·만료 상태도 재개하며, 다음처럼 실제 종료 복구를 검증할 수 있다.
 
 ```sh
 uv run wonyotti engine-stress --selection-run <v7 선택 폴더> \
   --market <개발 1분 자료> --feature-market <개발 5분 자료> \
   --start 2020-03-10 --end 2020-03-14
 ```
+
+v8도 같은 두 명령에 v8 선택 폴더를 지정한다. 완료한 복원 검사는 2021년 개발 구간 첫 거래의 월을 사용했으며, 신호 조건을 바꿔 대기·보유 상태를 만들지 않았다.
 
 `--halt --max-bars 0`은 수동 중지 의도를 저장한다. 다음 유효 시세를 처리할 때 청산하고 재진입을 막는다. 같은 사건의 재전달은 중복 체결하지 않고, 같은 ID의 다른 시세는 거부한다. 해시 저널은 로컬 손상 탐지용이며 외부 서명이나 계정 인증은 아니다. 소스 변경 후에는 기존 저널을 다른 프로그램으로 이어서 처리하지 않고 새 실행을 만들거나 보존한 코드 스냅샷을 사용한다.
 
@@ -190,6 +211,7 @@ uv run wonyotti engine-stress --selection-run artifacts/빈도선택ID
 | `timing-study` | 같은 주문의 1분·5분 연결과 집계 일치·누락 비교 |
 | `minute-repair`, `paired-repair` | 원체결 대조·두 해상도 복원·전후 값·실패·범위별 자료 |
 | `pullback-select`, `pullback-evaluate` | 확정 종가의 진입 대기 후보·고정 비교·대기 사건·실제 가격 차이 |
+| `net-edge-select`, `net-edge-evaluate` | 같은 실행 엔진의 순손익 학습·시간순 선택·필터 제거·비용·지연 비교 |
 | `event-replay` | 영속 저널, 중단·재개 상태, 단일 실행 대조 |
 | `engine-stress` | 실제 프로세스 종료 복구와 급변·중복·누락·수동 중지 검사 |
 | `study`, `research`, `robustness`, `replay` | v1 행동 연구·방향 모사·비용 비교·재표집·오프라인 재생 |
