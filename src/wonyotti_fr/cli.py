@@ -294,6 +294,12 @@ def main() -> None:
     inventory_labels.add_argument('--inventory-study-run', type=Path, required=True)
     inventory_labels.add_argument('--output', type=Path, default=Path('artifacts'))
     inventory_labels.set_defaults(func=lambda a: print(run_inventory_labels(a.path_labels_run, a.inventory_study_run, a.output)))
+    from .minute_inventory import run_minute_inventory_labels
+    minute_labels = commands.add_parser('minute-inventory-labels', help='수량 관리 정답에 현재 확정 분봉 입력 추가')
+    for name in ['labels-run', 'minute-history', 'history']:
+        minute_labels.add_argument(f'--{name}', type=Path, required=True)
+    minute_labels.add_argument('--output', type=Path, default=Path('artifacts'))
+    minute_labels.set_defaults(func=lambda a: print(run_minute_inventory_labels(a.labels_run, a.minute_history, a.history, a.output)))
     from .inventory_research import run_inventory_selection
     inventory_select = commands.add_parser('inventory-select', help='잔여 수량·실제 축소 크기의 고정 학습과 확인')
     for name in ['rate-selection-run', 'labels-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:

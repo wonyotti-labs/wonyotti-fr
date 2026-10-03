@@ -106,13 +106,20 @@ def prepare_period(market: Path, symbol: str, start: str, end: str) -> pd.DataFr
 
 
 def iter_events(data: pd.DataFrame):
+    from .minute_inputs import MINUTE_FEATURES
     names = ['time', 'end', 'open', 'high', 'low', 'close', 'funding_rate']
     if {'count', 'volume'} <= set(data.columns):
         names += ['count', 'volume']
-    for row in data[names + MARKET_FEATURES].itertuples(index=False, name=None):
+    extra = MINUTE_FEATURES if set(MINUTE_FEATURES) <= set(data.columns) else []
+    if set(MINUTE_FEATURES) & set(data.columns) and not extra:
+        raise ValueError('관리용 확정 분봉 특징의 일부 누락')
+    for row in data[names + MARKET_FEATURES + extra].itertuples(index=False, name=None):
         event = dict(zip(names, row[:len(names)], strict=True))
         event['time'], event['end'] = event['time'].isoformat(), event['end'].isoformat()
-        event['features'] = [float(x) if np.isfinite(x) else None for x in row[len(names):]]
+        split = len(names) + len(MARKET_FEATURES)
+        event['features'] = [float(x) if np.isfinite(x) else None for x in row[len(names):split]]
+        if extra:
+            event['minute_features'] = [float(x) if np.isfinite(x) else None for x in row[split:]]
         yield event
 
 

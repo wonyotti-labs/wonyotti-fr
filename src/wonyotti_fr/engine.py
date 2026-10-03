@@ -79,6 +79,11 @@ def validate_bar(bar: dict, seconds: int) -> dict:
     rate = float(bar.get("funding_rate", 0))
     if not np.isfinite(rate) or abs(rate) > 1:
         raise ValueError("유효하지 않은 펀딩률")
+    if 'minute_features' in bar:
+        values = bar['minute_features']
+        if (seconds != 60 or not isinstance(values, list) or len(values) != 4
+            or any(v is not None and (type(v) not in (int, float) or not np.isfinite(v)) for v in values)):
+            raise ValueError('관리용 확정 분봉 특징의 형식·숫자 오류')
     result.update(dict(zip(["open", "high", "low", "close"], prices, strict=True)))
     if 'count' in bar or 'volume' in bar:
         if 'count' not in bar or 'volume' not in bar:

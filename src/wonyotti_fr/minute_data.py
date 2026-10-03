@@ -7,6 +7,7 @@ import pandas as pd
 
 from .common import records
 from .event_features import MARKET_FEATURES, event_features
+from .minute_inputs import MINUTE_FEATURES, minute_features
 from .research import check_funding_coverage, load_market
 
 
@@ -73,7 +74,8 @@ def normalized_funding(frame: pd.DataFrame, first: pd.Timestamp, last: pd.Timest
     return selected
 
 
-def prepare_minute_period(market: Path, feature_market: Path, symbol: str, start: str, end: str) -> tuple[pd.DataFrame, dict]:
+def prepare_minute_period(market: Path, feature_market: Path, symbol: str, start: str, end: str,
+                          minute_inputs: bool = False) -> tuple[pd.DataFrame, dict]:
     first, last = pd.Timestamp(start, tz='UTC'), pd.Timestamp(end, tz='UTC')
     if (first >= last or last - first > pd.Timedelta(days=1500)
         or first.value % pd.Timedelta(minutes=5).value or last.value % pd.Timedelta(minutes=5).value):
@@ -96,10 +98,17 @@ def prepare_minute_period(market: Path, feature_market: Path, symbol: str, start
         raise ValueError('두 해상도 자료의 펀딩 시각·값 불일치')
     selected['funding_rate'] = selected.time.map(rates.set_index('time').rate).fillna(0)
     result = attach_confirmed_features(selected, five)
+    minute_checks = {}
+    if minute_inputs:
+        context = minute[(minute.time >= first - pd.Timedelta(minutes=60)) & (minute.time < last)]
+        result = result.merge(minute_features(context), on='end', how='left', validate='one_to_one')
+        minute_checks = {'minute_input_rule': '현재 확정 분봉과 과거 60분, 현재 거래량은 기준 평균에서 제외',
+                         'minute_input_available_rows': int(np.isfinite(result[MINUTE_FEATURES]).all(axis=1).sum()),
+                         'minute_input_warmup_rows': int(context.time.lt(first).sum())}
     valid = result[MARKET_FEATURES].notna().all(axis=1)
     known = result.feature_end.notna()
     if (result.loc[known, 'feature_end'] > result.loc[known, 'end']).any():
         raise ValueError('미확정 특징의 실행 입력 유입')
     return result, {'aggregate_comparison': comparison, 'minute_rows': len(result), 'funding_rows': len(rates),
                     'valid_feature_rows': int(valid.sum()), 'unavailable_feature_rows': int((~valid).sum()),
-                    'feature_rule': '가장 최근 확정 5분 특징, 미래 봉 및 시간 길이 변경 없음'}
+                    'feature_rule': '가장 최근 확정 5분 특징, 미래 봉 및 시간 길이 변경 없음', **minute_checks}
