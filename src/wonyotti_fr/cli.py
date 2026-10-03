@@ -34,6 +34,7 @@ from .reconstruct import reconstruct
 from .reports import write_reconstruction_report
 from .research import run_research
 from .robustness import run_robustness
+from .structure_study import run_structure_study
 from .study import run_study
 from .timing_study import run_timing_study
 from .verification import verify_samples
@@ -227,6 +228,13 @@ def main() -> None:
     edge_diagnostics.add_argument("--output", type=Path, default=Path("artifacts"))
     edge_diagnostics.set_defaults(func=lambda a: run_edge_diagnostics(a.selection_run, a.audit_run, a.study_run, a.history,
                                                                      a.market, a.recent_market, a.new_market, a.output))
+    structure = commands.add_parser("structure-study", help="원본 회계·보유 제한·추가 진입·체결 조건의 설명 대조")
+    structure.add_argument("--audit-run", type=Path, required=True)
+    structure.add_argument("--study-run", type=Path, required=True)
+    structure.add_argument("--history", type=Path, default=Path("data/bitmex-history"))
+    structure.add_argument("--minute-history", type=Path, default=Path("data/bitmex-history-1m"))
+    structure.add_argument("--output", type=Path, default=Path("artifacts"))
+    structure.set_defaults(func=lambda a: run_structure_study(a.audit_run, a.study_run, a.history, a.minute_history, a.output))
     timing = commands.add_parser("timing-study", help="동일 주문의 1분·5분 시세와 체결 가격 차이 비교")
     timing.add_argument("--audit-run", type=Path, required=True)
     timing.add_argument("--study-run", type=Path, required=True)
