@@ -306,6 +306,13 @@ def main() -> None:
     rate.add_argument('--output', type=Path, default=Path('artifacts'))
     rate.set_defaults(func=lambda a: run_rate_selection(a.path_selection_run, a.market, a.feature_market,
         a.confirmation_market, a.confirmation_features, a.output))
+    from .lifecycle_edge_research import run_lifecycle_edge_labels
+    lifecycle_labels = commands.add_parser('lifecycle-edge-labels', help='고정 v14 관리의 전체 거래 순손익 정답 생성')
+    for name in ['rate-selection-run', 'market', 'feature-market']:
+        lifecycle_labels.add_argument(f'--{name}', type=Path, required=True)
+    lifecycle_labels.add_argument('--output', type=Path, default=Path('artifacts'))
+    lifecycle_labels.set_defaults(func=lambda a: print(run_lifecycle_edge_labels(a.rate_selection_run,
+        a.market, a.feature_market, a.output)))
     pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate", "action-evaluate"], help="고정 v7~v14 후보의 다시장·비용·지연 비교")
     pullback_eval.add_argument("--selection-run", type=Path, required=True)
     pullback_eval.add_argument("--market", type=Path, required=True)
