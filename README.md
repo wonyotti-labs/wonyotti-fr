@@ -377,3 +377,6 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 
 
 [v34](docs/EXPERIMENT_V34.md)는 `order-history-boost-diagnose --history-run <v33 진단>`으로 실행한다. v33의 50개 입력과 모든 학습·진단 행을 유지하고 고정 부스팅 하나를 기존 두 로지스틱과 비교한다. v33 재학습·기준 예측을 먼저 재현하며 세 행동 모두 두 기준의 개선 조건을 통과해야 한다.
+
+
+[v35](docs/EXPERIMENT_V35.md)는 `history-calibration-diagnose --history-run <v33 진단> --calibration-run <v32 진단>`으로 실행한다. v32의 세 시간 구간과 모든 기존 열을 유지한 채 검증된 과거 주문 특징 여섯 개를 연결한다. 새 보정 부스팅을 기존 v21·새 보정 로지스틱·v32 보정 부스팅 모두와 비교하며 마지막 구간의 정답은 학습에 사용하지 않는다.

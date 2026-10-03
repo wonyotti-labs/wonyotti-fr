@@ -59,7 +59,7 @@ def calibration_admission(metrics):
             'profitability_accepted': False, 'trading_returns_evaluated': False, 'all_source_periods_already_observed': True}
 
 
-def run_calibration_diagnostics(selection: Path, labels: Path, diagnosis: Path, output: Path) -> Path:
+def run_calibration_diagnostics(selection: Path, labels: Path, diagnosis: Path, output: Path, *, _history_context=None) -> Path:
     frozen, original = load_selection(selection)
     if frozen['protocol'] != 'minute_inventory_micro_v21':
         raise ValueError('시간순 보정 진단에는 고정 v21 모델이 필요합니다.')
@@ -68,26 +68,35 @@ def run_calibration_diagnostics(selection: Path, labels: Path, diagnosis: Path, 
         or previous['labels_files_sha256'] != sha256(labels / 'files.json')):
         raise ValueError('시간순 보정 진단의 기존 입력 지문 오류')
     verify_files(diagnosis, list(json.loads((diagnosis / 'files.json').read_text())))
-    out = new_run(output, 'management-calibration-diagnosis', {'selection': str(selection), 'labels': str(labels),
+    context = _history_context
+    model_class = context['model_class'] if context else MinuteInventoryModels
+    boost_class = context['boost_class'] if context else HistogramManagementModels
+    protocol = 'docs/EXPERIMENT_V35.md' if context else 'docs/EXPERIMENT_V32.md'
+    out = new_run(output, 'history-calibration-diagnosis' if context else 'management-calibration-diagnosis', {'selection': str(selection), 'labels': str(labels),
         'diagnosis': str(diagnosis), 'selection_sha256': sha256(selection / 'frozen_selection.json'),
         'labels_files_sha256': sha256(labels / 'files.json'), 'diagnosis_files_sha256': sha256(diagnosis / 'files.json'),
-        'protocol_sha256': sha256(Path('docs/EXPERIMENT_V32.md')), 'periods': PERIODS,
+        'protocol_sha256': sha256(Path(protocol)), 'periods': PERIODS,
+        'features': model_class.features, **(context['metadata'] if context else {}),
         'all_source_periods_already_observed': True, 'trading_returns_evaluated': False})
     print(f'관리 빈도의 시간순 보정 진단: {out}', flush=True)
     try:
         frame, _ = load_minute_inventory_labels(labels)
         rows, support = calibration_split(frame, diagnosis)
         del frame
+        if context:
+            from .history_calibration_diagnostics import attach_history_splits
+            rows = attach_history_splits(rows, context)
         for name, part in rows.items():
             part.to_parquet(out / f'{name}_used.parquet', index=False)
         train, calibration, validation = (rows[n] for n in PERIODS)
-        logistic, _, log_support = MinuteInventoryModels.fit(train, calibration, 'logistic')
-        x, cx, vx = (rows[n][MinuteInventoryModels.features].to_numpy(dtype=float) for n in PERIODS)
+        logistic, _, log_support = model_class.fit(train, calibration, 'logistic')
+        x, cx, vx = (rows[n][model_class.features].to_numpy(dtype=float) for n in PERIODS)
         y, cy = (rows[n][[f'y_{a}' for a in ACTIONS]].to_numpy(dtype=int) for n in ['training', 'calibration'])
-        histogram, hist_support = HistogramManagementModels.fit(x, y, np.vstack([cx, vx]))
+        histogram, hist_support = boost_class.fit(x, y, np.vstack([cx, vx]))
         del x
         models, offsets, offset_support = {}, {}, {}
-        scores = {'original_v21': original.manager.probabilities(vx), 'constant': np.tile(cy.mean(axis=0), (len(vx), 1))}
+        scores = {'original_v21': original.manager.probabilities(validation[MinuteInventoryModels.features].to_numpy()),
+                  'constant': np.tile(cy.mean(axis=0), (len(vx), 1))}
         for name, model in [('logistic', logistic), ('histogram', histogram)]:
             offset, checks = ManagementOffset.fit(model.probabilities(cx), cy)
             models[name], offsets[name], offset_support[name] = model.to_dict(), offset.to_dict(), checks
@@ -97,6 +106,11 @@ def run_calibration_diagnostics(selection: Path, labels: Path, diagnosis: Path, 
         columns = ['end', 'episode_id', *[f'y_{a}' for a in ACTIONS]]
         pd.testing.assert_frame_equal(old_scores[columns], validation[columns], check_exact=True)
         np.testing.assert_array_equal(scores['original_v21'], old_scores[[a + '_logistic' for a in ACTIONS]].to_numpy())
+        if context:
+            previous_scores = context['previous_predictions']
+            pd.testing.assert_frame_equal(previous_scores[columns], validation[columns], check_exact=True)
+            np.testing.assert_array_equal(scores['original_v21'], previous_scores[[a + '_original_v21' for a in ACTIONS]].to_numpy())
+            scores['previous_calibrated'] = previous_scores[[a + '_histogram_calibrated' for a in ACTIONS]].to_numpy()
         predictions = validation[['end', 'episode_id', *[f'y_{a}' for a in ACTIONS]]].copy()
         metrics = {}
         for i, action in enumerate(ACTIONS):
@@ -113,6 +127,9 @@ def run_calibration_diagnostics(selection: Path, labels: Path, diagnosis: Path, 
             save_json(out / f'{name}.json', value)
         predictions.to_parquet(out / 'predictions.parquet', index=False)
         decision = calibration_admission(metrics)
+        if context:
+            from .history_calibration_diagnostics import history_calibration_admission
+            decision = history_calibration_admission(metrics)
         save_json(out / 'decision.json', decision)
         save_json(out / 'summary.json', {'complete': True, 'episode_intersection': 0,
             'original_predictions_exact': True, 'diagnosis_rows_exact': True, 'rank_preserved': True, **decision})
@@ -121,6 +138,10 @@ def run_calibration_diagnostics(selection: Path, labels: Path, diagnosis: Path, 
             + '\n\n2020년 학습·2021년 상반기 절편 보정·하반기 진단을 분리했다. 기존 18개월 학습을 12개월 학습과 6개월 보정으로 바꾼 차이도 포함한다. '
             '기울기와 예측 순위는 보존하며 보정 구간의 평균 일치는 이후 조건부 확률의 보장이 아니다. '
             '세 행동 모두의 기준을 요구하며 일부만 고르지 않는다. 이미 관찰한 자료이며 매매 수익성 진단이 아니다.\n')
+        if context:
+            with (out / 'REPORT.md').open('a') as stream:
+                stream.write('\n기존 v32 분할의 모든 열·정답을 유지하고 검증된 과거 주문 입력 여섯 개를 더했다. '
+                    '기존 v21·새 보정 로지스틱·v32 보정 부스팅 세 기준 모두를 넘는 조건이며 이전 실패 판단은 변경하지 않았다.\n')
         save_json(out / 'files.json', {p.name: sha256(p) for p in out.iterdir() if p.is_file()})
         print(f'후속 연구 허용: {decision["calibrated_histogram_admitted"]}', flush=True)
     except Exception as error:

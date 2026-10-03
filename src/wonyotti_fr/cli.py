@@ -333,6 +333,12 @@ def main() -> None:
     prior_select.add_argument('--output', type=Path, default=Path('artifacts'))
     prior_select.set_defaults(func=lambda a: print(run_position_prior_selection(a.selection_run,
         a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
+    from .history_calibration_diagnostics import run_history_calibration_diagnostics
+    history_calibration = commands.add_parser('history-calibration-diagnose', help='과거 주문 입력과 세 구간 빈도 보정의 결합 진단')
+    history_calibration.add_argument('--history-run', type=Path, required=True)
+    history_calibration.add_argument('--calibration-run', type=Path, required=True)
+    history_calibration.add_argument('--output', type=Path, default=Path('artifacts'))
+    history_calibration.set_defaults(func=lambda a: print(run_history_calibration_diagnostics(a.history_run, a.calibration_run, a.output)))
     from .order_history_boost import run_order_history_boost_diagnostics
     history_boost = commands.add_parser('order-history-boost-diagnose', help='고정 과거 주문 입력의 선형·비선형 시간순 대조')
     history_boost.add_argument('--history-run', type=Path, required=True)
