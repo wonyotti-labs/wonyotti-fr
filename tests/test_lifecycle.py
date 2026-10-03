@@ -41,10 +41,10 @@ def manager(intent='increase'):
     })
 
 
-def frozen_selection(root):
+def frozen_selection(root, addition_fraction=.1):
     previous = selection(root)
     previous.update(offset_bps=16)
-    sizing = {'addition_fraction': .1, 'reduction_fraction': .5}
+    sizing = {'addition_fraction': addition_fraction, 'reduction_fraction': .5}
     save_json(root / 'pullback_selection.json', previous)
     save_json(root / 'management_model.json', manager().to_dict())
     frozen = {

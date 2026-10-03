@@ -339,6 +339,13 @@ def main() -> None:
         direction_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     direction_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     direction_diagnosis.set_defaults(func=lambda a: print(run_direction_diagnostics(a.audit_run, a.study_run, a.history, a.output)))
+    from .probe_entry_research import run_probe_entry_selection
+    probe_select = commands.add_parser('probe-entry-select', help='최초 노출만 줄인 단일 후보와 비례 위험 축소 대조')
+    for name in ['selection-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
+        probe_select.add_argument(f'--{name}', type=Path, required=True)
+    probe_select.add_argument('--output', type=Path, default=Path('artifacts'))
+    probe_select.set_defaults(func=lambda a: print(run_probe_entry_selection(a.selection_run,
+        a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
     from .boosted_direction_research import run_boosted_direction_selection
     boosted_select = commands.add_parser('boosted-direction-select', help='시간순 진단을 통과한 고정 방향 부스팅 학습')
     for name in ['selection-run', 'diagnosis-run', 'audit-run', 'study-run', 'history', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:

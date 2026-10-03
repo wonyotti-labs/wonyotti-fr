@@ -28,6 +28,9 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'probe_entry_v29':
+        from .probe_entry import load_probe_entry_selection
+        return load_probe_entry_selection(selection, frozen)
     if frozen.get('protocol') == 'boosted_direction_v28':
         from .boosted_direction import load_boosted_direction_selection
         return load_boosted_direction_selection(selection, frozen)
