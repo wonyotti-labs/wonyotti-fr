@@ -27,10 +27,6 @@ def run_boosted_direction_selection(reference: Path, diagnosis: Path, audit: Pat
     if parent['protocol'] != 'position_direction_v27':
         raise ValueError('신규 방향 대조에는 고정 v27 모델이 필요합니다.')
     source, hashes = source_inputs(audit, study, history)
-    admission = read_admission(diagnosis, hashes)
-    data, events = new_position_targets(make_expansion_data(source), source['actions'])
-    train, ledger = position_direction_training(data, source['episodes'])
-    pd.testing.assert_frame_equal(train, pd.read_parquet(reference / 'direction_training_used.parquet'), check_exact=True)
     out = new_run(output, 'boosted-direction-selection', {'reference': str(reference), 'diagnosis': str(diagnosis), 'diagnosis_files_sha256': sha256(diagnosis / 'files.json'),
         'reference_sha256': sha256(reference / 'frozen_selection.json'), **hashes,
         'protocol_sha256': sha256(Path('docs/EXPERIMENT_V28.md')), 'candidate_count': 1,
@@ -39,6 +35,10 @@ def run_boosted_direction_selection(reference: Path, diagnosis: Path, audit: Pat
             (features, 'manifest-5m.json'), (confirmation_market, 'manifest-1m.json'), (confirmation_features, 'manifest-5m.json')]}})
     print(f'진단 통과 방향 부스팅 학습: {out}', flush=True)
     try:
+        admission = read_admission(diagnosis, hashes)
+        data, events = new_position_targets(make_expansion_data(source), source['actions'])
+        train, ledger = position_direction_training(data, source['episodes'])
+        pd.testing.assert_frame_equal(train.reset_index(drop=True), pd.read_parquet(reference / 'direction_training_used.parquet'), check_exact=True)
         copy_direction_parent(reference, out)
         save_json(out / 'direction_admission.json', admission)
         train.to_parquet(out / 'direction_training_used.parquet', index=False)

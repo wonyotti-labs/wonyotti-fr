@@ -133,6 +133,7 @@ def test_diagnosis_then_full_boosted_fit_preserves_training_and_management(tmp_p
     _, original = load_selection(parent)
     backtest(short_bars(), original, EngineConfig(**frozen['risk']), parent / 'candidate-00')
     data, actions, episodes = source_fixture()
+    data.loc[5, 'usable'] = False
     data[MARKET_FEATURES[0]] = np.resize([-2., -.5, 2., .5], len(data))
     data[MARKET_FEATURES[1]] = 0.
     targets, _ = new_position_targets(data, actions)
@@ -153,5 +154,5 @@ def test_diagnosis_then_full_boosted_fit_preserves_training_and_management(tmp_p
     assert current.base.direction.data['kind'] == 'boosted'
     assert current.base.activity.data == original.base.activity.data
     assert current.size_model.to_dict() == original.size_model.to_dict()
-    pd.testing.assert_frame_equal(pd.read_parquet(out / 'direction_training_used.parquet'), train, check_exact=True)
+    pd.testing.assert_frame_equal(pd.read_parquet(out / 'direction_training_used.parquet'), train.reset_index(drop=True), check_exact=True)
     assert json.loads((out / 'baseline_parity.json').read_text())['full_outputs_and_state_exact']
