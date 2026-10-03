@@ -371,3 +371,6 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 
 
 [v32](docs/EXPERIMENT_V32.md)의 빈도 보정 진단은 `management-calibration-diagnose --selection-run <v21 선택> --labels-run <v21 정답> --diagnosis-run <v30 진단>`으로 실행한다. 2020년 학습·2021년 상반기 절편 보정·하반기 진단을 분리한다. 두 모형의 보정 전후와 기존 모델·상수를 대조하며 세 행동 모두의 개선 조건을 요구한다. 매매 후보 실행은 별도 계획 전까지 포함하지 않는다.
+
+
+[v33](docs/EXPERIMENT_V33.md)의 과거 주문 맥락은 `order-history-diagnose --selection-run <v21 선택> --labels-run <v21 정답> --audit-run <원본 감사>`로 진단한다. 같은 포지션에서 판단 시각보다 앞선 독립 증가·축소 첫 체결만 이용해 여섯 입력을 추가한다. 기존 행·정답·모형 종류·시간 구간을 보존하며 세 행동 전체의 개선 조건을 요구한다. 이 단계에는 매매 실행이 없다.

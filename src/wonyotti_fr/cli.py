@@ -333,6 +333,12 @@ def main() -> None:
     prior_select.add_argument('--output', type=Path, default=Path('artifacts'))
     prior_select.set_defaults(func=lambda a: print(run_position_prior_selection(a.selection_run,
         a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
+    from .order_history_diagnostics import run_order_history_diagnostics
+    history_diagnosis = commands.add_parser('order-history-diagnose', help='과거 독립 증가·축소 주문 맥락의 예측 진단')
+    for name in ['selection-run', 'labels-run', 'audit-run']:
+        history_diagnosis.add_argument(f'--{name}', type=Path, required=True)
+    history_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
+    history_diagnosis.set_defaults(func=lambda a: print(run_order_history_diagnostics(a.selection_run, a.labels_run, a.audit_run, a.output)))
     from .calibration_diagnostics import run_calibration_diagnostics
     calibration_diagnosis = commands.add_parser('management-calibration-diagnose', help='학습·빈도 보정·진단을 세 구간으로 분리해 관리 점수 대조')
     for name in ['selection-run', 'labels-run', 'diagnosis-run']:
