@@ -108,9 +108,9 @@ def run_engine_stress(selection: Path, market: Path, output: Path, start: str = 
     destination = new_run(output, 'engine-stress', {**identity,
                                                    'checks': '가격 급변 시세, 실제 프로세스 종료, 중복·누락·잘못된 입력, 수동 중지'})
     try:
-        if frozen.get('protocol') in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
+        if frozen.get('protocol') in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
             bars, input_checks = prepare_minute_period(market, feature_market, 'BTCUSDT', start, end,
-                **({'minute_inputs': True} if frozen['protocol'] in {'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27'} else {}))
+                **({'minute_inputs': True} if frozen['protocol'] in {'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28'} else {}))
             save_json(destination / 'input_verification.json', input_checks)
             events = list(iter_events(bars))
             cases = {}
