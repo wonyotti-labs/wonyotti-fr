@@ -18,6 +18,13 @@ class PolicyDecision:
     intent: str
     state: dict
     event: str
+    reduction_fraction: float | None = None
+
+
+def validate_reduction_fraction(intent: str, fraction) -> None:
+    if fraction is not None and (intent != 'reduce' or type(fraction) not in (int, float)
+                                 or not np.isfinite(fraction) or not 0 < fraction <= 1):
+        raise ValueError('축소 주문의 의도·수량 비율 오류')
 
 
 def validate_policy_state(state: dict) -> None:
@@ -112,6 +119,16 @@ class TradingEngine:
         queue = s.get("deferred_intents")
         if not isinstance(queue, list) or len(queue) > self.config.signal_delay_bars or any(item not in INTENTS for item in queue):
             raise ValueError("지연 주문 상태 오류")
+        if 'pending_reduction_fraction' in s:
+            if s['pending_reduction_fraction'] is None:
+                raise ValueError('대기 축소 비율의 빈 값')
+            validate_reduction_fraction(s['pending'], s['pending_reduction_fraction'])
+        if 'deferred_reduction_fractions' in s:
+            fractions = s['deferred_reduction_fractions']
+            if not isinstance(fractions, list) or len(fractions) != len(queue):
+                raise ValueError('지연 축소 비율과 주문 순서 불일치')
+            for intent, fraction in zip(queue, fractions, strict=True):
+                validate_reduction_fraction(intent, fraction)
         for key in ["cash", "quantity", "entry_price", "peak", "day_equity", "total_fees", "total_funding", "closed_net"]:
             if not np.isfinite(s[key]):
                 raise ValueError("상태에 유한하지 않은 숫자가 있습니다.")
@@ -134,6 +151,7 @@ class TradingEngine:
                 "favorable_move": direction * (price / s["entry_price"] - 1) if direction else 0.0,
                 "hold_bars": s["index"] - s["entry_index"] if direction else 0,
                 "adds": s["active_trade"]["adds"] if direction else 0,
+                "remaining_fraction": abs(s['quantity']) / s['active_trade']['max_quantity'] if direction else 0.,
                 "average_entry": s["entry_price"],
                 "position_entry_time": s["active_trade"]["entry_time"] if direction else None,
                 "pending": s["pending"], "halted": s["permanent_halted"] or s["manual_halt"],
@@ -144,6 +162,8 @@ class TradingEngine:
         self.state["manual_halt"] = True
         self.state["pending"] = "hold"
         self.state["deferred_intents"] = []
+        self.state.pop('pending_reduction_fraction', None)
+        self.state.pop('deferred_reduction_fractions', None)
         if 'policy_state' in self.state:
             self.state['policy_state'] = {}
 
@@ -246,6 +266,8 @@ class TradingEngine:
             reason = s.pop('liquidity_exit_reason')
             reduce_position(abs(s['quantity']), opening, f'liquidity_{reason}')
             s['pending'], s['deferred_intents'] = 'hold', []
+            s.pop('pending_reduction_fraction', None)
+            s.pop('deferred_reduction_fractions', None)
             if reason in {'gap_stop', 'time_limit', 'intrabar_stop'}:
                 s['cooldown_until'] = i + c.cooldown_bars + 1
         direction = int(np.sign(s["quantity"]))
@@ -260,13 +282,15 @@ class TradingEngine:
         if blocked:
             reduce_position(abs(s["quantity"]), opening, "manual_halt" if s["manual_halt"] else "risk_halt")
         intent = s["pending"]
+        pending_fraction = s.get('pending_reduction_fraction')
         if not tradable and intent != 'hold' and not blocked:
             rejected.append('market_no_trades')
         elif not blocked and i >= s["cooldown_until"]:
             if intent == "exit":
                 reduce_position(abs(s["quantity"]), opening, "signal_exit")
             elif intent == "reduce":
-                reduce_position(abs(s["quantity"]) * c.reduction_fraction, opening, "signal_reduce")
+                fraction = c.reduction_fraction if pending_fraction is None else pending_fraction
+                reduce_position(abs(s["quantity"]) * fraction, opening, "signal_reduce")
             elif intent in {"enter_long", "enter_short"}:
                 requested = 1 if intent == "enter_long" else -1
                 if s["quantity"] and int(np.sign(s["quantity"])) != requested:
@@ -302,12 +326,15 @@ class TradingEngine:
         s["index"] += 1
         decision = "hold" if final or blocked or 'liquidity_exit_reason' in s else decide(bar, self.view(closing))
         policy_event = ''
+        next_fraction = None
         if isinstance(decision, PolicyDecision):
             validate_policy_state(decision.state)
             if type(decision.event) is not str or not 1 <= len(decision.event) <= 64:
                 raise ValueError('정책 사건의 형식·크기 오류')
             s['policy_state'] = copy.deepcopy(decision.state)
             next_intent, policy_event = decision.intent, decision.event
+            next_fraction = decision.reduction_fraction
+            validate_reduction_fraction(next_intent, next_fraction)
         else:
             next_intent = decision
             if 'policy_state' in s:
@@ -317,15 +344,31 @@ class TradingEngine:
             raise ValueError("정책이 지원하지 않는 주문 의도를 반환했습니다.")
         if final or blocked or 'liquidity_exit_reason' in s:
             s["deferred_intents"] = []
+            s.pop('deferred_reduction_fractions', None)
             next_intent = 'hold'
+            next_fraction = None
         elif not tradable and intent != 'hold':
             # 체결을 기다리는 의도와 뒤의 추가 지연 순서를 함께 보존한다.
             next_intent = intent
+            next_fraction = pending_fraction
         elif c.signal_delay_bars:
             # 지연된 의도도 상태에 저장해 재시작 후 같은 순서로 실행한다.
+            fractions = s.get('deferred_reduction_fractions', [None] * len(s['deferred_intents']))
+            fractions.append(next_fraction)
             s["deferred_intents"].append(next_intent)
-            next_intent = s["deferred_intents"].pop(0) if len(s["deferred_intents"]) > c.signal_delay_bars else "hold"
+            if len(s['deferred_intents']) > c.signal_delay_bars:
+                next_intent, next_fraction = s['deferred_intents'].pop(0), fractions.pop(0)
+            else:
+                next_intent, next_fraction = 'hold', None
+            if any(value is not None for value in fractions):
+                s['deferred_reduction_fractions'] = fractions
+            else:
+                s.pop('deferred_reduction_fractions', None)
         s["pending"] = next_intent
+        if next_fraction is None:
+            s.pop('pending_reduction_fraction', None)
+        else:
+            s['pending_reduction_fraction'] = next_fraction
         unrealized = s["quantity"] * (closing - s["entry_price"])
         active_net = (s["active_trade"]["gross_realized"] - s["active_trade"]["fees"]
                       - s["active_trade"]["funding_cost"]) if s["active_trade"] else 0.0
