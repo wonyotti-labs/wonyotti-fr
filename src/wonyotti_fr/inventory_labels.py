@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from .common import new_run, save_json, sha256
-from .inventory_management import InventoryActionModels
+from .inventory_management import TRAINING_PERIODS, InventoryActionModels
 from .inventory_study import attach_inventory
 from .minute_management import purged_window
 from .path_management import PATH_FEATURES
@@ -39,7 +39,9 @@ def sizing_labels(frame, orders, sizes):
     return ledger
 
 
-def sizing_training(frame, ledger):
+def sizing_training(frame, ledger, training_period=TRAINING_PERIODS[0]):
+    if training_period not in TRAINING_PERIODS:
+        raise ValueError('축소 크기 정답의 사전 고정 기간 오류')
     supported = ledger[ledger.size_reason.eq('supported')].set_index('window_end')
     full = frame[['end', 'entry_time', 'episode_id', 'label_end', 'usable']].copy()
     full['reduction_target'] = full.end.map(supported.reduction_target)
@@ -47,7 +49,7 @@ def sizing_training(frame, ledger):
     full['usable'] &= full.reduction_target.notna()
     full['label_end'] = full.size_label_end.fillna(full.label_end)
     # 포지션 경계 제거는 축소 표본만이 아니라 전체 시계열에서 판정한다.
-    selected = purged_window(full, '2019-01-01', '2020-07-01')
+    selected = purged_window(full, *training_period)
     selected = selected.merge(frame[['end', *InventoryActionModels.features]], on='end', validate='one_to_one')
     selected['order_key'] = selected.end.map(supported.order_key)
     return selected.drop(columns='size_label_end')

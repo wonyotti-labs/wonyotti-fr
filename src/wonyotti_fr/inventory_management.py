@@ -11,6 +11,9 @@ from .engine import PolicyDecision
 from .path_management import PathActionModels
 from .rate_policy import RateActionPolicy
 
+TRAINING_PERIODS = [('2019-01-01', '2020-07-01'), ('2020-01-01', '2021-07-01')]
+CALIBRATION_PERIODS = [('2020-07-01', '2021-01-01'), ('2021-07-01', '2022-01-01')]
+
 
 class InventoryActionModels(PathActionModels):
     features = PathActionModels.features + ['remaining_fraction']
@@ -27,11 +30,14 @@ class ReductionModel:
         self.intercept = data['intercept']
 
     @classmethod
-    def fit(cls, frame):
+    def fit(cls, frame, training_period=TRAINING_PERIODS[0]):
+        if training_period not in TRAINING_PERIODS:
+            raise ValueError('축소 크기 학습의 사전 고정 기간 오류')
+        first, last = (pd.Timestamp(value, tz='UTC') for value in training_period)
         x, y = frame[cls.features].to_numpy(dtype=float), frame.reduction_target.to_numpy(dtype=float)
         if (len(frame) < 100 or frame.end.max() - frame.end.min() < pd.Timedelta(days=90)
-            or frame.end.min() < pd.Timestamp('2019-01-02', tz='UTC')
-            or frame.label_end.max() >= pd.Timestamp('2020-06-30', tz='UTC')
+            or frame.end.min() < first + pd.Timedelta(days=1)
+            or frame.label_end.max() >= last - pd.Timedelta(days=1)
             or not np.isfinite(x).all() or not np.isfinite(y).all() or not ((y > 0) & (y <= 1)).all()):
             raise ValueError('축소 크기 학습의 지원 표본·시간·목표 오류')
         scaler = StandardScaler().fit(x)

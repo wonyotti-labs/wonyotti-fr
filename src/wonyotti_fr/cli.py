@@ -298,9 +298,10 @@ def main() -> None:
     inventory_select = commands.add_parser('inventory-select', help='잔여 수량·실제 축소 크기의 고정 학습과 확인')
     for name in ['rate-selection-run', 'labels-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
         inventory_select.add_argument(f'--{name}', type=Path, required=True)
+    inventory_select.add_argument('--latest-source', action='store_true', help='v20의 2020~2021년 상반기 학습·하반기 보정')
     inventory_select.add_argument('--output', type=Path, default=Path('artifacts'))
     inventory_select.set_defaults(func=lambda a: print(run_inventory_selection(a.rate_selection_run, a.labels_run,
-        a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
+        a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output, latest_source=a.latest_source)))
     action = commands.add_parser("action-select", help="분별 관리 사건과 행동별 정책 선택")
     action.add_argument("--v9-selection-run", type=Path, required=True)
     action.add_argument("--labels-run", type=Path, required=True)
@@ -348,14 +349,14 @@ def main() -> None:
     lifecycle_select.add_argument('--output', type=Path, default=Path('artifacts'))
     lifecycle_select.set_defaults(func=lambda a: print(run_lifecycle_edge_selection(a.rate_selection_run, a.labels_run,
         a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output, overlap_weighted=a.overlap_weighted, direction_only=a.direction_only)))
-    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate", "action-evaluate"], help="고정 v7~v19 후보의 다시장·비용·지연 비교")
+    pullback_eval = commands.add_parser("pullback-evaluate", aliases=["net-edge-evaluate", "lifecycle-evaluate", "action-evaluate"], help="고정 v7~v20 후보의 다시장·비용·지연 비교")
     pullback_eval.add_argument("--selection-run", type=Path, required=True)
     pullback_eval.add_argument("--market", type=Path, required=True)
     pullback_eval.add_argument("--feature-market", type=Path, required=True)
     pullback_eval.add_argument("--period", choices=['observed', 'seen_2026', 'verified_2022_2024'], required=True)
     pullback_eval.add_argument("--symbols", nargs='+', choices=['BTCUSDT', 'ETHUSDT', 'SOLUSDT'], default=['BTCUSDT', 'ETHUSDT', 'SOLUSDT'])
     pullback_eval.add_argument("--output", type=Path, default=Path("artifacts"))
-    pullback_eval.add_argument("--diagnostic-only", action="store_true", help="v12~v19 확인 실패 후 사전 계획한 BTC 고정·연간 비교")
+    pullback_eval.add_argument("--diagnostic-only", action="store_true", help="v12~v20 확인 실패 후 사전 계획한 BTC 고정·연간 비교")
     pullback_eval.set_defaults(func=lambda a: run_pullback_evaluation(a.selection_run, a.market, a.feature_market, a.output, a.period, a.symbols, a.diagnostic_only))
     journal = commands.add_parser("event-replay", help="영속 저널을 이용한 사건별 봇 재생과 중단 복원")
     journal.add_argument("--selection-run", type=Path, required=True)

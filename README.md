@@ -338,3 +338,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v19](docs/EXPERIMENT_V19.md)의 수량 진단은 `inventory-study --audit-run <원본 감사 폴더> --labels-run <action-labels 출력>`으로 실행한다. `--bot-runs <개별 봇 실행 폴더> ...`로 보유 수량 상태를 비교할 수 있다. 과거 최대 수량 대비 잔량, 축소 요청·실제 체결 크기, 겹친 주문, 원본 BTC 손익을 연결하며 새 모델이나 수익 문턱을 선택하지 않는다. 원본 수량이 적게 남았다는 이유로 회계에서 삭제하지 않는다.
 
 수량 관리 학습은 `inventory-labels --path-labels-run <path-labels 출력> --inventory-study-run <수량 진단 출력>` 뒤 `inventory-select --rate-selection-run <v14 선택> --labels-run <수량 정답 출력>`으로 진행한다. 선택 명령에는 기존과 같은 개발·확인 시장 경로가 필요하다. 관리 정답은 그대로 유지하고, 실제 체결량과 분 경계 보유량을 연결할 수 있는 주문만 축소 크기 회귀에 사용한다. 예측 축소 비율은 주문과 함께 저장하며 고정 축소 대조와 성과로 재선택하지 않는다.
+
+[v20](docs/EXPERIMENT_V20.md)은 같은 `inventory-select` 명령에 `--latest-source`를 추가한다. 관리·축소 크기 학습을 2020년~2021년 상반기, 빈도 보정을 2021년 하반기로 옮긴다. 이 경우 2021년 재생은 학습 적합 진단이며 시간순 성과로 보고하지 않는다.

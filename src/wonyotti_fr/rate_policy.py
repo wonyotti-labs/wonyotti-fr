@@ -21,9 +21,12 @@ def validate_rate_state(stored):
         raise ValueError('행동 누적량의 저장 숫자 오류')
 
 
-def calibrate_rates(model, data):
-    if (data.end.min() < pd.Timestamp('2020-07-02', tz='UTC')
-        or data.label_end.max() >= pd.Timestamp('2021-01-01', tz='UTC') - pd.Timedelta(days=1)):
+def calibrate_rates(model, data, period=('2020-07-01', '2021-01-01')):
+    if period not in [('2020-07-01', '2021-01-01'), ('2021-07-01', '2022-01-01')]:
+        raise ValueError('행동 빈도 보정의 사전 고정 기간 오류')
+    first, last = (pd.Timestamp(value, tz='UTC') for value in period)
+    if (data.end.min() < first + pd.Timedelta(days=1)
+        or data.label_end.max() >= last - pd.Timedelta(days=1)):
         raise ValueError('행동 빈도 보정의 시간 격리 오류')
     scores = model.probabilities(data[model.features].to_numpy(dtype=float))
     labels = data[[f'y_{a}' for a in ACTIONS]].to_numpy()
