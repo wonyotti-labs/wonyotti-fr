@@ -53,11 +53,13 @@ def run_reversal_selection(reference: Path, market: Path, features: Path, confir
         save_json(out / 'confirmation_checks.json', {'positive': confirmation['total_return'] > 0,
             'at_least_30_trades': confirmation['closed_trades'] >= 30, 'no_halt': not confirmation['permanent_halt'],
             'profitability_accepted': False, 'all_periods_already_observed': True})
-        comparison = pd.DataFrame([{'policy': 'v12_flat', 'period': '2021', **parent['development_metrics']},
+        comparison_rows = [{'policy': 'v12_flat', 'period': '2021', **parent['development_metrics']},
             {'policy': 'v13_reverse', 'period': '2021', **metrics},
             {'policy': 'v12_flat', 'period': '2022', **json.loads((reference / 'confirmation-2022' / 'metrics.json').read_text())},
-            {'policy': 'v13_reverse', 'period': '2022', **confirmation}])
-        save_json(out / 'comparison.json', comparison.to_dict('records'))
+            {'policy': 'v13_reverse', 'period': '2022', **confirmation}]
+        # 서로 다른 부가 열을 표로 합칠 때 생기는 결측값을 원래 JSON에 주입하지 않는다.
+        save_json(out / 'comparison.json', comparison_rows)
+        comparison = pd.DataFrame(comparison_rows)
         (out / 'REPORT.md').write_text('# 모델 청산의 반전 실행 대조\n\n' + table(comparison[
             ['policy', 'period', 'total_return', 'max_drawdown', 'closed_trades', 'permanent_halt']])
             + '\n\n관리 모델·문턱·신규 진입·위험은 기존 v12와 같다. 모델 청산을 반전으로 해석한 단일 가설이며 '

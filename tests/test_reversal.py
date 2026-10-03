@@ -14,6 +14,7 @@ from wonyotti_fr.event_backtest import backtest, iter_events
 from wonyotti_fr.event_research import load_selection
 from wonyotti_fr.path_management import ReversalPathPolicy
 from wonyotti_fr.pullback_policy import PullbackPolicy
+from wonyotti_fr.reversal_research import run_reversal_selection
 
 
 def policy():
@@ -94,3 +95,21 @@ def test_reversal_frozen_model_and_actual_recovery(tmp_path, kind):
     save_json(root / 'frozen_integrity.json', {'frozen_selection_sha256': sha256(root / 'frozen_selection.json')})
     with pytest.raises(ValueError, match='고정 기반'):
         load_selection(root)
+
+
+def test_reversal_report_preserves_different_metadata_without_nan(tmp_path, monkeypatch):
+    root = tmp_path / 'selection'
+    frozen = path_selection(root)
+    metrics = {'total_return': -.1, 'max_drawdown': -.15, 'closed_trades': 30, 'permanent_halt': False}
+    frozen.update(candidate=1, development_metrics={**metrics, 'kind': 'logistic', 'multiplier': 1.5})
+    save_json(root / 'frozen_selection.json', frozen)
+    save_json(root / 'frozen_integrity.json', {'frozen_selection_sha256': sha256(root / 'frozen_selection.json')})
+    save_json(root / 'confirmation-2022' / 'metrics.json', metrics)
+    for name in ['manifest-1m.json', 'manifest-5m.json']:
+        (tmp_path / name).write_text('{}')
+    monkeypatch.setattr('wonyotti_fr.reversal_research.prepare_minute_period', lambda *_: (bars(), {}))
+    out = run_reversal_selection(root, tmp_path, tmp_path, tmp_path, tmp_path, tmp_path / 'runs')
+    rows = json.loads((out / 'comparison.json').read_text())
+    assert len(rows) == 4 and rows[0]['kind'] == 'logistic' and 'kind' not in rows[-1]
+    assert json.loads((out / 'summary.json').read_text())['complete']
+    assert isinstance(load_selection(out)[1], ReversalPathPolicy)
