@@ -80,12 +80,21 @@ def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int, *, mana
             raise ValueError('같은 시각에 중복 진입 체결')
         entry_by_time = {row.stamp: row for row in entries.itertuples(index=False)}
     matched = set()
+    available_times = (pd.DatetimeIndex(bars.loc[bars['count'].gt(0) & bars.volume.gt(0), 'time'])
+                       if {'count', 'volume'} <= set(bars.columns) else None)
     for row in decisions:
         expected = row['decision_time'] + pd.Timedelta(minutes=delay)
-        entry = entry_by_time.get(expected) if row['status'] in ('triggered', 'immediate', 'reversal') else None
-        row.update(executed=entry is not None, expected_entry_time=expected, entry_price=None,
+        executable = expected
+        if available_times is not None:
+            index = available_times.searchsorted(expected)
+            executable = available_times[index] if index < len(available_times) else pd.NaT
+        entry = entry_by_time.get(executable) if row['status'] in ('triggered', 'immediate', 'reversal') else None
+        row.update(executed=entry is not None, expected_entry_time=expected, executable_entry_time=executable,
+                   liquidity_wait_minutes=(executable-expected).total_seconds()/60 if pd.notna(executable) else None, entry_price=None,
                    favorable_at_decision_bps=None, favorable_at_fill_bps=None, fill_vs_decision_bps=None)
         if entry is not None:
+            if executable in matched:
+                raise ValueError('하나의 진입 체결에 중복 연결된 대기')
             direction = int(np.sign(entry.delta_quantity))
             if row['direction'] is not None and row['direction'] != direction:
                 raise ValueError('대기 방향과 실제 진입 체결 방향 불일치')
@@ -93,7 +102,7 @@ def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int, *, mana
             row['entry_price'] = float(entry.price)
             row['favorable_at_fill_bps'] = float(direction * np.log(row['reference_price'] / entry.price) * 10000)
             row['fill_vs_decision_bps'] = float(direction * np.log(row['decision_close'] / entry.price) * 10000)
-            matched.add(expected)
+            matched.add(executable)
         if row['direction'] is not None:
             row['favorable_at_decision_bps'] = float(row['direction'] * np.log(row['reference_price'] / row['decision_close']) * 10000)
     if len(matched) != len(entries):

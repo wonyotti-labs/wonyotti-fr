@@ -107,6 +107,8 @@ def prepare_period(market: Path, symbol: str, start: str, end: str) -> pd.DataFr
 
 def iter_events(data: pd.DataFrame):
     names = ['time', 'end', 'open', 'high', 'low', 'close', 'funding_rate']
+    if {'count', 'volume'} <= set(data.columns):
+        names += ['count', 'volume']
     for row in data[names + MARKET_FEATURES].itertuples(index=False, name=None):
         event = dict(zip(names, row[:len(names)], strict=True))
         event['time'], event['end'] = event['time'].isoformat(), event['end'].isoformat()

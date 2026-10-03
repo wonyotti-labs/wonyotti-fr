@@ -73,6 +73,16 @@ def validate_bar(bar: dict, seconds: int) -> dict:
     if not np.isfinite(rate) or abs(rate) > 1:
         raise ValueError("유효하지 않은 펀딩률")
     result.update(dict(zip(["open", "high", "low", "close"], prices, strict=True)))
+    if 'count' in bar or 'volume' in bar:
+        if 'count' not in bar or 'volume' not in bar:
+            raise ValueError('거래 활동 입력의 필드 누락')
+        count, volume = bar['count'], bar['volume']
+        if (type(count) not in (int, float) or type(volume) not in (int, float)
+            or not np.isfinite([count, volume]).all() or min(count, volume) < 0
+            or count % 1 or (count == 0) != (volume == 0)
+            or (count == 0 and len(set(prices)) != 1)):
+            raise ValueError('거래 활동 입력의 숫자·무거래 가격 오류')
+        result.update(count=int(count), volume=float(volume))
     result.update(time=stamp.isoformat(), end=(stamp + pd.Timedelta(seconds=seconds)).isoformat(), funding_rate=rate)
     return result
 
@@ -107,6 +117,10 @@ class TradingEngine:
                 raise ValueError("상태에 유한하지 않은 숫자가 있습니다.")
         if (s["quantity"] == 0) != (s["active_trade"] is None):
             raise ValueError("보유 수량과 거래 상태가 다릅니다.")
+        if 'liquidity_exit_reason' in s:
+            if (s['liquidity_exit_reason'] not in {'gap_stop', 'time_limit', 'risk_halt', 'manual_halt', 'intrabar_stop'}
+                or not s['quantity'] or s['completed']):
+                raise ValueError('무거래 위험 청산 대기 상태 오류')
         if s["completed"] and s["quantity"] != 0:
             raise ValueError("완료 상태에 미청산 수량이 있습니다.")
 
@@ -151,11 +165,18 @@ class TradingEngine:
             raise ValueError("시세가 중복·역순이거나 누락됐습니다.")
         i, opening, high, low, closing = s["index"], bar["open"], bar["high"], bar["low"], bar["close"]
         fills, closed, rejected = [], [], []
+        tradable = bar.get('count', 1) > 0
 
         def reduce_position(amount: float, price: float, reason: str, at_end: bool = False):
             direction = int(np.sign(s["quantity"]))
             amount = min(amount, abs(s["quantity"]))
             if amount <= 0:
+                return
+            if not tradable:
+                if reason == 'end_of_test':
+                    raise ValueError('종료 봉에 거래가 없어 보유 포지션을 청산할 수 없습니다.')
+                if reason not in {'signal_exit', 'signal_reduce', 'signal_reverse'}:
+                    s.setdefault('liquidity_exit_reason', reason)
                 return
             execution = price * (1 - direction * c.slippage_bps / 10000)
             fee = amount * execution * c.fee_bps / 10000
@@ -221,6 +242,12 @@ class TradingEngine:
         s["peak"] = max(s["peak"], equity)
         s["daily_halted"] |= equity <= s["day_equity"] * (1 - c.daily_loss_limit)
         s["permanent_halted"] |= equity <= s["peak"] * (1 - c.max_drawdown)
+        if tradable and 'liquidity_exit_reason' in s:
+            reason = s.pop('liquidity_exit_reason')
+            reduce_position(abs(s['quantity']), opening, f'liquidity_{reason}')
+            s['pending'], s['deferred_intents'] = 'hold', []
+            if reason in {'gap_stop', 'time_limit', 'intrabar_stop'}:
+                s['cooldown_until'] = i + c.cooldown_bars + 1
         direction = int(np.sign(s["quantity"]))
         stop = s["entry_price"] * (1 - direction * c.stop_fraction)
         if direction and c.stop_fraction and ((direction > 0 and opening <= stop) or (direction < 0 and opening >= stop)):
@@ -233,7 +260,9 @@ class TradingEngine:
         if blocked:
             reduce_position(abs(s["quantity"]), opening, "manual_halt" if s["manual_halt"] else "risk_halt")
         intent = s["pending"]
-        if not blocked and i >= s["cooldown_until"]:
+        if not tradable and intent != 'hold' and not blocked:
+            rejected.append('market_no_trades')
+        elif not blocked and i >= s["cooldown_until"]:
             if intent == "exit":
                 reduce_position(abs(s["quantity"]), opening, "signal_exit")
             elif intent == "reduce":
@@ -271,7 +300,7 @@ class TradingEngine:
         s["max_drawdown"] = min(s["max_drawdown"], drawdown)
         s["last_end"], s["last_close"] = bar["end"], closing
         s["index"] += 1
-        decision = "hold" if final or blocked else decide(bar, self.view(closing))
+        decision = "hold" if final or blocked or 'liquidity_exit_reason' in s else decide(bar, self.view(closing))
         policy_event = ''
         if isinstance(decision, PolicyDecision):
             validate_policy_state(decision.state)
@@ -286,8 +315,12 @@ class TradingEngine:
                 s['policy_state'] = {}
         if next_intent not in INTENTS:
             raise ValueError("정책이 지원하지 않는 주문 의도를 반환했습니다.")
-        if final or blocked:
+        if final or blocked or 'liquidity_exit_reason' in s:
             s["deferred_intents"] = []
+            next_intent = 'hold'
+        elif not tradable and intent != 'hold':
+            # 체결을 기다리는 의도와 뒤의 추가 지연 순서를 함께 보존한다.
+            next_intent = intent
         elif c.signal_delay_bars:
             # 지연된 의도도 상태에 저장해 재시작 후 같은 순서로 실행한다.
             s["deferred_intents"].append(next_intent)

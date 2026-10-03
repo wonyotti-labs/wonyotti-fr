@@ -29,15 +29,17 @@ def verify_stress(events: list[dict], selection: Path, directory: Path, identity
                   interruption_kind: str = 'position', require_state: bool = False) -> dict:
     if len(events) < 4:
         raise ValueError('장애 검증 사건이 부족합니다.')
-    if interruption_kind not in {'position', 'waiting'}:
+    if interruption_kind not in {'position', 'waiting', 'liquidity'}:
         raise ValueError('지원하지 않는 중단 상태')
     frozen, policy = load_selection(selection)
     config = EngineConfig(**frozen['risk'])
     memory = TradingEngine(config)
     expected = [memory.step(event, policy, final=index == len(events) - 1) for index, event in enumerate(events)]
     candidates = [index + 1 for index, result in enumerate(expected[:-2])
-                  if (result['quantity'] != 0 if interruption_kind == 'position' else bool(json.loads(result.get('policy_state', '{}'))))]
-    if not candidates and (require_state or interruption_kind == 'waiting'):
+                  if (result['quantity'] != 0 if interruption_kind == 'position' else
+                      ('market_no_trades' in result['rejected'] and result['next_intent'] != 'hold')
+                      if interruption_kind == 'liquidity' else bool(json.loads(result.get('policy_state', '{}'))))]
+    if not candidates and (require_state or interruption_kind in {'waiting', 'liquidity'}):
         raise ValueError(f'요청한 {interruption_kind} 상태가 없어 장애 검증을 실행할 수 없습니다.')
     cut = candidates[0] if candidates else min(24, len(events) - 2)
     journal_path = directory / 'crash.sqlite'
@@ -73,6 +75,7 @@ def verify_stress(events: list[dict], selection: Path, directory: Path, identity
         journal.verify()
         checks['crash_restart_full_results_equal'] = canonical(journal.results()) == canonical(expected)
         checks['crash_restart_final_state_equal'] = canonical(journal.snapshot()) == canonical(memory.snapshot())
+    tradable_cut = next((i for i in range(cut, len(events)) if events[i].get('count', 1) > 0), cut)
     manual_memory = TradingEngine(config)
     manual_expected = []
     with EventJournal(directory / 'manual.sqlite', config, {**identity, 'manual_control': True}) as journal:
@@ -83,10 +86,10 @@ def verify_stress(events: list[dict], selection: Path, directory: Path, identity
             expected_row = manual_memory.step(event, policy, final=index == len(events) - 1)
             manual_expected.append(expected_row)
             actual = journal.process(event, policy, final=index == len(events) - 1)
-            if index == cut:
-                checks['manual_halt_liquidates_next_bar'] = actual['quantity'] == 0 and actual['next_intent'] == 'hold'
+            if index == tradable_cut:
+                checks['manual_halt_liquidates_when_executable'] = actual['quantity'] == 0 and actual['next_intent'] == 'hold'
         checks['manual_halt_full_results_equal'] = canonical(journal.results()) == canonical(manual_expected)
-        checks['manual_halt_no_reentry'] = all(row['quantity'] == 0 for row in manual_expected[cut:])
+        checks['manual_halt_no_reentry'] = all(row['quantity'] == 0 for row in manual_expected[tradable_cut:])
     if not all(checks.values()):
         raise ValueError(f'장애 검증 미통과: {[name for name, passed in checks.items() if not passed]}')
     return {'checks': checks, 'bars': len(events), 'interruption_after_bars': cut,
@@ -120,7 +123,7 @@ def run_engine_stress(selection: Path, market: Path, output: Path, start: str = 
                 f'대기 중 {cases["waiting"]["interruption_after_bars"]}봉, 보유 중 {cases["position"]["interruption_after_bars"]}봉 뒤 '
                 '서로 다른 저널의 프로세스를 커밋 직전에 실제 종료했다.\n\n'
                 '두 경우 모두 전체 결과·최종 상태가 단일 실행과 일치했다. 중복·변경된 중복·누락·잘못된 시세를 검사했고, '
-                '수동 중지는 대기를 비우고 다음 시세에서 보유분을 청산한 뒤 재진입을 차단했다. '
+                '수동 중지는 대기를 비우고 다음 거래 가능 시세에서 보유분을 청산한 뒤 재진입을 차단했다. '
                 '각 상태가 실제로 발생하지 않으면 이 검증은 통과하지 않는다. '
                 '거래소 주문·인증·출금이나 실제 체결·호가·시장 충격은 검증 범위가 아니다.\n', encoding='utf-8')
             print(f'대기·보유 중 실제 장애 검증: {destination}', flush=True)
