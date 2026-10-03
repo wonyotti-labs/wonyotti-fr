@@ -281,6 +281,13 @@ def main() -> None:
     path_labels.add_argument('--labels-run', type=Path, required=True)
     path_labels.add_argument('--output', type=Path, default=Path('artifacts'))
     path_labels.set_defaults(func=lambda a: print(run_path_labels(a.labels_run, a.output)))
+    from .inventory_study import run_inventory_study
+    inventory = commands.add_parser('inventory-study', help='원본 잔여 수량·축소 크기·실현 손익의 연결 진단')
+    inventory.add_argument('--audit-run', type=Path, required=True)
+    inventory.add_argument('--labels-run', type=Path, required=True)
+    inventory.add_argument('--bot-runs', nargs='*', type=Path, default=[])
+    inventory.add_argument('--output', type=Path, default=Path('artifacts'))
+    inventory.set_defaults(func=lambda a: print(run_inventory_study(a.audit_run, a.labels_run, a.output, a.bot_runs)))
     action = commands.add_parser("action-select", help="분별 관리 사건과 행동별 정책 선택")
     action.add_argument("--v9-selection-run", type=Path, required=True)
     action.add_argument("--labels-run", type=Path, required=True)
