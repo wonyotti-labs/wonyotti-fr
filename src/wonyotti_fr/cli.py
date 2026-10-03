@@ -300,6 +300,12 @@ def main() -> None:
         minute_labels.add_argument(f'--{name}', type=Path, required=True)
     minute_labels.add_argument('--output', type=Path, default=Path('artifacts'))
     minute_labels.set_defaults(func=lambda a: print(run_minute_inventory_labels(a.labels_run, a.minute_history, a.history, a.output)))
+    from .addition_research import run_addition_labels
+    addition_labels = commands.add_parser('addition-effect-labels', help='같은 보유 상태에서 추가 유지·취소의 순효과 정답 생성')
+    for name in ['selection-run', 'market', 'feature-market']:
+        addition_labels.add_argument(f'--{name}', type=Path, required=True)
+    addition_labels.add_argument('--output', type=Path, default=Path('artifacts'))
+    addition_labels.set_defaults(func=lambda a: print(run_addition_labels(a.selection_run, a.market, a.feature_market, a.output)))
     from .minute_inventory_research import run_minute_inventory_selection
     minute_select = commands.add_parser('minute-inventory-select', help='확정 분봉 입력을 추가한 관리 모델의 학습과 확인')
     for name in ['inventory-selection-run', 'labels-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
