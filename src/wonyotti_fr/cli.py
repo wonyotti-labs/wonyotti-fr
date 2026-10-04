@@ -385,6 +385,13 @@ def main() -> None:
         first_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     first_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     first_diagnosis.set_defaults(func=lambda a: print(run_first_management_diagnosis(a.selection_run, a.diagnosis_run, a.output)))
+    from .exit_state_research import run_exit_state_selection
+    exit_state = commands.add_parser('exit-state-select', help='청산 문턱 직접 적용의 고정 매매 대조')
+    for name in ['selection-run', 'diagnosis-run', 'market', 'features', 'confirmation-market', 'confirmation-features']:
+        exit_state.add_argument(f'--{name}', type=Path, required=True)
+    exit_state.add_argument('--output', type=Path, default=Path('artifacts'))
+    exit_state.set_defaults(func=lambda a: print(run_exit_state_selection(a.selection_run, a.diagnosis_run,
+        a.market, a.features, a.confirmation_market, a.confirmation_features, a.output)))
     from .activity_ablation_research import run_activity_ablation_selection
     activity_ablation = commands.add_parser('activity-ablation-select', help='신규 활동 관문 제거의 고정 비교')
     for name in ['selection-run', 'market', 'features', 'confirmation-market', 'confirmation-features']:
