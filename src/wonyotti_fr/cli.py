@@ -395,6 +395,11 @@ def main() -> None:
     exit_horizon.add_argument('--diagnosis-run', type=Path, required=True)
     exit_horizon.add_argument('--output', type=Path, default=Path('artifacts'))
     exit_horizon.set_defaults(func=lambda a: print(run_exit_horizon_diagnosis(a.diagnosis_run, a.output)))
+    from .close_capacity_diagnostics import run_close_capacity_diagnosis
+    close_capacity = commands.add_parser('close-capacity-diagnose', help='앞 학습 내부의 시간순 청산 회귀 복잡도 선택')
+    close_capacity.add_argument('--diagnosis-run', type=Path, required=True)
+    close_capacity.add_argument('--output', type=Path, default=Path('artifacts'))
+    close_capacity.set_defaults(func=lambda a: print(run_close_capacity_diagnosis(a.diagnosis_run, a.output)))
     from .exposure_close_diagnostics import run_exposure_close_diagnosis
     exposure_close = commands.add_parser('exposure-close-diagnose', help='현재 노출을 반영한 청산 가치 회귀 진단')
     exposure_close.add_argument('--diagnosis-run', type=Path, required=True)

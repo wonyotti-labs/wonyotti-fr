@@ -17,6 +17,7 @@ REGRESSION_SETTINGS = {'loss': 'squared_error', 'max_iter': 64, 'learning_rate':
 class EntryRegressionModel:
     features = NET_FEATURES
     format = 'entry_histogram_regression_v1'
+    settings = REGRESSION_SETTINGS
 
     def __init__(self, data):
         self.data = copy.deepcopy(data)
@@ -31,17 +32,17 @@ class EntryRegressionModel:
             or vx.ndim != 2 or vx.shape[1] != len(cls.features) or not len(vx) or not np.isfinite(vx).all()):
             raise ValueError('진입 회귀의 학습 차원·지원·숫자·가중치 오류')
         with threadpool_limits(limits=1):
-            learner = HistGradientBoostingRegressor(**REGRESSION_SETTINGS).fit(x, y, sample_weight=w)
+            learner = HistGradientBoostingRegressor(**cls.settings).fit(x, y, sample_weight=w)
             expected, validation_expected = learner.predict(x), learner.predict(vx)
-        if (learner.n_iter_ != 64 or learner._baseline_prediction.shape != (1, 1)
-            or len(learner._predictors) != 64 or any(len(part) != 1 for part in learner._predictors)):
+        if (learner.n_iter_ != cls.settings['max_iter'] or learner._baseline_prediction.shape != (1, 1)
+            or len(learner._predictors) != cls.settings['max_iter'] or any(len(part) != 1 for part in learner._predictors)):
             raise ValueError('진입 회귀 내보내기의 반복·초기 점수 구조 오류')
         trees = []
         required = {'value', 'count', 'feature_idx', 'num_threshold', 'missing_go_to_left',
             'left', 'right', 'gain', 'depth', 'is_leaf', 'bin_threshold', 'is_categorical', 'bitset_idx'}
         for part in learner._predictors:
             nodes = part[0].nodes
-            if set(nodes.dtype.names) != required or nodes['is_categorical'].any() or nodes['depth'].max() > 2:
+            if set(nodes.dtype.names) != required or nodes['is_categorical'].any() or nodes['depth'].max() > cls.settings['max_depth']:
                 raise ValueError('진입 회귀 내보내기의 지원하지 않는 노드 구조')
             leaf = nodes['is_leaf'].astype(bool)
             # 말단 값에 반영된 학습률을 다시 곱하지 않는다.
@@ -50,7 +51,7 @@ class EntryRegressionModel:
                 'feature': np.where(leaf, -2, nodes['feature_idx'].astype(int)).tolist(),
                 'threshold': np.where(leaf, 0., nodes['num_threshold']).tolist(),
                 'value': np.where(leaf, nodes['value'], 0.).tolist()})
-        model = cls.from_dict({'format': cls.format, 'features': cls.features, 'settings': REGRESSION_SETTINGS,
+        model = cls.from_dict({'format': cls.format, 'features': cls.features, 'settings': cls.settings,
             'baseline': float(learner._baseline_prediction[0, 0]), 'trees': trees})
         error = float(np.max(np.abs(model.predict(x)-expected)))
         validation_error = float(np.max(np.abs(model.predict(vx)-validation_expected)))
@@ -62,21 +63,21 @@ class EntryRegressionModel:
     @classmethod
     def from_dict(cls, data):
         if (data.get('format') != cls.format or data.get('features') != cls.features
-            or data.get('settings') != REGRESSION_SETTINGS
+            or data.get('settings') != cls.settings
             or type(data.get('baseline')) not in (int, float) or not np.isfinite(data['baseline'])
-            or not isinstance(data.get('trees'), list) or len(data['trees']) != 64):
+            or not isinstance(data.get('trees'), list) or len(data['trees']) != cls.settings['max_iter']):
             raise ValueError('진입 회귀의 형식·특징·설정·초기 점수 오류')
         for tree in data['trees']:
             if not isinstance(tree, dict) or set(tree) != {'left', 'right', 'feature', 'threshold', 'value'}:
                 raise ValueError('진입 회귀의 트리 구조 오류')
             count = len(tree['left'])
-            if (not 1 <= count <= 7 or any(len(tree[k]) != count for k in ['right', 'feature', 'threshold', 'value'])
+            if (not 1 <= count <= 2*cls.settings['max_leaf_nodes']-1 or any(len(tree[k]) != count for k in ['right', 'feature', 'threshold', 'value'])
                 or not np.isfinite(tree['threshold']).all() or not np.isfinite(tree['value']).all()):
                 raise ValueError('진입 회귀의 노드 크기·숫자 오류')
             visited, pending = set(), [(0, 0)]
             while pending:
                 node, depth = pending.pop()
-                if node in visited or not 0 <= node < count or depth > 2:
+                if node in visited or not 0 <= node < count or depth > cls.settings['max_depth']:
                     raise ValueError('진입 회귀의 순환·공유·범위·깊이 오류')
                 visited.add(node)
                 left, right, feature = (tree[k][node] for k in ['left', 'right', 'feature'])
@@ -104,7 +105,7 @@ class EntryRegressionModel:
             for tree in self.data['trees']:
                 left, right, feature, threshold, value = (np.asarray(tree[k]) for k in ['left', 'right', 'feature', 'threshold', 'value'])
                 node = np.zeros(len(matrix), dtype=int)
-                for _ in range(2):
+                for _ in range(self.settings['max_depth']):
                     split = left[node] != -1
                     indices = np.flatnonzero(split)
                     current = node[indices]
