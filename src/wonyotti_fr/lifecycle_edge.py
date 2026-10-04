@@ -35,8 +35,10 @@ class LifecycleNetPolicy:
 
 def lifecycle_outcome(events: list[dict], start: int, direction: int, config: EngineConfig,
                       policy: RateActionPolicy, cutoff: pd.Timestamp) -> tuple[dict, list[dict]]:
+    from .exit_move_state import ExitMovePolicy
+    supported_limit = config.max_hold_bars == 0 or (isinstance(policy, ExitMovePolicy) and config.max_hold_bars > 0)
     if (direction not in (-1, 1) or not isinstance(policy, RateActionPolicy) or config.bar_seconds != 60
-        or config.signal_delay_bars != 0 or config.max_hold_bars != 0 or not 0 <= start < len(events)
+        or config.signal_delay_bars != 0 or not supported_limit or not 0 <= start < len(events)
         or cutoff.tzinfo is None or cutoff.utcoffset().total_seconds()):
         raise ValueError('전체 거래 정답의 기반·방향·시간 설정 오류')
     engine = TradingEngine(config)

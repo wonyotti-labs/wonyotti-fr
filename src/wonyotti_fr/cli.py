@@ -395,6 +395,15 @@ def main() -> None:
     exit_horizon.add_argument('--diagnosis-run', type=Path, required=True)
     exit_horizon.add_argument('--output', type=Path, default=Path('artifacts'))
     exit_horizon.set_defaults(func=lambda a: print(run_exit_horizon_diagnosis(a.diagnosis_run, a.output)))
+    from .policy_outcomes import run_policy_outcomes
+    outcomes = commands.add_parser('policy-outcome-labels', help='현재 정책의 독립 진입 효용 정답 생성·재개')
+    for name in ['selection-run', 'market', 'features']:
+        outcomes.add_argument(f'--{name}', type=Path, required=True)
+    outcomes.add_argument('--output', type=Path, default=Path('artifacts'))
+    outcomes.add_argument('--resume-run', type=Path)
+    outcomes.add_argument('--max-opportunities', type=int)
+    outcomes.set_defaults(func=lambda a: print(run_policy_outcomes(a.selection_run, a.market, a.features,
+        a.output, resume=a.resume_run, max_opportunities=a.max_opportunities)))
     from .exit_move_research import run_exit_move_selection
     exit_move = commands.add_parser('exit-move-select', help='원본 청산 가격 이동 폭의 추가 청산 조건 대조')
     for name in ['selection-run', 'diagnosis-run', 'market', 'features', 'confirmation-market', 'confirmation-features']:
