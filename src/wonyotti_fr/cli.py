@@ -368,6 +368,11 @@ def main() -> None:
         direction_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     direction_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     direction_diagnosis.set_defaults(func=lambda a: print(run_direction_diagnostics(a.audit_run, a.study_run, a.history, a.output)))
+    from .history_window import run_history_window_diagnosis
+    history_window = commands.add_parser('history-window-diagnose', help='과거 두 연도 추가의 관리 예측 진단')
+    history_window.add_argument('--diagnosis-run', type=Path, required=True)
+    history_window.add_argument('--output', type=Path, default=Path('artifacts'))
+    history_window.set_defaults(func=lambda a: print(run_history_window_diagnosis(a.diagnosis_run, a.output)))
     from .exit_direct import run_exit_direct_diagnosis
     exit_direct = commands.add_parser('exit-direct-diagnose', help='청산 문턱의 가산 제거 진단')
     for name in ['selection-run', 'diagnosis-run']:
