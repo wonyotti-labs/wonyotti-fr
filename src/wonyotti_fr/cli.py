@@ -379,6 +379,11 @@ def main() -> None:
         first_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     first_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     first_diagnosis.set_defaults(func=lambda a: print(run_first_management_diagnosis(a.selection_run, a.diagnosis_run, a.output)))
+    from .context_position import run_context_diagnostics
+    context_diagnosis = commands.add_parser('context-position-diagnose', help='보유 방향의 다일 시장 맥락 진단')
+    context_diagnosis.add_argument('--diagnosis-run', type=Path, required=True)
+    context_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
+    context_diagnosis.set_defaults(func=lambda a: print(run_context_diagnostics(a.diagnosis_run, a.output)))
     from .position_target import run_position_diagnostics
     position_diagnosis = commands.add_parser('position-target-diagnose', help='다음 경계의 보유 방향 재구성 진단')
     position_diagnosis.add_argument('--activity-run', type=Path, required=True)

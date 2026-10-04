@@ -23,6 +23,7 @@ def joint_targets(frame):
 class JointEntryModel:
     format = 'joint_entry_multinomial_v1'
     classes = JOINT_CLASSES
+    features = MARKET_FEATURES
 
     def __init__(self, data):
         self.data = copy.deepcopy(data)
@@ -30,7 +31,7 @@ class JointEntryModel:
     @classmethod
     def fit(cls, values, labels):
         x, y = np.asarray(values, dtype=float), np.asarray(labels)
-        if (x.ndim != 2 or x.shape[1] != len(MARKET_FEATURES) or len(x) < 1000
+        if (x.ndim != 2 or x.shape[1] != len(cls.features) or len(x) < 1000
             or not np.isfinite(x).all() or y.shape != (len(x),) or y.dtype.kind not in 'iu'
             or set(np.unique(y)) != {0, 1, 2} or (np.bincount(y, minlength=3) < 20).any()):
             raise ValueError('결합 진입 모형의 차원·클래스·지원 부족')
@@ -40,7 +41,7 @@ class JointEntryModel:
             expected = learner.predict_proba(scaler.transform(x))
         if learner.n_iter_.max() >= 2000 or not np.array_equal(learner.classes_, np.arange(3)):
             raise ValueError('결합 진입 모형의 수렴·클래스 순서 오류')
-        model = cls.from_dict({'format': cls.format, 'features': MARKET_FEATURES, 'classes': cls.classes,
+        model = cls.from_dict({'format': cls.format, 'features': cls.features, 'classes': cls.classes,
             'settings': JOINT_SETTINGS, 'mean': scaler.mean_.tolist(), 'scale': scaler.scale_.tolist(),
             'coefficients': learner.coef_.tolist(), 'intercepts': learner.intercept_.tolist()})
         error = float(np.max(np.abs(model.probabilities(x)-expected)))
@@ -51,10 +52,11 @@ class JointEntryModel:
 
     @classmethod
     def from_dict(cls, data):
-        if (data.get('format') != cls.format or data.get('features') != MARKET_FEATURES
+        if (data.get('format') != cls.format or data.get('features') != cls.features
             or data.get('classes') != cls.classes or data.get('settings') != JOINT_SETTINGS):
             raise ValueError('결합 진입 모형의 형식·클래스·설정 오류')
-        for key, shape in [('mean', (14,)), ('scale', (14,)), ('coefficients', (3, 14)), ('intercepts', (3,))]:
+        width = len(cls.features)
+        for key, shape in [('mean', (width,)), ('scale', (width,)), ('coefficients', (3, width)), ('intercepts', (3,))]:
             value = np.asarray(data[key], dtype=float)
             if value.shape != shape or not np.isfinite(value).all() or (key == 'scale' and (value <= 0).any()):
                 raise ValueError('결합 진입 모형의 계수·표준화 오류')
@@ -62,7 +64,7 @@ class JointEntryModel:
 
     def probabilities(self, values):
         x = np.asarray(values, dtype=float)
-        if x.ndim != 2 or x.shape[1] != len(MARKET_FEATURES):
+        if x.ndim != 2 or x.shape[1] != len(self.features):
             raise ValueError('결합 진입 모형의 예측 차원 오류')
         result = np.full((len(x), 3), np.nan)
         valid = np.flatnonzero(np.isfinite(x).all(axis=1))
