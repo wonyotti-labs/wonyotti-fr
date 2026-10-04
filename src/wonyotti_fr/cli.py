@@ -390,6 +390,11 @@ def main() -> None:
         first_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     first_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     first_diagnosis.set_defaults(func=lambda a: print(run_first_management_diagnosis(a.selection_run, a.diagnosis_run, a.output)))
+    from .exit_horizon import run_exit_horizon_diagnosis
+    exit_horizon = commands.add_parser('exit-horizon-diagnose', help='동일 포지션의 15분 청산 목표 학습 진단')
+    exit_horizon.add_argument('--diagnosis-run', type=Path, required=True)
+    exit_horizon.add_argument('--output', type=Path, default=Path('artifacts'))
+    exit_horizon.set_defaults(func=lambda a: print(run_exit_horizon_diagnosis(a.diagnosis_run, a.output)))
     from .recent_history_research import run_recent_history_selection
     recent_history = commands.add_parser('recent-history-select', help='관리 학습·보정 창의 최신 원본 전진 대조')
     for name in ['selection-run', 'diagnosis-run', 'market', 'features', 'confirmation-market', 'confirmation-features']:
