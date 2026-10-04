@@ -12,6 +12,8 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 
+from .source_snapshot import copy_snapshot
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -53,7 +55,7 @@ def new_run(root: Path, label: str, settings: dict) -> Path:
     snapshot = destination / "code_snapshot"
     snapshot.mkdir()
     for path in sorted(source.glob("*.py")):
-        (snapshot / path.name).write_bytes(path.read_bytes())
+        copy_snapshot(path, snapshot / path.name)
     code_hashes = {p.name: sha256(p) for p in sorted(snapshot.glob("*.py"))}
     versions = {}
     for name in ["pandas", "numpy", "pyarrow", "httpx", "scikit-learn", "matplotlib"]:
@@ -63,7 +65,7 @@ def new_run(root: Path, label: str, settings: dict) -> Path:
             pass
     lock = Path("uv.lock")
     if lock.exists():
-        (snapshot / "uv.lock").write_bytes(lock.read_bytes())
+        copy_snapshot(lock, snapshot / "uv.lock")
     save_json(destination / "manifest.json", {
         "created_utc": now, "settings": settings, "git_commit": commit, "git_dirty": dirty,
         "source_sha256": code_hashes, "python": platform.python_version(),
