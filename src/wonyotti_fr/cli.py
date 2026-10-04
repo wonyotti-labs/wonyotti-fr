@@ -395,6 +395,15 @@ def main() -> None:
     exit_horizon.add_argument('--diagnosis-run', type=Path, required=True)
     exit_horizon.add_argument('--output', type=Path, default=Path('artifacts'))
     exit_horizon.set_defaults(func=lambda a: print(run_exit_horizon_diagnosis(a.diagnosis_run, a.output)))
+    from .close_effect import run_close_effect_labels
+    close_effect = commands.add_parser('close-effect-labels', help='보유 유지와 즉시 청산의 순효과 정답 생성')
+    for name in ['selection-run', 'market', 'features']:
+        close_effect.add_argument(f'--{name}', type=Path, required=True)
+    close_effect.add_argument('--output', type=Path, default=Path('artifacts'))
+    close_effect.add_argument('--resume-run', type=Path)
+    close_effect.add_argument('--max-opportunities', type=int)
+    close_effect.set_defaults(func=lambda a: print(run_close_effect_labels(a.selection_run, a.market, a.features, a.output,
+        resume=a.resume_run, max_opportunities=a.max_opportunities)))
     from .entry_stop_risk import run_entry_stop_diagnosis
     stop_risk = commands.add_parser('entry-stop-diagnose', help='신규 진입의 손절 확률과 조건부 손익 진단')
     stop_risk.add_argument('--diagnosis-run', type=Path, required=True)
