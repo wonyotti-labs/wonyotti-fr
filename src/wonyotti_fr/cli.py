@@ -395,6 +395,11 @@ def main() -> None:
     exit_horizon.add_argument('--diagnosis-run', type=Path, required=True)
     exit_horizon.add_argument('--output', type=Path, default=Path('artifacts'))
     exit_horizon.set_defaults(func=lambda a: print(run_exit_horizon_diagnosis(a.diagnosis_run, a.output)))
+    from .continuation_diagnostics import run_continuation_diagnosis
+    continuation = commands.add_parser('continuation-diagnose', help='현재 관리 의도를 구분한 청산 가치 진단')
+    continuation.add_argument('--diagnosis-run', type=Path, required=True)
+    continuation.add_argument('--output', type=Path, default=Path('artifacts'))
+    continuation.set_defaults(func=lambda a: print(run_continuation_diagnosis(a.diagnosis_run, a.output)))
     from .first_close_diagnostics import run_first_close_diagnosis
     first_close = commands.add_parser('first-close-diagnose', help='포지션당 최초 청산 선택의 조건부 효과 진단')
     first_close.add_argument('--diagnosis-run', type=Path, required=True)

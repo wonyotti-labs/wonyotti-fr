@@ -68,10 +68,12 @@ def first_close_metrics(positions):
         'selected_zero': int(chosen.first_effect_pnl.eq(0).sum())}
 
 
-def paired_week_blocks(positions):
-    if set(positions) != set(FIRST_MODELS):
+def paired_week_blocks(positions, *, model_names=None):
+    names = FIRST_MODELS if model_names is None else model_names
+    if (not isinstance(names, list) or len(names) != 2 or any(not isinstance(n, str) or not n for n in names)
+        or len(set(names)) != 2 or set(positions) != set(names)):
         raise ValueError('최초 청산 블록 진단의 비교 모형 오류')
-    first, second = (positions[k] for k in FIRST_MODELS)
+    first, second = (positions[k] for k in names)
     keys = ['position_entry_time', 'direction', 'first_available_time', 'reference_equity']
     pd.testing.assert_frame_equal(first[keys], second[keys], check_exact=True)
     if (first.empty or first.position_entry_time.duplicated().any() or not first.position_entry_time.is_monotonic_increasing
@@ -82,18 +84,18 @@ def paired_week_blocks(positions):
     blocks = pd.DataFrame({'block': np.arange(13), 'start': pd.date_range(BLOCK_START, periods=13, freq='7D')})
     blocks['end'] = blocks.start.add(pd.Timedelta(days=7)).clip(upper=BLOCK_END)
     blocks['positions'] = np.bincount(block, minlength=13)
-    for name in FIRST_MODELS:
+    for name in names:
         # 블록 안 합은 재표본 평균의 분자이며 연속 계좌 수익이 아니다.
         blocks[f'effect_sum_{name}'] = np.bincount(block, weights=positions[name].first_effect_common_bps, minlength=13)
     draws = np.random.default_rng(63).integers(0, 13, size=(1000, 13))
     denominator = blocks.positions.to_numpy()[draws].sum(axis=1)
     replicates = pd.DataFrame({'replicate': np.arange(1000), 'positions': denominator})
-    for name in FIRST_MODELS:
+    for name in names:
         numerator = blocks[f'effect_sum_{name}'].to_numpy()[draws].sum(axis=1)
         replicates[name] = np.divide(numerator, denominator, out=np.full(1000, np.nan), where=denominator > 0)
-    replicates['paired_difference'] = replicates.economic-replicates.boosted
+    replicates['paired_difference'] = replicates[names[0]]-replicates[names[1]]
     intervals = {}
-    for name in [*FIRST_MODELS, 'paired_difference']:
+    for name in [*names, 'paired_difference']:
         valid = replicates[name].dropna()
         intervals[name] = {'valid_replicates': len(valid), 'lower': float(valid.quantile(.025)) if len(valid) else None,
             'upper': float(valid.quantile(.975)) if len(valid) else None}
