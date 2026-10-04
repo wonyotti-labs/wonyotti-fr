@@ -395,6 +395,11 @@ def main() -> None:
     exit_horizon.add_argument('--diagnosis-run', type=Path, required=True)
     exit_horizon.add_argument('--output', type=Path, default=Path('artifacts'))
     exit_horizon.set_defaults(func=lambda a: print(run_exit_horizon_diagnosis(a.diagnosis_run, a.output)))
+    from .close_learning import run_close_learning_diagnosis
+    close_learning = commands.add_parser('close-learning-diagnose', help='보유 청산 순효과의 시간순 예측 진단')
+    close_learning.add_argument('--labels', type=Path, required=True)
+    close_learning.add_argument('--output', type=Path, default=Path('artifacts'))
+    close_learning.set_defaults(func=lambda a: print(run_close_learning_diagnosis(a.labels, a.output)))
     from .close_effect import run_close_effect_labels
     close_effect = commands.add_parser('close-effect-labels', help='보유 유지와 즉시 청산의 순효과 정답 생성')
     for name in ['selection-run', 'market', 'features']:
