@@ -135,8 +135,15 @@ def summarize_observations(engine: TradingEngine, bars: int, final: float, avera
     elapsed_years = bars * config.bar_seconds / (365.25 * 24 * 3600)
     daily_returns = daily.pct_change().dropna()
     deviation = daily_returns.std()
+    try:
+        annual = (final / config.initial_equity) ** (1 / elapsed_years) - 1 if final >= 0 else None
+    except OverflowError:
+        annual = None
+    # 짧은 급등 구간의 연율화 불능이 전체 체결·손익 저장을 중단하지 않게 한다.
+    if annual is not None and not np.isfinite(annual):
+        annual = None
     return {'total_return': final / config.initial_equity - 1,
-            'annualized_return': (final / config.initial_equity) ** (1 / elapsed_years) - 1,
+            'annualized_return': annual,
             'max_drawdown': state['max_drawdown'], 'closed_trades': state['closed_trades'],
             'win_rate': state['wins'] / state['closed_trades'] if state['closed_trades'] else None,
             'profit_factor': state['sum_gains'] / state['sum_losses'] if state['sum_losses'] else None,
