@@ -183,6 +183,9 @@ class MinuteActionPolicy(PullbackPolicy):
         return management_values(bar['features'], state['direction'], state['favorable_move'],
                                  state['hold_bars'], state['adds'])
 
+    def action_threshold(self, action, state):
+        return self.thresholds[action] * self.multiplier
+
     def __call__(self, bar, state):
         if state['bar_seconds'] != 60:
             raise ValueError('분별 관리 정책의 실행 간격 오류')
@@ -212,7 +215,7 @@ class MinuteActionPolicy(PullbackPolicy):
         if not np.isfinite(scores).all():
             return PolicyDecision('hold', {}, 'action_unavailable')
         for action, score in zip(ACTIONS, scores, strict=True):
-            if score >= self.thresholds[action] * self.multiplier:
+            if score >= self.action_threshold(action, state):
                 return PolicyDecision(action, {'management_after': (current + pd.Timedelta(minutes=3)).isoformat(),
                                                'management_direction': state['direction']}, f'action_{action}')
         return PolicyDecision('hold', {}, 'action_hold')

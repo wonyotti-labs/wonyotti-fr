@@ -379,6 +379,13 @@ def main() -> None:
         first_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     first_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     first_diagnosis.set_defaults(func=lambda a: print(run_first_management_diagnosis(a.selection_run, a.diagnosis_run, a.output)))
+    from .first_state_research import run_first_state_selection
+    first_select = commands.add_parser('first-state-select', help='첫 관리 문턱의 자체 체결 적용 비교')
+    for name in ['selection-run', 'diagnosis-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
+        first_select.add_argument(f'--{name}', type=Path, required=True)
+    first_select.add_argument('--output', type=Path, default=Path('artifacts'))
+    first_select.set_defaults(func=lambda a: print(run_first_state_selection(a.selection_run, a.diagnosis_run,
+        a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
     from .history_state_research import run_history_state_selection
     history_select = commands.add_parser('history-state-select', help='보정된 주문 이력 모델의 자체 체결 관리 비교')
     for name in ['selection-run', 'diagnosis-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
