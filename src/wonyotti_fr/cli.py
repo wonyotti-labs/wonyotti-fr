@@ -379,6 +379,12 @@ def main() -> None:
         first_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     first_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     first_diagnosis.set_defaults(func=lambda a: print(run_first_management_diagnosis(a.selection_run, a.diagnosis_run, a.output)))
+    from .joint_research import run_joint_diagnostics
+    joint_diagnosis = commands.add_parser('joint-entry-diagnose', help='신규 진입 활동·방향의 결합 예측 진단')
+    for name in ['activity-run', 'direction-run']:
+        joint_diagnosis.add_argument(f'--{name}', type=Path, required=True)
+    joint_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
+    joint_diagnosis.set_defaults(func=lambda a: print(run_joint_diagnostics(a.activity_run, a.direction_run, a.output)))
     from .activity_diagnostics import run_activity_diagnostics
     activity_diagnosis = commands.add_parser('activity-model-diagnose', help='신규 진입 활동의 시간순 모형 비교')
     for name in ['audit-run', 'study-run', 'history']:
