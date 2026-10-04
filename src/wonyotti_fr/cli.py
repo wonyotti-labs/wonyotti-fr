@@ -395,6 +395,13 @@ def main() -> None:
     exit_horizon.add_argument('--diagnosis-run', type=Path, required=True)
     exit_horizon.add_argument('--output', type=Path, default=Path('artifacts'))
     exit_horizon.set_defaults(func=lambda a: print(run_exit_horizon_diagnosis(a.diagnosis_run, a.output)))
+    from .net_exit_research import run_net_exit_selection
+    net_exit = commands.add_parser('net-exit-select', help='추가 조기 청산의 현재 비용 조건 대조')
+    for name in ['selection-run', 'market', 'features', 'confirmation-market', 'confirmation-features']:
+        net_exit.add_argument(f'--{name}', type=Path, required=True)
+    net_exit.add_argument('--output', type=Path, default=Path('artifacts'))
+    net_exit.set_defaults(func=lambda a: print(run_net_exit_selection(a.selection_run, a.market, a.features,
+        a.confirmation_market, a.confirmation_features, a.output)))
     from .horizon_exit_research import run_horizon_exit_selection
     horizon_exit = commands.add_parser('horizon-exit-select', help='기존 청산 점수의 범위 문턱 고정 매매 대조')
     for name in ['selection-run', 'diagnosis-run', 'market', 'features', 'confirmation-market', 'confirmation-features']:

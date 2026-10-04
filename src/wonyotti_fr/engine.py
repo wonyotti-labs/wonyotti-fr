@@ -152,12 +152,21 @@ class TradingEngine:
     def view(self, price: float) -> dict:
         s = self.state
         direction = int(np.sign(s["quantity"]))
+        estimated_exit_net = 0.
+        if direction:
+            # 현재 가격의 청산 비용만 반영하며 다음 체결 가격을 미리 사용하지 않는다.
+            execution = price * (1 - direction * self.config.slippage_bps / 10000)
+            exit_fee = abs(s['quantity']) * execution * self.config.fee_bps / 10000
+            trade = s['active_trade']
+            estimated_exit_net = (trade['gross_realized'] - trade['fees'] - trade['funding_cost']
+                                  + s['quantity'] * (execution - s['entry_price']) - exit_fee)
         return {"direction": direction, "equity": s["cash"] + s["quantity"] * price,
                 "favorable_move": direction * (price / s["entry_price"] - 1) if direction else 0.0,
                 "hold_bars": s["index"] - s["entry_index"] if direction else 0,
                 "adds": s["active_trade"]["adds"] if direction else 0,
                 "remaining_fraction": abs(s['quantity']) / s['active_trade']['max_quantity'] if direction else 0.,
                 "average_entry": s["entry_price"],
+                "estimated_exit_net": float(estimated_exit_net),
                 "position_entry_time": s["active_trade"]["entry_time"] if direction else None,
                 "pending": s["pending"], "halted": s["permanent_halted"] or s["manual_halt"],
                 "bar_seconds": self.config.bar_seconds,
