@@ -28,9 +28,11 @@ def effective_count(weights):
 
 def episode_weights(episode_ids):
     ids = np.asarray(episode_ids)
-    if (ids.ndim != 1 or not len(ids) or ids.dtype.kind not in 'iu'
-        or (ids <= 0).any()):
+    if (ids.ndim != 1 or not len(ids) or ids.dtype.kind not in 'iuf'
+        or not np.isfinite(ids).all() or ((ids <= 0) | (ids >= 2**53)).any()
+        or (ids != np.floor(ids)).any()):
         raise ValueError('포지션 균등 가중치의 식별자 오류')
+    ids = ids.astype(np.int64)
     episodes, inverse, counts = np.unique(ids, return_inverse=True, return_counts=True)
     weights = len(ids) / (len(episodes) * counts[inverse].astype(float))
     sums = np.bincount(inverse, weights=weights)

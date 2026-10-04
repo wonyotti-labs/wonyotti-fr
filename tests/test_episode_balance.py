@@ -38,13 +38,16 @@ def test_weights_equal_episode_totals_and_preserve_original_order():
     shuffled = np.random.default_rng(42).permutation(len(ids))
     permuted, _ = episode_weights(ids[shuffled])
     np.testing.assert_array_equal(permuted, w[shuffled])
+    np.testing.assert_array_equal(episode_weights(ids.astype(float))[0], w)
 
 
-@pytest.mark.parametrize('kind', ['float', 'negative', 'missing', 'shape', 'empty', 'few_effective'])
+@pytest.mark.parametrize('kind', ['fractional', 'negative', 'missing', 'shape', 'empty', 'few_effective', 'too_large'])
 def test_weights_reject_invalid_identifiers_and_weak_effective_support(kind):
     ids = np.arange(1, 1201)
-    if kind == 'float':
-        ids = ids.astype(float)
+    if kind == 'fractional':
+        ids = ids.astype(float)+.5
+    elif kind == 'too_large':
+        ids[0] = 2**53
     elif kind == 'negative':
         ids[0] = -1
     elif kind == 'missing':
