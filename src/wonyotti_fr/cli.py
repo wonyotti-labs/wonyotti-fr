@@ -395,6 +395,11 @@ def main() -> None:
     exit_horizon.add_argument('--diagnosis-run', type=Path, required=True)
     exit_horizon.add_argument('--output', type=Path, default=Path('artifacts'))
     exit_horizon.set_defaults(func=lambda a: print(run_exit_horizon_diagnosis(a.diagnosis_run, a.output)))
+    from .first_close_diagnostics import run_first_close_diagnosis
+    first_close = commands.add_parser('first-close-diagnose', help='포지션당 최초 청산 선택의 조건부 효과 진단')
+    first_close.add_argument('--diagnosis-run', type=Path, required=True)
+    first_close.add_argument('--output', type=Path, default=Path('artifacts'))
+    first_close.set_defaults(func=lambda a: print(run_first_close_diagnosis(a.diagnosis_run, a.output)))
     from .close_economics import run_close_economic_diagnosis
     close_economics = commands.add_parser('close-economic-diagnose', help='현재 노출·추정 청산 손익의 입력 보완 진단')
     close_economics.add_argument('--diagnosis-run', type=Path, required=True)
