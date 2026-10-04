@@ -21,7 +21,9 @@ FIRST_MODELS = ['economic', 'boosted']
 BLOCK_START, BLOCK_END = pd.Timestamp('2021-10-02', tz='UTC'), pd.Timestamp('2021-12-31', tz='UTC')
 
 
-def first_close_positions(frame, prediction):
+def first_close_positions(frame, prediction, *, margin_bps=0.):
+    if type(margin_bps) not in (int, float) or not np.isfinite(margin_bps) or margin_bps < 0:
+        raise ValueError('최초 청산 진단의 실행 문턱 오류')
     columns = ['close_advantage_pnl', 'close_advantage_bps', 'decision_equity', prediction]
     if (frame.empty or frame.decision_time.isna().any() or frame.decision_time.duplicated().any()
         or not frame.decision_time.is_monotonic_increasing
@@ -36,7 +38,7 @@ def first_close_positions(frame, prediction):
     for entry, part in frame.groupby('position_entry_time', sort=True):
         if part.direction.nunique() != 1 or part.continue_end.nunique() != 1 or part.continue_cash.nunique() != 1:
             raise ValueError('최초 청산 진단의 원래 포지션 연결 오류')
-        selected = part.loc[part[prediction].gt(0) & part.original_intent.ne('exit')]
+        selected = part.loc[part[prediction].gt(margin_bps) & part.original_intent.ne('exit')]
         first, anchor = (selected.iloc[0] if len(selected) else None), part.iloc[0]
         amount = float(first.close_advantage_pnl) if first is not None else 0.
         result.append({'position_entry_time': entry, 'direction': int(anchor.direction),

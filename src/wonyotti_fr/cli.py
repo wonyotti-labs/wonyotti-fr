@@ -395,6 +395,11 @@ def main() -> None:
     exit_horizon.add_argument('--diagnosis-run', type=Path, required=True)
     exit_horizon.add_argument('--output', type=Path, default=Path('artifacts'))
     exit_horizon.set_defaults(func=lambda a: print(run_exit_horizon_diagnosis(a.diagnosis_run, a.output)))
+    from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
+    first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
+    first_margin.add_argument('--diagnosis-run', type=Path, required=True)
+    first_margin.add_argument('--output', type=Path, default=Path('artifacts'))
+    first_margin.set_defaults(func=lambda a: print(run_first_close_margin_diagnosis(a.diagnosis_run, a.output)))
     from .weekly_close_diagnostics import run_weekly_close_diagnosis
     weekly_close = commands.add_parser('weekly-close-diagnose', help='확정 결과만 누적한 주간 청산 가치 재학습 진단')
     weekly_close.add_argument('--diagnosis-run', type=Path, required=True)

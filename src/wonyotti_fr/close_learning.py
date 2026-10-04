@@ -69,14 +69,16 @@ class CloseRidgeModel:
         return copy.deepcopy(self.data)
 
 
-def close_metrics(frame, prediction):
+def close_metrics(frame, prediction, *, margin_bps=0.):
+    if type(margin_bps) not in (int, float) or not np.isfinite(margin_bps) or margin_bps < 0:
+        raise ValueError('청산 진단 지표의 실행 문턱 오류')
     target, weight, prediction = (np.asarray(v, dtype=float) for v in [frame.close_advantage_bps, frame.sample_weight, prediction])
     if (not len(target) or prediction.shape != target.shape or weight.shape != target.shape
         or not all(np.isfinite(v).all() for v in [target, weight, prediction]) or (weight <= 0).any()
         or frame.position_entry_time.isna().any() or frame.original_intent.isna().any()):
         raise ValueError('청산 진단 지표의 행·예측·가중치 오류')
     # 원래 청산도 오차에 포함하되 추가 청산의 효과와 구분한다.
-    selected = (prediction > 0) & frame.original_intent.ne('exit').to_numpy()
+    selected = (prediction > margin_bps) & frame.original_intent.ne('exit').to_numpy()
     return {'rows': len(target), 'positions': int(frame.position_entry_time.nunique()),
         'weighted_mse': float(np.average((target-prediction)**2, weights=weight)),
         'mse': float(np.mean((target-prediction)**2)), 'selected': int(selected.sum()),
