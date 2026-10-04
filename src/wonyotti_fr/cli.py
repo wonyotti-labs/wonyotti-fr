@@ -400,6 +400,12 @@ def main() -> None:
     close_utility.add_argument('--diagnosis-run', type=Path, required=True)
     close_utility.add_argument('--output', type=Path, default=Path('artifacts'))
     close_utility.set_defaults(func=lambda a: print(run_close_utility_diagnosis(a.diagnosis_run, a.output)))
+
+    from .close_context_diagnostics import run_close_context_diagnosis
+    close_context = commands.add_parser('close-context-diagnose', help='다일 시장 상태의 청산 비용 학습 진단')
+    close_context.add_argument('--diagnosis-run', type=Path, required=True)
+    close_context.add_argument('--output', type=Path, default=Path('artifacts'))
+    close_context.set_defaults(func=lambda a: print(run_close_context_diagnosis(a.diagnosis_run, a.output)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)

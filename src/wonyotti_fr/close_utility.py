@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from .continuation_inputs import ContinuationCloseModel, validate_pending_matrix
+from .continuation_inputs import PENDING_FEATURES, ContinuationCloseModel, validate_pending_matrix
 from .first_close_diagnostics import first_close_positions
 from .histogram_management import HistogramManagementModels
 
@@ -53,7 +53,7 @@ class UtilityCloseModel(HistogramManagementModels):
         for matrix in [x, vx]:
             if matrix.ndim != 2 or matrix.shape[1] != len(cls.features) or not np.isfinite(matrix).all():
                 raise ValueError('청산 비용 모델의 현재 입력 오류')
-            validate_pending_matrix(matrix[:, -4:])
+            validate_pending_matrix(matrix[:, [cls.features.index(name) for name in PENDING_FEATURES]])
         ledger, support = cost_training(target, weights)
         if len(x) != len(ledger):
             raise ValueError('청산 비용 모델의 입력·정답 행 수 불일치')
@@ -66,7 +66,7 @@ class UtilityCloseModel(HistogramManagementModels):
         matrix = np.asarray(values, dtype=float)
         if matrix.ndim != 2 or matrix.shape[1] != len(self.features):
             raise ValueError('청산 비용 점수의 입력 차원 오류')
-        validate_pending_matrix(matrix[:, -4:])
+        validate_pending_matrix(matrix[:, [self.features.index(name) for name in PENDING_FEATURES]])
         return super().probabilities(matrix)
 
 
@@ -124,18 +124,18 @@ def first_cost_positions(frame, scores):
     return positions
 
 
-def utility_admission(metrics, probability, first, intervals):
-    candidate, p, constant = metrics['utility'], probability['utility'], probability['training_constant']
+def utility_admission(metrics, probability, first, intervals, *, candidate_name="utility"):
+    candidate, p, constant = metrics[candidate_name], probability[candidate_name], probability['training_constant']
     if (len({(v['rows'], v['positions']) for v in metrics.values()}) != 1
         or any(v['rows'] != candidate['rows'] for v in probability.values())
         or any(v['positions'] != candidate['positions'] for v in first.values())
-        or first['utility']['selected_positions'] != candidate['selected_positions']):
+        or first[candidate_name]['selected_positions'] != candidate['selected_positions']):
         raise ValueError('청산 비용 진단의 행·최초 포지션 불일치')
     checks = {'cost_log_loss_vs_constant': p['cost_log_loss'] is not None and constant['cost_log_loss'] is not None and p['cost_log_loss'] < constant['cost_log_loss']*.99,
         'cost_brier_not_worse': p['cost_brier'] is not None and constant['cost_brier'] is not None and p['cost_brier'] <= constant['cost_brier']+1e-12}
     checks.update({f'weighted_regret_vs_{name}': candidate['weighted_regret_bps'] < metrics[name]['weighted_regret_bps']
         for name in ['training_constant', 'continuation', 'weekly']})
-    mean = first['utility']['all_position_mean_common_bps']
+    mean = first[candidate_name]['all_position_mean_common_bps']
     checks.update(at_least_100_selected=candidate['selected'] >= 100,
         at_least_30_selected_positions=candidate['selected_positions'] >= 30,
         positive_selected_weighted_mean=candidate['selected_weighted_mean_bps'] is not None and candidate['selected_weighted_mean_bps'] > 0,
@@ -143,7 +143,7 @@ def utility_admission(metrics, probability, first, intervals):
         positive_first_choice_mean=mean > 0,
         first_mean_vs_continuation=mean > first['continuation']['all_position_mean_common_bps'],
         first_mean_vs_weekly=mean > first['weekly']['all_position_mean_common_bps'])
-    for key, name in [('positive_first_interval_lower', 'utility'), ('positive_paired_interval_lower', 'paired_difference')]:
+    for key, name in [('positive_first_interval_lower', candidate_name), ('positive_paired_interval_lower', 'paired_difference')]:
         low = intervals['intervals'][name]['lower']
         checks[key] = bool(low is not None and np.isfinite(low) and low > 0)
     return {'checks': checks, 'utility_admitted': all(checks.values()), 'trading_returns_evaluated': False}

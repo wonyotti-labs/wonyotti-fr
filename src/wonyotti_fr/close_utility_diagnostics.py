@@ -69,10 +69,10 @@ def reproduce_margin(reference, output):
     return reproduced
 
 
-def fit_utility(training, weights, diagnosis):
+def fit_utility(training, weights, diagnosis, *, model_class=UtilityCloseModel):
     pd.testing.assert_frame_equal(weights.drop(columns='sample_weight'), training[['decision_time', 'position_entry_time']], check_exact=True)
-    model, support, costs = UtilityCloseModel.fit(training[UtilityCloseModel.features].to_numpy(dtype=float),
-        training.close_advantage_bps, weights.sample_weight, diagnosis[UtilityCloseModel.features].to_numpy(dtype=float))
+    model, support, costs = model_class.fit(training[model_class.features].to_numpy(dtype=float),
+        training.close_advantage_bps, weights.sample_weight, diagnosis[model_class.features].to_numpy(dtype=float))
     ledger = pd.concat([training[['decision_time', 'position_entry_time']].reset_index(drop=True), costs], axis=1)
     return model, support, ledger
 
