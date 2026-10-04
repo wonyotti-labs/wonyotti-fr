@@ -28,6 +28,9 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'holding_support_v40':
+        from .holding_support import load_holding_selection
+        return load_holding_selection(selection, frozen)
     if frozen.get('protocol') == 'first_state_v39':
         from .first_state import load_first_state_selection
         return load_first_state_selection(selection, frozen)

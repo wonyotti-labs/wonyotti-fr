@@ -379,6 +379,13 @@ def main() -> None:
         first_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     first_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     first_diagnosis.set_defaults(func=lambda a: print(run_first_management_diagnosis(a.selection_run, a.diagnosis_run, a.output)))
+    from .holding_support_research import run_holding_support_selection
+    holding_select = commands.add_parser('holding-support-select', help='관찰한 보유 시간 한도의 고정 비교')
+    for name in ['selection-run', 'diagnosis-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
+        holding_select.add_argument(f'--{name}', type=Path, required=True)
+    holding_select.add_argument('--output', type=Path, default=Path('artifacts'))
+    holding_select.set_defaults(func=lambda a: print(run_holding_support_selection(a.selection_run, a.diagnosis_run,
+        a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
     from .first_state_research import run_first_state_selection
     first_select = commands.add_parser('first-state-select', help='첫 관리 문턱의 자체 체결 적용 비교')
     for name in ['selection-run', 'diagnosis-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
