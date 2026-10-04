@@ -395,6 +395,11 @@ def main() -> None:
     exit_horizon.add_argument('--diagnosis-run', type=Path, required=True)
     exit_horizon.add_argument('--output', type=Path, default=Path('artifacts'))
     exit_horizon.set_defaults(func=lambda a: print(run_exit_horizon_diagnosis(a.diagnosis_run, a.output)))
+    from .close_calibration import run_close_calibration_diagnosis
+    close_calibration = commands.add_parser('close-calibration-diagnose', help='별도 시간 구간의 청산 금액 보정 진단')
+    close_calibration.add_argument('--diagnosis-run', type=Path, required=True)
+    close_calibration.add_argument('--output', type=Path, default=Path('artifacts'))
+    close_calibration.set_defaults(func=lambda a: print(run_close_calibration_diagnosis(a.diagnosis_run, a.output)))
     from .close_learning import run_close_learning_diagnosis
     close_learning = commands.add_parser('close-learning-diagnose', help='보유 청산 순효과의 시간순 예측 진단')
     close_learning.add_argument('--labels', type=Path, required=True)
