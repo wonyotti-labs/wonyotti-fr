@@ -379,6 +379,12 @@ def main() -> None:
         first_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     first_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     first_diagnosis.set_defaults(func=lambda a: print(run_first_management_diagnosis(a.selection_run, a.diagnosis_run, a.output)))
+    from .activity_diagnostics import run_activity_diagnostics
+    activity_diagnosis = commands.add_parser('activity-model-diagnose', help='신규 진입 활동의 시간순 모형 비교')
+    for name in ['audit-run', 'study-run', 'history']:
+        activity_diagnosis.add_argument(f'--{name}', type=Path, required=True)
+    activity_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
+    activity_diagnosis.set_defaults(func=lambda a: print(run_activity_diagnostics(a.audit_run, a.study_run, a.history, a.output)))
     from .episode_balance import run_episode_balance_diagnosis
     episode_diagnosis = commands.add_parser('episode-balance-diagnose', help='포지션별 관리 학습 기여 균등화 진단')
     episode_diagnosis.add_argument('--diagnosis-run', type=Path, required=True)

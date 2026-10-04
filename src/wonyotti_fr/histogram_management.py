@@ -17,6 +17,7 @@ HISTOGRAM_SETTINGS = {'loss': 'log_loss', 'max_iter': 64, 'learning_rate': .05,
 
 class HistogramManagementModels:
     features = MinuteInventoryModels.features
+    actions = ACTIONS
     format = 'histogram_management_v1'
     kind = 'histogram'
 
@@ -27,7 +28,7 @@ class HistogramManagementModels:
     def fit(cls, values, labels, validation_values, *, sample_weight=None):
         x, y = np.asarray(values, dtype=float), np.asarray(labels)
         if (x.ndim != 2 or x.shape[1] != len(cls.features) or len(x) < 1000
-            or y.shape != (len(x), len(ACTIONS)) or not np.isfinite(x).all()
+            or y.shape != (len(x), len(cls.actions)) or not np.isfinite(x).all()
             or not np.isin(y, [0, 1]).all() or (y.sum(axis=0) < 20).any()
             or ((1 - y).sum(axis=0) < 20).any()):
             raise ValueError('관리 부스팅의 학습 차원·유한성·지원 부족')
@@ -42,7 +43,7 @@ class HistogramManagementModels:
                 raise ValueError('관리 부스팅의 표본 가중치 오류')
             fit_options['sample_weight'] = weights
         binaries, expected, validation_expected = [], [], []
-        for i, action in enumerate(ACTIONS):
+        for i, action in enumerate(cls.actions):
             with threadpool_limits(limits=1):
                 learner = HistGradientBoostingClassifier(**HISTOGRAM_SETTINGS).fit(x, y[:, i], **fit_options)
                 expected.append(learner.predict_proba(x)[:, 1])
@@ -71,17 +72,17 @@ class HistogramManagementModels:
         validation_error = float(np.max(np.abs(model.probabilities(vx) - np.column_stack(validation_expected))))
         if error > 1e-12 or validation_error > 1e-12:
             raise ValueError('관리 부스팅의 숫자 내보내기 불일치')
-        return model, {'rows': len(x), 'positive': dict(zip(ACTIONS, y.sum(axis=0).astype(int).tolist(), strict=True)),
-            'negative': dict(zip(ACTIONS, (1 - y).sum(axis=0).astype(int).tolist(), strict=True)),
+        return model, {'rows': len(x), 'positive': dict(zip(cls.actions, y.sum(axis=0).astype(int).tolist(), strict=True)),
+            'negative': dict(zip(cls.actions, (1 - y).sum(axis=0).astype(int).tolist(), strict=True)),
             'export_max_error': error, 'validation_export_max_error': validation_error, 'early_stopping': False}
 
     @classmethod
     def from_dict(cls, data):
         if (data.get('format') != cls.format or data.get('features') != cls.features
             or data.get('settings') != HISTOGRAM_SETTINGS or not isinstance(data.get('models'), list)
-            or len(data['models']) != len(ACTIONS)):
+            or len(data['models']) != len(cls.actions)):
             raise ValueError('관리 부스팅의 형식·특징·고정 설정 오류')
-        for model, action in zip(data['models'], ACTIONS, strict=True):
+        for model, action in zip(data['models'], cls.actions, strict=True):
             if (model.get('action') != action or type(model.get('baseline')) not in (int, float)
                 or not np.isfinite(model['baseline']) or not isinstance(model.get('trees'), list)
                 or len(model['trees']) != 64):
@@ -116,7 +117,7 @@ class HistogramManagementModels:
         if values.ndim != 2 or values.shape[1] != len(self.features):
             raise ValueError('관리 부스팅의 예측 차원 오류')
         valid = np.isfinite(values).all(axis=1)
-        result = np.full((len(values), len(ACTIONS)), np.nan)
+        result = np.full((len(values), len(self.actions)), np.nan)
         matrix = values[valid]
         if len(values) == 1:
             if not valid[0]:
