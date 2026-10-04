@@ -58,6 +58,11 @@ def waiting_diagnostics(directory: Path, bars: pd.DataFrame, delay: int, *, mana
                 if RATE_STATE & set(previous):
                     validate_rate_state(previous)
                     previous = {k: v for k, v in previous.items() if k not in RATE_STATE}
+                from .history_state import FILL_STATE, validate_fill_history
+                if FILL_STATE & set(previous):
+                    validate_path_state(previous)
+                    validate_fill_history(previous)
+                    previous = {k: v for k, v in previous.items() if k not in FILL_STATE}
                 path = bool(PATH_STATE & set(previous))
                 if path:
                     validate_path_state(previous)

@@ -111,6 +111,20 @@ class HistogramManagementModels:
         valid = np.isfinite(values).all(axis=1)
         result = np.full((len(values), len(ACTIONS)), np.nan)
         matrix = values[valid]
+        if len(values) == 1:
+            if not valid[0]:
+                return result
+            with np.errstate(over='ignore', invalid='ignore'):
+                for i, model in enumerate(self.data['models']):
+                    logit = np.float64(model['baseline'])
+                    for tree in model['trees']:
+                        node = 0
+                        while tree['left'][node] != -1:
+                            node = (tree['left'][node] if matrix[0, tree['feature'][node]] <= tree['threshold'][node]
+                                    else tree['right'][node])
+                        logit += tree['value'][node]
+                    result[0, i] = 1 / (1 + np.exp(-np.clip(logit, -700, 700))) if np.isfinite(logit) else np.nan
+            return result
         for i, model in enumerate(self.data['models']):
             logits = np.full(len(matrix), model['baseline'], dtype=float)
             for tree in model['trees']:

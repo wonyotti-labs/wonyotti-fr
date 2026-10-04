@@ -368,6 +368,13 @@ def main() -> None:
         direction_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     direction_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     direction_diagnosis.set_defaults(func=lambda a: print(run_direction_diagnostics(a.audit_run, a.study_run, a.history, a.output)))
+    from .history_state_research import run_history_state_selection
+    history_select = commands.add_parser('history-state-select', help='보정된 주문 이력 모델의 자체 체결 관리 비교')
+    for name in ['selection-run', 'diagnosis-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:
+        history_select.add_argument(f'--{name}', type=Path, required=True)
+    history_select.add_argument('--output', type=Path, default=Path('artifacts'))
+    history_select.set_defaults(func=lambda a: print(run_history_state_selection(a.selection_run, a.diagnosis_run,
+        a.market, a.feature_market, a.confirmation_market, a.confirmation_features, a.output)))
     from .current_state_research import run_current_state_selection
     current_select = commands.add_parser('current-state-select', help='누적량 대신 현재 점수와 기존 문턱으로 관리 판단 비교')
     for name in ['selection-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:

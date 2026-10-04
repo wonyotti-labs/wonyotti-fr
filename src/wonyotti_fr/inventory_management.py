@@ -95,12 +95,15 @@ class InventoryRatePolicy(RateActionPolicy):
         decision = super().__call__(bar, state)
         return self.size_reduction(bar, state, decision)
 
+    def size_feature_values(self, bar, state):
+        return self.feature_values(bar, state)
+
     def size_reduction(self, bar, state, decision):
         if decision.intent != 'reduce' or self.size_model is None:
             return decision
         # 행동 판단 때 이미 갱신한 과거 가격 경로로 같은 입력을 구성한다.
         context = {**state, '_path_bounds': (decision.state['path_low'], decision.state['path_high'])}
-        fraction = float(self.size_model.predict(self.feature_values(bar, context).reshape(1, -1))[0])
+        fraction = float(self.size_model.predict(self.size_feature_values(bar, context).reshape(1, -1))[0])
         if fraction == 0:
             return PolicyDecision('hold', decision.state, 'action_zero_reduction')
         return PolicyDecision('reduce', decision.state, 'action_sized_reduce', fraction)

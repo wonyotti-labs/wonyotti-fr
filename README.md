@@ -380,3 +380,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 
 
 [v35](docs/EXPERIMENT_V35.md)는 `history-calibration-diagnose --history-run <v33 진단> --calibration-run <v32 진단>`으로 실행한다. v32의 세 시간 구간과 모든 기존 열을 유지한 채 검증된 과거 주문 특징 여섯 개를 연결한다. 새 보정 부스팅을 기존 v21·새 보정 로지스틱·v32 보정 부스팅 모두와 비교하며 마지막 구간의 정답은 학습에 사용하지 않는다.
+
+[v36](docs/EXPERIMENT_V36.md)은 `history-state-select --selection-run <v31 선택> --diagnosis-run <v35 진단>`과 개발·확인 시장 경로로 실행한다. 사전 진단을 통과한 관리 모형과 절편을 그대로 복사하고, 상반기 F점수로 문턱을 고정한다. 봇 자신의 체결만 과거 이력에 반영하며 기존 진입·축소 크기·위험을 유지한다. 원래 v31 대조·실제 종료 복원·다년 후속 검증을 포함하고 실거래 연결은 제외한다.
