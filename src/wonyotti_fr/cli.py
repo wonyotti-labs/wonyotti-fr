@@ -379,6 +379,11 @@ def main() -> None:
         first_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     first_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     first_diagnosis.set_defaults(func=lambda a: print(run_first_management_diagnosis(a.selection_run, a.diagnosis_run, a.output)))
+    from .episode_balance import run_episode_balance_diagnosis
+    episode_diagnosis = commands.add_parser('episode-balance-diagnose', help='포지션별 관리 학습 기여 균등화 진단')
+    episode_diagnosis.add_argument('--diagnosis-run', type=Path, required=True)
+    episode_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
+    episode_diagnosis.set_defaults(func=lambda a: print(run_episode_balance_diagnosis(a.diagnosis_run, a.output)))
     from .holding_support_research import run_holding_support_selection
     holding_select = commands.add_parser('holding-support-select', help='관찰한 보유 시간 한도의 고정 비교')
     for name in ['selection-run', 'diagnosis-run', 'market', 'feature-market', 'confirmation-market', 'confirmation-features']:

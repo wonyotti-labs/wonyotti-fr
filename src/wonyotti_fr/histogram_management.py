@@ -24,7 +24,7 @@ class HistogramManagementModels:
         self.data = copy.deepcopy(data)
 
     @classmethod
-    def fit(cls, values, labels, validation_values):
+    def fit(cls, values, labels, validation_values, *, sample_weight=None):
         x, y = np.asarray(values, dtype=float), np.asarray(labels)
         if (x.ndim != 2 or x.shape[1] != len(cls.features) or len(x) < 1000
             or y.shape != (len(x), len(ACTIONS)) or not np.isfinite(x).all()
@@ -34,10 +34,17 @@ class HistogramManagementModels:
         vx = np.asarray(validation_values, dtype=float)
         if vx.ndim != 2 or vx.shape[1] != len(cls.features) or not len(vx) or not np.isfinite(vx).all():
             raise ValueError('관리 부스팅의 숫자 검증 입력 오류')
+        fit_options = {}
+        if sample_weight is not None:
+            weights = np.asarray(sample_weight, dtype=float)
+            if (weights.shape != (len(x),) or not np.isfinite(weights).all() or (weights <= 0).any()
+                or not np.isclose(weights.mean(), 1., atol=1e-12, rtol=0)):
+                raise ValueError('관리 부스팅의 표본 가중치 오류')
+            fit_options['sample_weight'] = weights
         binaries, expected, validation_expected = [], [], []
         for i, action in enumerate(ACTIONS):
             with threadpool_limits(limits=1):
-                learner = HistGradientBoostingClassifier(**HISTOGRAM_SETTINGS).fit(x, y[:, i])
+                learner = HistGradientBoostingClassifier(**HISTOGRAM_SETTINGS).fit(x, y[:, i], **fit_options)
                 expected.append(learner.predict_proba(x)[:, 1])
                 validation_expected.append(learner.predict_proba(vx)[:, 1])
             if (learner.n_iter_ != 64 or learner._baseline_prediction.shape != (1, 1)
