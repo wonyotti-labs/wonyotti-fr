@@ -395,6 +395,11 @@ def main() -> None:
     exit_horizon.add_argument('--diagnosis-run', type=Path, required=True)
     exit_horizon.add_argument('--output', type=Path, default=Path('artifacts'))
     exit_horizon.set_defaults(func=lambda a: print(run_exit_horizon_diagnosis(a.diagnosis_run, a.output)))
+    from .entry_regression_diagnostics import run_entry_regression_diagnosis
+    entry_regression = commands.add_parser('entry-regression-diagnose', help='신규 진입 손익의 단일 비선형 회귀 진단')
+    entry_regression.add_argument('--selection-run', type=Path, required=True)
+    entry_regression.add_argument('--output', type=Path, default=Path('artifacts'))
+    entry_regression.set_defaults(func=lambda a: print(run_entry_regression_diagnosis(a.selection_run, a.output)))
     from .policy_entry_research import run_policy_entry_selection
     policy_entry = commands.add_parser('policy-entry-select', help='현재 관리 손익 기반 신규 진입 필터 대조')
     for name in ['selection-run', 'labels', 'market', 'features', 'confirmation-market', 'confirmation-features']:

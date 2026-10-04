@@ -392,3 +392,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v55](docs/EXPERIMENT_V55.md)는 `policy-outcome-labels --selection-run <v54 선택> --market <2021년 1분 시세> --features <5분 특징 시세>`로 현재 정책의 모든 독립 진입 손익을 생성한다. 중단한 실행은 같은 입력과 `--resume-run <정답 출력>`으로 재개한다. 완료 기회는 원자적으로 보존하며 입력·정책·코드가 바뀐 재개를 거부한다. `--max-opportunities`는 새로 계산할 기회 수만 제한하며 일부 완료 결과는 학습에 사용할 수 없다.
 
 [v56](docs/EXPERIMENT_V56.md)는 `policy-entry-select --selection-run <v54 선택> --labels <완료한 v55 정답> --market <2021년 1분 시세> --features <5분 특징 시세> --confirmation-market <2022년 1분 시세> --confirmation-features <확인 5분 특징 시세>`로 실행한다. 현재 관리 정책의 전체 순손익을 가중 회귀로 학습해 신규 진입만 판단한다. 손실을 포함한 전체 정답과 읽기 전용 원장을 대조하고 겹친 구간의 비중을 조정한다. 관리·위험은 유지하며 필터 제거 대조가 원래 v54 전체 결과와 일치해야 한다. 학습 완료나 합성 검사 통과를 수익성 입증으로 표시하지 않는다.
+
+[v57](docs/EXPERIMENT_V57.md)은 `entry-regression-diagnose --selection-run <v56 선택>`으로 실행한다. 같은 현재 정책 정답을 시간순으로 나누고 경계를 넘는 정답을 배제한 뒤, 각 구간 안에서만 중첩 가중치를 다시 계산한다. 앞 구간에서 학습한 가중 회귀·고정 부스팅·상수를 후속 구간에서 비교하며 모든 배제 사유와 방향·월별 결과를 보존한다. 진단 조건을 통과해도 실제 계좌 수익성이나 봇 적용을 뜻하지 않는다.
