@@ -174,4 +174,3 @@ def run_first_close_margin_diagnosis(reference: Path, output: Path) -> Path:
         save_json(out/'failure.json', {'type': type(error).__name__, 'message': str(error)})
         raise
     return out
-
