@@ -395,6 +395,11 @@ def main() -> None:
     exit_horizon.add_argument('--diagnosis-run', type=Path, required=True)
     exit_horizon.add_argument('--output', type=Path, default=Path('artifacts'))
     exit_horizon.set_defaults(func=lambda a: print(run_exit_horizon_diagnosis(a.diagnosis_run, a.output)))
+    from .weekly_close_diagnostics import run_weekly_close_diagnosis
+    weekly_close = commands.add_parser('weekly-close-diagnose', help='확정 결과만 누적한 주간 청산 가치 재학습 진단')
+    weekly_close.add_argument('--diagnosis-run', type=Path, required=True)
+    weekly_close.add_argument('--output', type=Path, default=Path('artifacts'))
+    weekly_close.set_defaults(func=lambda a: print(run_weekly_close_diagnosis(a.diagnosis_run, a.output)))
     from .close_capacity_diagnostics import run_close_capacity_diagnosis
     close_capacity = commands.add_parser('close-capacity-diagnose', help='앞 학습 내부의 시간순 청산 회귀 복잡도 선택')
     close_capacity.add_argument('--diagnosis-run', type=Path, required=True)
