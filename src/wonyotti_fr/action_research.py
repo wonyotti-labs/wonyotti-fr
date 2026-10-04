@@ -28,6 +28,9 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'activity_ablation_v46':
+        from .activity_ablation import load_activity_ablation_selection
+        return load_activity_ablation_selection(selection, frozen)
     if frozen.get('protocol') == 'holding_support_v40':
         from .holding_support import load_holding_selection
         return load_holding_selection(selection, frozen)

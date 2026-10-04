@@ -25,9 +25,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 def evaluation_period(frozen: dict, period: str) -> tuple[str, str]:
     allowed = {'observed': ('2022-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01'),
                'verified_2022_2024': ('2022-01-01', '2025-01-01')}
-    if frozen.get('protocol') in {'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
+    if frozen.get('protocol') in {'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
         allowed = {'observed': ('2023-01-01', '2026-01-01'), 'seen_2026': ('2026-01-01', '2026-10-01')}
-    if frozen.get('protocol') not in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'} or period not in allowed:
+    if frozen.get('protocol') not in {'pullback_v7', 'net_edge_v8', 'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'} or period not in allowed:
         raise ValueError('v7~v36 고정 후보와 이미 관찰한 평가 기간이 필요합니다.')
     key = 'seen_2026_period' if period == 'seen_2026' else 'observed_evaluation_period'
     expected = allowed['observed'] if period == 'verified_2022_2024' else allowed[period]
@@ -42,8 +42,8 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
     frozen, policy = load_selection(selection)
     is_edge = frozen['protocol'] in {'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}
     is_net = frozen['protocol'] == 'net_edge_v8'
-    is_action = frozen['protocol'] in {'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}
-    is_lifecycle = frozen['protocol'] in {'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}
+    is_action = frozen['protocol'] in {'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}
+    is_lifecycle = frozen['protocol'] in {'lifecycle_v9', 'minute_action_v10', 'minute_action_v11', 'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}
     start, end = evaluation_period(frozen, period)
     if not symbols or len(symbols) != len(set(symbols)) or not set(symbols) <= {'BTCUSDT', 'ETHUSDT', 'SOLUSDT'}:
         raise ValueError('평가 심볼의 종류·중복 오류')
@@ -67,41 +67,41 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         from .action_research import load_action_selection
         _, original_manager = load_action_selection(selection, json.loads((selection / 'rate_selection.json').read_text()))
         variants['unfiltered_v14'] = (original_manager, config)
-    if frozen['protocol'] in {'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .action_research import load_action_selection
         from .inventory_research import fixed_size_control
         _, original_manager = load_action_selection(selection, json.loads((selection / 'rate_selection.json').read_text()))
         variants['unfiltered_v14'] = (original_manager, config)
-        if frozen['protocol'] not in {'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+        if frozen['protocol'] not in {'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
             variants['inventory_fixed_size'] = (fixed_size_control(policy), config)
-    if frozen['protocol'] in {'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         _, previous_inventory = load_selection(selection / 'previous_inventory')
         variants['previous_v20'] = (previous_inventory, config)
     if frozen['protocol'] == 'addition_effect_v22':
         from .minute_inventory_research import load_minute_inventory_selection
         _, original_minute = load_minute_inventory_selection(selection, json.loads((selection / 'minute_selection.json').read_text()))
         variants['unfiltered_v21'] = (original_minute, config)
-    if frozen['protocol'] in {'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .minute_inventory_research import load_minute_inventory_selection
         _, original_minute = load_minute_inventory_selection(selection, json.loads((selection / 'minute_selection.json').read_text()))
         variants['previous_v21'] = (original_minute, config)
         variants['ungated_v7'] = (PullbackPolicy(original_minute.base, policy.offset_bps, policy.ttl_minutes), EngineConfig(**previous['risk']))
-    if frozen['protocol'] in {'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .new_position import load_new_position_selection
         _, original_position = load_new_position_selection(selection, json.loads((selection / 'position_selection.json').read_text()))
         variants['previous_v25'] = (original_position, config)
         variants.pop('previous_v20')
-    if frozen['protocol'] in {'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .position_prior import load_position_prior_selection
         _, original_prior = load_position_prior_selection(selection, json.loads((selection / 'prior_selection.json').read_text()))
         variants['previous_v26'] = (original_prior, config)
         variants.pop('previous_v21')
-    if frozen['protocol'] in {'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .position_direction import load_position_direction_selection
         _, original_direction = load_position_direction_selection(selection, json.loads((selection / 'direction_selection.json').read_text()))
         variants['previous_v27'] = (original_direction, config)
         variants.pop('previous_v25')
-    if frozen['protocol'] in {'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .probe_entry import load_probe_parent, probe_risks
         parent, original_probe = load_probe_parent(selection, frozen)
         _, original_risk, matched_risk = probe_risks(parent)
@@ -110,28 +110,33 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         variants['unfiltered_v14'] = (variants['unfiltered_v14'][0], original_risk)
         variants.pop('previous_v26')
         variants.pop('previous_v27')
-    if frozen['protocol'] in {'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .current_state import load_current_parent
         _, original_current = load_current_parent(selection, frozen)
         variants['previous_v29'] = (original_current, config)
         variants.pop('matched_initial_risk')
-    if frozen['protocol'] in {'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .history_state import load_history_parent
         _, previous_history = load_history_parent(selection, frozen)
         variants['previous_v31'] = (previous_history, config)
         variants.pop('previous_v28')
-    if frozen['protocol'] in {'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .first_state import load_first_parent
         _, original_first = load_first_parent(selection, frozen)
         variants['previous_v36'] = (original_first, config)
         variants.pop('previous_v29')
-    if frozen['protocol'] == 'holding_support_v40':
+    if frozen['protocol'] in {'holding_support_v40', 'activity_ablation_v46'}:
         from .holding_support import load_holding_parent
         first_parent, original_holding = load_holding_parent(selection, frozen)
         parent_risk = EngineConfig(**first_parent['risk'])
         variants['previous_v39'] = (original_holding, parent_risk)
         variants['previous_v36'] = (variants['previous_v36'][0], parent_risk)
         variants.pop('previous_v31')
+    if frozen['protocol'] == 'activity_ablation_v46':
+        from .activity_ablation import load_activity_parent
+        activity_parent, original_activity = load_activity_parent(selection, frozen)
+        variants['previous_v40'] = (original_activity, EngineConfig(**activity_parent['risk']))
+        variants.pop('previous_v36')
     if frozen['protocol'] == 'new_position_v25':
         from .recent_entry import load_recent_entry_selection
         _, original_recent = load_recent_entry_selection(selection, json.loads((selection / 'recent_selection.json').read_text()))
@@ -159,10 +164,10 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
             protocol, label = 'docs/EXPERIMENT_V14.md', 'action-rate'
         if frozen['protocol'] == 'minute_rate_reverse_v18':
             protocol, label = 'docs/EXPERIMENT_V18.md', 'action-rate-reversal'
-        if frozen['protocol'] in {'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+        if frozen['protocol'] in {'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
             protocol, label = (('docs/EXPERIMENT_V20.md', 'inventory-recent')
                                if frozen['protocol'] == 'minute_inventory_recent_v20' else ('docs/EXPERIMENT_V19.md', 'inventory'))
-        if frozen['protocol'] in {'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+        if frozen['protocol'] in {'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
             protocol, label = 'docs/EXPERIMENT_V21.md', 'minute-inventory'
         if frozen['protocol'] == 'addition_effect_v22':
             protocol, label = 'docs/EXPERIMENT_V22.md', 'addition-effect'
@@ -174,28 +179,30 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
             protocol, label = 'docs/EXPERIMENT_V25.md', 'new-position'
         if frozen['protocol'] == 'position_prior_v26':
             protocol, label = 'docs/EXPERIMENT_V26.md', 'position-prior'
-        if frozen['protocol'] in {'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+        if frozen['protocol'] in {'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
             protocol, label = 'docs/EXPERIMENT_V27.md', 'position-direction'
-        if frozen['protocol'] in {'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+        if frozen['protocol'] in {'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
             protocol, label = 'docs/EXPERIMENT_V28.md', 'boosted-direction'
-        if frozen['protocol'] in {'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+        if frozen['protocol'] in {'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
             protocol, label = 'docs/EXPERIMENT_V29.md', 'probe-entry'
-        if frozen['protocol'] in {'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+        if frozen['protocol'] in {'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
             protocol, label = 'docs/EXPERIMENT_V31.md', 'current-state'
-        if frozen['protocol'] in {'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+        if frozen['protocol'] in {'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
             protocol, label = 'docs/EXPERIMENT_V36.md', 'history-state'
-        if frozen['protocol'] in {'first_state_v39', 'holding_support_v40'}:
+        if frozen['protocol'] in {'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
             protocol, label = 'docs/EXPERIMENT_V39.md', 'first-state'
-        if frozen['protocol'] == 'holding_support_v40':
+        if frozen['protocol'] in {'holding_support_v40', 'activity_ablation_v46'}:
             protocol, label = 'docs/EXPERIMENT_V40.md', 'holding-support'
+        if frozen['protocol'] == 'activity_ablation_v46':
+            protocol, label = 'docs/EXPERIMENT_V46.md', 'activity-ablation'
         if is_edge:
             protocol, label = (('docs/EXPERIMENT_V16.md', 'lifecycle-weighted') if frozen['protocol'] == 'lifecycle_edge_v16'
                                else ('docs/EXPERIMENT_V15.md', 'lifecycle-edge'))
             if frozen['protocol'] == 'lifecycle_edge_v17':
                 protocol, label = 'docs/EXPERIMENT_V17.md', 'direction-edge'
     if diagnostic_only:
-        if frozen['protocol'] not in {'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'} or symbols != ['BTCUSDT']:
-            raise ValueError('축소 진단은 v12~v40의 BTC 고정 비교만 지원합니다.')
+        if frozen['protocol'] not in {'minute_path_v12', 'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'} or symbols != ['BTCUSDT']:
+            raise ValueError('축소 진단은 지원하는 BTC 고정 비교만 허용합니다.')
         confirmation = json.loads((selection / 'confirmation-2022' / 'metrics.json').read_text())
         if confirmation['total_return'] > 0 and confirmation['closed_trades'] >= 30 and not confirmation['permanent_halt']:
             raise ValueError('확인 선행 조건을 통과한 후보는 전체 평가가 필요합니다.')
@@ -213,20 +220,20 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
         names.extend(['pullback_selection.json', 'net_model.json'])
     if is_lifecycle:
         names.extend(['pullback_selection.json', 'action_model.json' if is_action else 'management_model.json'])
-    if frozen['protocol'] in {'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
+    if frozen['protocol'] in {'minute_reverse_v13', 'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
         names.append('path_selection.json')
-    if frozen['protocol'] in {'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
+    if frozen['protocol'] in {'minute_rate_v14', 'minute_rate_reverse_v18', 'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46', 'lifecycle_edge_v15', 'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
         names.append('rate_calibration.json')
     if frozen['protocol'] == 'minute_rate_reverse_v18':
         names.append('rate_selection.json')
-    if frozen['protocol'] in {'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'minute_inventory_v19', 'minute_inventory_recent_v20', 'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .inventory_research import INVENTORY_FILES
         names.extend(['rate_selection.json', *INVENTORY_FILES])
     if is_edge:
         names.extend(['rate_selection.json', 'net_model.json'])
     if frozen['protocol'] in {'lifecycle_edge_v16', 'lifecycle_edge_v17'}:
         names.extend(['training_weights.parquet', 'weighting.json'])
-    if frozen['protocol'] in {'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .minute_inventory_research import copy_previous_inventory
         copy_previous_inventory(selection / 'previous_inventory', destination / 'previous_inventory')
     if frozen['protocol'] == 'addition_effect_v22':
@@ -238,31 +245,33 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
     if frozen['protocol'] == 'realized_exit_v24':
         from .realized_exit_research import EXIT_MODEL_FILES
         names.extend(['minute_selection.json', *EXIT_MODEL_FILES])
-    if frozen['protocol'] in {'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .new_position import POSITION_FILES
         from .recent_entry import ENTRY_FILES
         names.extend(['minute_selection.json', 'recent_selection.json', *ENTRY_FILES, *POSITION_FILES])
-    if frozen['protocol'] in {'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .position_prior import PRIOR_FILES
         names.extend(['position_selection.json', *PRIOR_FILES])
-    if frozen['protocol'] in {'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .position_direction import DIRECTION_FILES
         names.extend(['prior_selection.json', *DIRECTION_FILES])
-    if frozen['protocol'] in {'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .boosted_direction import BOOST_FILES
         names.extend(['direction_selection.json', *BOOST_FILES])
-    if frozen['protocol'] in {'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         names.append('boost_selection.json')
-    if frozen['protocol'] in {'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         names.append('probe_selection.json')
-    if frozen['protocol'] in {'history_state_v36', 'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .history_state import HISTORY_POLICY_FILES
         names.extend(['current_selection.json', *HISTORY_POLICY_FILES])
-    if frozen['protocol'] in {'first_state_v39', 'holding_support_v40'}:
+    if frozen['protocol'] in {'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'}:
         from .first_state import FIRST_POLICY_FILES
         names.extend(['history_selection.json', *FIRST_POLICY_FILES])
-    if frozen['protocol'] == 'holding_support_v40':
+    if frozen['protocol'] in {'holding_support_v40', 'activity_ablation_v46'}:
         names.extend(['first_selection.json', 'holding_support.json'])
+    if frozen['protocol'] == 'activity_ablation_v46':
+        names.append('holding_selection.json')
     for name in names:
         (destination / name).write_bytes((selection / name).read_bytes())
     print(f'진입 대기 {period} 평가: {destination}', flush=True)
@@ -271,7 +280,7 @@ def run_pullback_evaluation(selection: Path, market: Path, feature_market: Path,
     try:
         for axis, symbol in zip(axes[:, 0], symbols, strict=True):
             bars, checks = prepare_minute_period(market, feature_market, symbol, start, end,
-                **({'minute_inputs': True} if frozen['protocol'] in {'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40'} else {}))
+                **({'minute_inputs': True} if frozen['protocol'] in {'minute_inventory_micro_v21', 'addition_effect_v22', 'recent_entry_v23', 'realized_exit_v24', 'new_position_v25', 'position_prior_v26', 'position_direction_v27', 'boosted_direction_v28', 'probe_entry_v29', 'current_state_v31', 'history_state_v36', 'first_state_v39', 'holding_support_v40', 'activity_ablation_v46'} else {}))
             save_json(destination / f'{symbol}-input.json', checks)
             for name, (strategy, risk) in variants.items():
                 target = destination / symbol / name

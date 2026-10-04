@@ -379,6 +379,13 @@ def main() -> None:
         first_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     first_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     first_diagnosis.set_defaults(func=lambda a: print(run_first_management_diagnosis(a.selection_run, a.diagnosis_run, a.output)))
+    from .activity_ablation_research import run_activity_ablation_selection
+    activity_ablation = commands.add_parser('activity-ablation-select', help='신규 활동 관문 제거의 고정 비교')
+    for name in ['selection-run', 'market', 'features', 'confirmation-market', 'confirmation-features']:
+        activity_ablation.add_argument(f'--{name}', type=Path, required=True)
+    activity_ablation.add_argument('--output', type=Path, default=Path('artifacts'))
+    activity_ablation.set_defaults(func=lambda a: print(run_activity_ablation_selection(a.selection_run,
+        a.market, a.features, a.confirmation_market, a.confirmation_features, a.output)))
     from .context_position import run_context_diagnostics
     context_diagnosis = commands.add_parser('context-position-diagnose', help='보유 방향의 다일 시장 맥락 진단')
     context_diagnosis.add_argument('--diagnosis-run', type=Path, required=True)
