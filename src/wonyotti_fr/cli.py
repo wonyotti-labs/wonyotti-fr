@@ -395,6 +395,13 @@ def main() -> None:
     exit_horizon.add_argument('--diagnosis-run', type=Path, required=True)
     exit_horizon.add_argument('--output', type=Path, default=Path('artifacts'))
     exit_horizon.set_defaults(func=lambda a: print(run_exit_horizon_diagnosis(a.diagnosis_run, a.output)))
+    from .policy_entry_research import run_policy_entry_selection
+    policy_entry = commands.add_parser('policy-entry-select', help='현재 관리 손익 기반 신규 진입 필터 대조')
+    for name in ['selection-run', 'labels', 'market', 'features', 'confirmation-market', 'confirmation-features']:
+        policy_entry.add_argument(f'--{name}', type=Path, required=True)
+    policy_entry.add_argument('--output', type=Path, default=Path('artifacts'))
+    policy_entry.set_defaults(func=lambda a: print(run_policy_entry_selection(a.selection_run, a.labels, a.market, a.features,
+        a.confirmation_market, a.confirmation_features, a.output)))
     from .policy_outcomes import run_policy_outcomes
     outcomes = commands.add_parser('policy-outcome-labels', help='현재 정책의 독립 진입 효용 정답 생성·재개')
     for name in ['selection-run', 'market', 'features']:

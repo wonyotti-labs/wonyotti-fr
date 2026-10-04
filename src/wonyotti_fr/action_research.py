@@ -28,6 +28,9 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'policy_entry_v56':
+        from .policy_entry import load_policy_entry_selection
+        return load_policy_entry_selection(selection, frozen)
     if frozen.get('protocol') == 'exit_move_v54':
         from .exit_move_state import load_exit_move_selection
         return load_exit_move_selection(selection, frozen)
