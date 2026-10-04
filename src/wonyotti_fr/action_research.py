@@ -28,6 +28,9 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'exit_move_v54':
+        from .exit_move_state import load_exit_move_selection
+        return load_exit_move_selection(selection, frozen)
     if frozen.get('protocol') == 'net_exit_v53':
         from .net_exit_state import load_net_exit_selection
         return load_net_exit_selection(selection, frozen)
