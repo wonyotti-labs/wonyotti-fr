@@ -390,6 +390,13 @@ def main() -> None:
         first_diagnosis.add_argument(f'--{name}', type=Path, required=True)
     first_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     first_diagnosis.set_defaults(func=lambda a: print(run_first_management_diagnosis(a.selection_run, a.diagnosis_run, a.output)))
+    from .recent_history_research import run_recent_history_selection
+    recent_history = commands.add_parser('recent-history-select', help='관리 학습·보정 창의 최신 원본 전진 대조')
+    for name in ['selection-run', 'diagnosis-run', 'market', 'features', 'confirmation-market', 'confirmation-features']:
+        recent_history.add_argument(f'--{name}', type=Path, required=True)
+    recent_history.add_argument('--output', type=Path, default=Path('artifacts'))
+    recent_history.set_defaults(func=lambda a: print(run_recent_history_selection(a.selection_run, a.diagnosis_run,
+        a.market, a.features, a.confirmation_market, a.confirmation_features, a.output)))
     from .exit_state_research import run_exit_state_selection
     exit_state = commands.add_parser('exit-state-select', help='청산 문턱 직접 적용의 고정 매매 대조')
     for name in ['selection-run', 'diagnosis-run', 'market', 'features', 'confirmation-market', 'confirmation-features']:

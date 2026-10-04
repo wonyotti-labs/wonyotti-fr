@@ -28,6 +28,9 @@ def candidate_plan():
 
 
 def load_action_selection(selection: Path, frozen: dict):
+    if frozen.get('protocol') == 'recent_history_v50':
+        from .recent_history import load_recent_history_selection
+        return load_recent_history_selection(selection, frozen)
     if frozen.get('protocol') == 'exit_state_v48':
         from .exit_state import load_exit_state_selection
         return load_exit_state_selection(selection, frozen)
