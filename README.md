@@ -384,3 +384,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v36](docs/EXPERIMENT_V36.md)은 `history-state-select --selection-run <v31 선택> --diagnosis-run <v35 진단>`과 개발·확인 시장 경로로 실행한다. 사전 진단을 통과한 관리 모형과 절편을 그대로 복사하고, 상반기 F점수로 문턱을 고정한다. 봇 자신의 체결만 과거 이력에 반영하며 기존 진입·축소 크기·위험을 유지한다. 원래 v31 대조·실제 종료 복원·다년 후속 검증을 포함하고 실거래 연결은 제외한다.
 
 [v37](docs/EXPERIMENT_V37.md)은 `first-management-diagnose --selection-run <v36 선택> --diagnosis-run <v35 진단>`으로 실행한다. 원래 청산·반복 행동 문턱을 유지하고 첫 추가·축소만 상반기 정답으로 분리한다. 하반기 첫 행동 재현율·F점수와 전체 F점수의 사전 조건을 두 행동 모두 통과해야 후속 매매 연구를 허용한다. 원본 상태 고정 진단이며 봇 수익률을 실행하지 않는다.
+
+[v38](docs/EXPERIMENT_V38.md)은 `first-management-direct-diagnose --diagnosis-run <v37 진단>`으로 실행한다. 같은 상반기 첫 문턱·모델을 재현하고 첫 추가·축소에만 가산을 제거한다. 청산·반복 요청과 기존 진단 기준은 보존하며, 통과하더라도 별도 매매 계획 전에는 봇에 적용하지 않는다.

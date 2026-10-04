@@ -50,8 +50,9 @@ def first_management_admission(metrics, unchanged):
         'trading_returns_evaluated': False, 'all_source_periods_already_observed': True}
 
 
-def first_management_diagnosis(calibration, validation, manager, thresholds, multiplier):
-    if multiplier != 1.5 or set(thresholds) != set(ACTIONS):
+def first_management_diagnosis(calibration, validation, manager, thresholds, multiplier, *, first_multiplier=1.5):
+    if (multiplier != 1.5 or set(thresholds) != set(ACTIONS)
+        or type(first_multiplier) not in (int, float) or first_multiplier not in (1., 1.5)):
         raise ValueError('첫 관리 주문 진단의 기존 문턱·배율 오류')
     for part, name in [(calibration, 'calibration'), (validation, 'diagnosis')]:
         first, last = (pd.Timestamp(v, tz='UTC') for v in PERIODS[name])
@@ -92,7 +93,7 @@ def first_management_diagnosis(calibration, validation, manager, thresholds, mul
         groups = {'all': np.ones(len(validation), dtype=bool)}
         if action in FIRST_ACTIONS:
             first = validation[f'past_{action}_exists'].eq(0).to_numpy()
-            separate[first] = scores[first, i] >= first_thresholds[action] * multiplier
+            separate[first] = scores[first, i] >= first_thresholds[action] * first_multiplier
             groups.update(first=first, repeat=~first)
             unchanged[f'repeat_{action}'] = bool(np.array_equal(separate[~first], original[~first]))
         else:
@@ -105,7 +106,7 @@ def first_management_diagnosis(calibration, validation, manager, thresholds, mul
     return first_thresholds, support, predictions, metrics, first_management_admission(metrics, unchanged)
 
 
-def run_first_management_diagnosis(selection: Path, diagnosis: Path, output: Path) -> Path:
+def run_first_management_diagnosis(selection: Path, diagnosis: Path, output: Path, *, _first_context=None) -> Path:
     frozen, policy = load_selection(selection)
     if frozen['protocol'] != 'history_state_v36':
         raise ValueError('첫 관리 주문 진단에는 고정 v36 후보가 필요합니다.')
@@ -116,20 +117,28 @@ def run_first_management_diagnosis(selection: Path, diagnosis: Path, output: Pat
     evidence = json.loads((selection / 'history_admission.json').read_text())
     if sha256(diagnosis / 'files.json') != evidence['files_sha256']:
         raise ValueError('첫 관리 주문 진단의 원본 입력 지문 불일치')
-    out = new_run(output, 'first-management-diagnosis', {'selection': str(selection), 'diagnosis': str(diagnosis),
+    context = _first_context
+    first_multiplier = 1. if context else 1.5
+    protocol = 'docs/EXPERIMENT_V38.md' if context else 'docs/EXPERIMENT_V37.md'
+    out = new_run(output, 'first-management-direct-diagnosis' if context else 'first-management-diagnosis', {'selection': str(selection), 'diagnosis': str(diagnosis),
         'selection_sha256': sha256(selection / 'frozen_selection.json'),
         'diagnosis_files_sha256': sha256(diagnosis / 'files.json'),
-        'protocol_sha256': sha256(Path('docs/EXPERIMENT_V37.md')), 'new_models_fitted': False,
+        'protocol_sha256': sha256(Path(protocol)), 'new_models_fitted': False,
+        **(context['metadata'] if context else {}),
         'calibration_period': PERIODS['calibration'], 'diagnosis_period': PERIODS['diagnosis']})
     print(f'첫 관리 주문과 반복 주문 문턱 진단: {out}', flush=True)
     try:
         calibration, validation = (pd.read_parquet(diagnosis / f'{n}_used.parquet') for n in ['calibration', 'diagnosis'])
         first, support, predictions, metrics, decision = first_management_diagnosis(
-            calibration, validation, policy.manager, policy.thresholds, policy.multiplier)
+            calibration, validation, policy.manager, policy.thresholds, policy.multiplier,
+            first_multiplier=first_multiplier)
+        if context and (first != context['thresholds']['thresholds'] or support != context['thresholds']['support']):
+            raise ValueError('첫 문턱 직접 적용의 상반기 선택 재현 불일치')
         for name in ['history_manager.json', 'history_offset.json', 'history_thresholds.json']:
             (out / name).write_bytes((selection / name).read_bytes())
         save_json(out / 'first_thresholds.json', {'thresholds': first, 'support': support,
             'betas': {a: BETAS[a] for a in FIRST_ACTIONS}, 'multiplier': policy.multiplier,
+            **({'first_multiplier': 1.} if context else {}),
             'calibration_period': PERIODS['calibration'], 'minimum_predicted_positive': 20})
         predictions.to_parquet(out / 'predictions.parquet', index=False)
         save_json(out / 'metrics.json', metrics)
@@ -140,7 +149,8 @@ def run_first_management_diagnosis(selection: Path, diagnosis: Path, output: Pat
                 for a, phases in metrics.items() for phase, comparison in phases.items() for kind, m in comparison.items()]
         (out / 'REPORT.md').write_text('# 첫 관리 주문 문턱의 분리 진단\n\n' + table(pd.DataFrame(rows))
             + '\n\n같은 관리 모형·절편·배율을 유지하고 첫 추가·축소 문턱만 상반기 정답으로 분리했다. '
-            '청산과 반복 주문 요청은 그대로다. 원본 상태 고정 진단이며 실제 매매 수익성이나 체결 재현이 아니다.\n')
+            '청산과 반복 주문 요청은 그대로다. 원본 상태 고정 진단이며 실제 매매 수익성이나 체결 재현이 아니다.\n'
+            + ('첫 행동에만 기존 선택 문턱을 가산 없이 직접 적용했다.\n' if context else ''))
         save_json(out / 'files.json', {p.name: sha256(p) for p in out.iterdir() if p.is_file()})
         print(f'후속 매매 연구 허용: {decision["first_thresholds_admitted"]}', flush=True)
     except Exception as error:
