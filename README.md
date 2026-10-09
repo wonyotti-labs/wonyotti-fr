@@ -448,3 +448,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v83](docs/EXPERIMENT_V83.md)은 `weekly-first-linear-diagnose --diagnosis-run <v82 실패 진단> --verification <독립 검산 기록 JSON> --verification-sha256 <신뢰한 검산 기록 SHA-256>`으로 실행한다. 매주 이틀 전에 확정된 첫 기회만 같은 선형 모델에 누적 반영한다. 아홉 주간 모델과 주간 상수를 열한 정책·아홉 조건으로 비교하며 이후 주의 학습에 포함되는 과거 보정 결과를 명시한다.
 
 [v84](docs/EXPERIMENT_V84.md)은 `first-opportunity-expand-labels --selection-run <v54 고정 선택> --diagnosis-run <v82 실패 진단> --verification <v82 독립 검산 JSON> --verification-sha256 <신뢰한 SHA-256> --market <1분 개발 시세> --features <5분 완전 시세>`로 실행한다. 2021년 전체 경로와 기존 첫 기회·74개 입력·현금이 일치한 뒤 2020년 4월부터 같은 정책의 첫 기회 정답을 추가한다. `--max-opportunities`와 `--resume-run`으로 부분 실행을 보존하고 재개한다. 새 모델 학습은 별도 계획이며, 2021년에 학습한 부모의 과거 재생을 2020년 당시 가능한 수익으로 주장하지 않는다.
+
+[v85](docs/EXPERIMENT_V85.md)은 `expanded-first-linear-diagnose --diagnosis-run <v83 실패 진단> --verification <v83 독립 검산 JSON> --verification-sha256 <신뢰한 SHA-256> --expansion-run <v84 확장 자료> --expansion-verification <v84 독립 검산 JSON> --expansion-verification-sha256 <신뢰한 SHA-256>`으로 실행한다. 같은 첫 판단 선형 설정에 과거의 확정 정답을 추가하며 기존 열한 정책·새 모델·새 상수와 열 가지 내부 조건을 비교한다. 과거 전체 원장·미확정·기회 없음을 보존하고 보정 후 재학습·문턱 탐색·마지막 진단은 수행하지 않는다.

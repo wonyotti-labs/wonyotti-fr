@@ -496,6 +496,16 @@ def main() -> None:
     first_expansion.add_argument('--resume-run', type=Path)
     first_expansion.add_argument('--max-opportunities', type=int)
     first_expansion.set_defaults(func=lambda a: print(run_first_opportunity_expansion(a.selection_run, a.diagnosis_run, a.verification, a.verification_sha256, a.market, a.features, a.output, resume=a.resume_run, max_opportunities=a.max_opportunities)))
+    from .expanded_first_diagnostics import run_expanded_first_diagnosis
+    expanded_first = commands.add_parser('expanded-first-linear-diagnose', help='과거 첫 기회를 추가한 고정 선형 판단 비교')
+    expanded_first.add_argument('--diagnosis-run', type=Path, required=True)
+    expanded_first.add_argument('--verification', type=Path, required=True)
+    expanded_first.add_argument('--verification-sha256', required=True)
+    expanded_first.add_argument('--expansion-run', type=Path, required=True)
+    expanded_first.add_argument('--expansion-verification', type=Path, required=True)
+    expanded_first.add_argument('--expansion-verification-sha256', required=True)
+    expanded_first.add_argument('--output', type=Path, default=Path('artifacts'))
+    expanded_first.set_defaults(func=lambda a: print(run_expanded_first_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.expansion_run, a.expansion_verification, a.expansion_verification_sha256, a.output)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)
