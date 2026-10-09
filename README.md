@@ -442,3 +442,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v80](docs/EXPERIMENT_V80.md)은 `stopping-regression-diagnose --diagnosis-run <v79 내부 보정 실패 진단>`으로 실행한다. 동일한 미래 첫 청산 현금 정답과 전체 행 비중으로 회귀기 하나를 학습하며 0 정답도 포함한다. 예측은 계좌 bp이고 문턱은 0bp다. 다섯 내부 보정 조건을 모두 통과한 경우에만 열다섯 정책·일곱 주간 비교·열세 조건을 평가하며 기존 실패를 유지한다.
 
 [v81](docs/EXPERIMENT_V81.md)은 `first-opportunity-diagnose --diagnosis-run <v80 실패 진단> --verification <독립 검산 기록 JSON> --verification-sha256 <신뢰한 검산 기록 SHA-256>`으로 실행한다. 포지션의 첫 적격 기회만 동일 비중으로 학습하고 한 번만 판단한다. 기존 검산 근거를 지문으로 재사용하며 여덟 보정 정책·여섯 조건을 기록한다. 마지막 진단과 연속 매매 적용은 이번 단계에 포함하지 않는다.
+
+[v82](docs/EXPERIMENT_V82.md)은 `first-linear-diagnose --diagnosis-run <v81 실패 진단> --verification <독립 검산 기록 JSON> --verification-sha256 <신뢰한 검산 기록 SHA-256>`으로 실행한다. 같은 첫 기회·현금·비용으로 표준화한 L2 로지스틱 모델 하나를 비교한다. 기존 여덟 정책을 보존하고 아홉 정책·일곱 내부 조건을 기록하며 마지막 진단과 매매 적용은 수행하지 않는다.
