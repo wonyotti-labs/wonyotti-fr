@@ -418,6 +418,12 @@ def main() -> None:
     weekly_flow.add_argument('--diagnosis-run', type=Path, required=True)
     weekly_flow.add_argument('--output', type=Path, default=Path('artifacts'))
     weekly_flow.set_defaults(func=lambda a: print(run_weekly_flow_diagnosis(a.diagnosis_run, a.output)))
+
+    from .stopping_close_diagnostics import run_stopping_close_diagnosis
+    stopping_close = commands.add_parser('stopping-close-diagnose', help='이후 청산 정책을 반영한 정답 진단')
+    stopping_close.add_argument('--diagnosis-run', type=Path, required=True)
+    stopping_close.add_argument('--output', type=Path, default=Path('artifacts'))
+    stopping_close.set_defaults(func=lambda a: print(run_stopping_close_diagnosis(a.diagnosis_run, a.output)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)

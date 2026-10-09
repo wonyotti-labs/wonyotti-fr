@@ -67,18 +67,18 @@ def fit_weekly_flow(ledger, diagnosis, original_training, original_weights, orig
     return score, constant
 
 
-def weekly_flow_admission(metrics, probability, first, intervals, utility_intervals, context_intervals, flow_intervals):
+def weekly_flow_admission(metrics, probability, first, intervals, utility_intervals, context_intervals, flow_intervals, *, candidate_name='weekly_flow'):
     base = flow_close_admission(metrics, probability, first, intervals, utility_intervals, context_intervals,
-        candidate_name='weekly_flow')
+        candidate_name=candidate_name)
     checks = dict(base['checks'])
-    candidate, previous, constant = probability['weekly_flow'], probability['flow'], probability['weekly_constant']
+    candidate, previous, constant = probability[candidate_name], probability['flow'], probability['weekly_constant']
     low = flow_intervals['intervals']['paired_difference']['lower']
     checks.update(cost_log_loss_vs_flow=candidate['cost_log_loss'] is not None and previous['cost_log_loss'] is not None and candidate['cost_log_loss'] < previous['cost_log_loss']*.99,
         cost_brier_vs_flow=candidate['cost_brier'] is not None and previous['cost_brier'] is not None and candidate['cost_brier'] <= previous['cost_brier']+1e-12,
-        weighted_regret_vs_flow=metrics['weekly_flow']['weighted_regret_bps'] < metrics['flow']['weighted_regret_bps'],
-        first_mean_vs_flow=first['weekly_flow']['all_position_mean_common_bps'] > first['flow']['all_position_mean_common_bps'],
+        weighted_regret_vs_flow=metrics[candidate_name]['weighted_regret_bps'] < metrics['flow']['weighted_regret_bps'],
+        first_mean_vs_flow=first[candidate_name]['all_position_mean_common_bps'] > first['flow']['all_position_mean_common_bps'],
         positive_flow_paired_interval_lower=bool(low is not None and np.isfinite(low) and low > 0),
         cost_log_loss_vs_weekly_constant=candidate['cost_log_loss'] is not None and constant['cost_log_loss'] is not None and candidate['cost_log_loss'] < constant['cost_log_loss']*.99,
         cost_brier_vs_weekly_constant=candidate['cost_brier'] is not None and constant['cost_brier'] is not None and candidate['cost_brier'] <= constant['cost_brier']+1e-12,
-        weighted_regret_vs_weekly_constant=metrics['weekly_flow']['weighted_regret_bps'] < metrics['weekly_constant']['weighted_regret_bps'])
+        weighted_regret_vs_weekly_constant=metrics[candidate_name]['weighted_regret_bps'] < metrics['weekly_constant']['weighted_regret_bps'])
     return {'checks': checks, 'weekly_flow_admitted': all(checks.values()), 'trading_returns_evaluated': False}

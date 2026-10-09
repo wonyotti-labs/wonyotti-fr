@@ -81,7 +81,8 @@ def reproduce_utility(reference, output):
 
 def evaluate_close_scores(reference, diagnosis, scores, output, *, candidate_name, comparisons, admission):
     expected = {'context': ('continuation', 'utility'), 'flow': ('continuation', 'utility', 'context'),
-        'weekly_flow': ('continuation', 'utility', 'context', 'flow')}
+        'weekly_flow': ('continuation', 'utility', 'context', 'flow'),
+        'stopping_flow': ('continuation', 'utility', 'context', 'flow', 'weekly_flow')}
     score_names = {candidate_name, 'weekly_constant'} if candidate_name == 'weekly_flow' else {candidate_name}
     if comparisons != expected.get(candidate_name) or set(scores) != score_names:
         raise ValueError('청산 비용 확장의 후보·비교 이름 오류')
