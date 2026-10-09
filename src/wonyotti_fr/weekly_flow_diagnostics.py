@@ -26,7 +26,7 @@ FLOW_COMMON_FILES = (CONTEXT_COMMON_FILES-{'context_source.json'}) | {'flow_sour
     'context_blocks.parquet', 'context_block_draws.parquet', 'context_block_replicates.parquet', 'context_block_intervals.json'}
 
 
-def reproduce_flow(reference, output):
+def validate_flow_reference(reference):
     files = json.loads((reference/'files.json').read_text())
     settings = json.loads((reference/'manifest.json').read_text())['settings']
     parent = Path(settings['reference'])
@@ -54,6 +54,11 @@ def reproduce_flow(reference, output):
         or summary['original_cost_ledger_and_prior_preserved'] is not True
         or summary['zero_effect_rows_preserved'] is not True or summary['profitability_accepted'] is not False):
         raise ValueError('주간 비용 학습의 원래 체결 설정·완료 오류')
+    return parent, expected, optional
+
+
+def reproduce_flow(reference, output):
+    parent, expected, optional = validate_flow_reference(reference)
     reproduced = run_close_flow_diagnosis(parent, output)
     same_outputs(reference, reproduced, expected-{'manifest.json', 'reference_parity.json'})
     for folder in [reference, reproduced]:

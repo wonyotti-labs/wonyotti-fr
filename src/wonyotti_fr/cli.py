@@ -432,6 +432,12 @@ def main() -> None:
     minute_close.add_argument('--max-opportunities', type=int)
     minute_close.set_defaults(func=lambda a: print(run_minute_close_effect_labels(a.labels_run, a.output,
         resume=a.resume, max_opportunities=a.max_opportunities)))
+    from .minute_close_diagnostics import run_minute_close_diagnosis
+    minute_diagnosis = commands.add_parser('minute-close-diagnose', help='분별 청산의 판단 빈도와 학습 효과 비교')
+    minute_diagnosis.add_argument('--labels-run', type=Path, required=True)
+    minute_diagnosis.add_argument('--diagnosis-run', type=Path, required=True)
+    minute_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
+    minute_diagnosis.set_defaults(func=lambda a: print(run_minute_close_diagnosis(a.labels_run, a.diagnosis_run, a.output)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)

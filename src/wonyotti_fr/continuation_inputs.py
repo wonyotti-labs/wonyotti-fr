@@ -54,14 +54,20 @@ def validate_pending_matrix(values):
     return values
 
 
-def load_pending_inputs(labels, ledger):
+def load_pending_inputs(labels, ledger, *, decision_seconds=300):
+    if type(decision_seconds) is not int or decision_seconds not in (60, 300):
+        raise ValueError('현재 관리 의도의 수집 간격 오류')
     hashes = json.loads((labels/'files.json').read_text())
-    if (set(hashes) != CLOSE_FILES or (labels/'files.json').is_symlink()
+    expected_files = CLOSE_FILES | ({'legacy_parity.json'} if decision_seconds == 60 else set())
+    if (set(hashes) != expected_files or (labels/'files.json').is_symlink()
         or any((labels/n).is_symlink() or sha256(labels/n) != h for n, h in hashes.items())
         or any((labels/('outcomes.sqlite'+suffix)).exists() for suffix in ['-wal', '-shm'])):
         raise ValueError('현재 관리 의도의 원장 파일·지문 오류')
     pd.testing.assert_frame_equal(ledger.drop(columns=ECONOMIC_FEATURES), pd.read_parquet(labels/'opportunity_ledger.parquet'), check_exact=True)
     settings = json.loads((labels/'manifest.json').read_text())['settings']
+    if (settings.get('decision_seconds', 300) != decision_seconds
+        or (decision_seconds == 60 and settings['protocol_sha256'] != sha256(Path('docs/EXPERIMENT_V74.md')))):
+        raise ValueError('현재 관리 의도의 원래 간격·계획 오류')
     reference = Path(settings['reference'])
     curve_path = reference/'candidate-00/equity.parquet'
     if (sha256(reference/'frozen_selection.json') != settings['reference_sha256']
