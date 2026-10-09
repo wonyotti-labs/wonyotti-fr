@@ -453,6 +453,11 @@ def main() -> None:
     threshold_close.add_argument('--diagnosis-run', type=Path, required=True)
     threshold_close.add_argument('--output', type=Path, default=Path('artifacts'))
     threshold_close.set_defaults(func=lambda a: print(run_close_threshold_diagnosis(a.diagnosis_run, a.output)))
+    from .early_stopping_diagnostics import run_early_stopping_diagnosis
+    early_stopping = commands.add_parser('early-stopping-close-diagnose', help='분별 이후 정책의 첫 청산 대비 현재 청산 학습')
+    early_stopping.add_argument('--diagnosis-run', type=Path, required=True)
+    early_stopping.add_argument('--output', type=Path, default=Path('artifacts'))
+    early_stopping.set_defaults(func=lambda a: print(run_early_stopping_diagnosis(a.diagnosis_run, a.output)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)
