@@ -412,6 +412,12 @@ def main() -> None:
     close_flow.add_argument('--diagnosis-run', type=Path, required=True)
     close_flow.add_argument('--output', type=Path, default=Path('artifacts'))
     close_flow.set_defaults(func=lambda a: print(run_close_flow_diagnosis(a.diagnosis_run, a.output)))
+
+    from .weekly_flow_diagnostics import run_weekly_flow_diagnosis
+    weekly_flow = commands.add_parser('weekly-flow-diagnose', help='확정 결과의 주간 청산 비용 재학습 진단')
+    weekly_flow.add_argument('--diagnosis-run', type=Path, required=True)
+    weekly_flow.add_argument('--output', type=Path, default=Path('artifacts'))
+    weekly_flow.set_defaults(func=lambda a: print(run_weekly_flow_diagnosis(a.diagnosis_run, a.output)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)

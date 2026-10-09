@@ -92,14 +92,14 @@ def attach_close_flow(rows, bars):
     return output
 
 
-def flow_close_admission(metrics, probability, first, intervals, utility_intervals, context_intervals):
-    base = context_close_admission(metrics, probability, first, intervals, utility_intervals, candidate_name='flow')
+def flow_close_admission(metrics, probability, first, intervals, utility_intervals, context_intervals, *, candidate_name="flow"):
+    base = context_close_admission(metrics, probability, first, intervals, utility_intervals, candidate_name=candidate_name)
     checks = dict(base['checks'])
-    candidate, previous = probability['flow'], probability['context']
+    candidate, previous = probability[candidate_name], probability['context']
     low = context_intervals['intervals']['paired_difference']['lower']
     checks.update(cost_log_loss_vs_context=candidate['cost_log_loss'] is not None and previous['cost_log_loss'] is not None and candidate['cost_log_loss'] < previous['cost_log_loss']*.99,
         cost_brier_vs_context=candidate['cost_brier'] is not None and previous['cost_brier'] is not None and candidate['cost_brier'] <= previous['cost_brier']+1e-12,
-        weighted_regret_vs_context=metrics['flow']['weighted_regret_bps'] < metrics['context']['weighted_regret_bps'],
-        first_mean_vs_context=first['flow']['all_position_mean_common_bps'] > first['context']['all_position_mean_common_bps'],
+        weighted_regret_vs_context=metrics[candidate_name]['weighted_regret_bps'] < metrics['context']['weighted_regret_bps'],
+        first_mean_vs_context=first[candidate_name]['all_position_mean_common_bps'] > first['context']['all_position_mean_common_bps'],
         positive_context_paired_interval_lower=bool(low is not None and np.isfinite(low) and low > 0))
     return {'checks': checks, 'flow_admitted': all(checks.values()), 'trading_returns_evaluated': False}

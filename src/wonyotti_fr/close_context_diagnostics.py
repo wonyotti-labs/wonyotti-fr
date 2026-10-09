@@ -15,6 +15,7 @@ from .close_learning_inputs import CLOSE_SPLITS
 from .close_utility import (
     UtilityCloseModel,
     cost_probability_metrics,
+    cost_scores,
     first_cost_positions,
     policy_effect_metrics,
 )
@@ -77,39 +78,45 @@ def reproduce_utility(reference, output):
     return reproduced
 
 
-def evaluate_context(reference, diagnosis, model, output, *, candidate_name='context',
-                     comparisons=('continuation', 'utility'), admission=context_close_admission):
-    if comparisons != {'context': ('continuation', 'utility'), 'flow': ('continuation', 'utility', 'context')}.get(candidate_name):
+def evaluate_close_scores(reference, diagnosis, scores, output, *, candidate_name, comparisons, admission):
+    expected = {'context': ('continuation', 'utility'), 'flow': ('continuation', 'utility', 'context'),
+        'weekly_flow': ('continuation', 'utility', 'context', 'flow')}
+    score_names = {candidate_name, 'weekly_constant'} if candidate_name == 'weekly_flow' else {candidate_name}
+    if comparisons != expected.get(candidate_name) or set(scores) != score_names:
         raise ValueError('청산 비용 확장의 후보·비교 이름 오류')
-    score = candidate_name+'_score'
     frame = pd.read_parquet(reference/'predictions.parquet')
     keys = ['decision_time', 'position_entry_time', 'label_end', 'direction', 'original_intent', 'close_advantage_bps']
     pd.testing.assert_frame_equal(frame[keys], diagnosis[keys], check_exact=True)
-    if score in frame:
+    if any(name+'_score' in frame for name in scores):
         raise ValueError('청산 비용 확장의 기존 점수 덮어쓰기 거부')
-    frame[score] = model.probabilities(diagnosis[model.features].to_numpy(dtype=float))[:, 0]
+    actions = {}
+    for name, values in scores.items():
+        frame[name+'_score'] = cost_scores(values, len(frame))
+        actions[name] = frame[name+'_score'].gt(.5).to_numpy() & frame.original_intent.ne('exit').to_numpy()
     frame.to_parquet(output/'predictions.parquet', index=False)
-    action = frame[score].gt(.5).to_numpy() & frame.original_intent.ne('exit').to_numpy()
     values = {name: json.loads((reference/f'{name}.json').read_text()) for name in
         ['metrics', 'probability_metrics', 'first_metrics', 'breakdown', 'probability_breakdown', 'first_breakdown']}
-    values['metrics'][candidate_name] = policy_effect_metrics(frame, action)
-    values['probability_metrics'][candidate_name] = cost_probability_metrics(frame.close_advantage_bps, frame.sample_weight, frame[score])
     positions = {name: pd.read_parquet(reference/f'positions_{name}.parquet') for name in values['first_metrics']}
-    positions[candidate_name] = first_cost_positions(diagnosis, frame[score])
-    values['first_metrics'][candidate_name] = first_close_metrics(positions[candidate_name])
+    for name in scores:
+        values['metrics'][name] = policy_effect_metrics(frame, actions[name])
+        values['probability_metrics'][name] = cost_probability_metrics(frame.close_advantage_bps, frame.sample_weight, frame[name+'_score'])
+        positions[name] = first_cost_positions(diagnosis, frame[name+'_score'])
+        values['first_metrics'][name] = first_close_metrics(positions[name])
     for name, part in positions.items():
         part.to_parquet(output/f'positions_{name}.parquet', index=False)
     groups = [('direction', str(k), part) for k, part in frame.groupby('direction')]
     groups += [('month', k, part) for k, part in frame.groupby(frame.decision_time.dt.strftime('%Y-%m'))]
     for kind, group, part in groups:
-        values['breakdown'].append({'kind': kind, 'group': group, 'model': candidate_name, **policy_effect_metrics(part, action[part.index])})
-        values['probability_breakdown'].append({'kind': kind, 'group': group, 'model': candidate_name,
-            **cost_probability_metrics(part.close_advantage_bps, part.sample_weight, part[score])})
-    first = positions[candidate_name]
-    groups = [('direction', str(k), part) for k, part in first.groupby('direction')]
-    groups += [('entry_month', k, part) for k, part in first.groupby(first.position_entry_time.dt.strftime('%Y-%m'))]
-    for kind, group, part in groups:
-        values['first_breakdown'].append({'kind': kind, 'group': group, 'model': candidate_name, **first_close_metrics(part)})
+        for name in scores:
+            values['breakdown'].append({'kind': kind, 'group': group, 'model': name, **policy_effect_metrics(part, actions[name][part.index])})
+            values['probability_breakdown'].append({'kind': kind, 'group': group, 'model': name,
+                **cost_probability_metrics(part.close_advantage_bps, part.sample_weight, part[name+'_score'])})
+    for name in scores:
+        first = positions[name]
+        groups = [('direction', str(k), part) for k, part in first.groupby('direction')]
+        groups += [('entry_month', k, part) for k, part in first.groupby(first.position_entry_time.dt.strftime('%Y-%m'))]
+        for kind, group, part in groups:
+            values['first_breakdown'].append({'kind': kind, 'group': group, 'model': name, **first_close_metrics(part)})
     intervals = {}
     previous_draws = pd.read_parquet(reference/'block_draws.parquet')
     for other in comparisons:
@@ -125,6 +132,13 @@ def evaluate_context(reference, diagnosis, model, output, *, candidate_name='con
         save_json(output/f'{name}.json', value)
     return admission(values['metrics'], values['probability_metrics'], values['first_metrics'],
         *[intervals[name] for name in comparisons])
+
+
+def evaluate_context(reference, diagnosis, model, output, *, candidate_name='context',
+                     comparisons=('continuation', 'utility'), admission=context_close_admission):
+    score = model.probabilities(diagnosis[model.features].to_numpy(dtype=float))[:, 0]
+    return evaluate_close_scores(reference, diagnosis, {candidate_name: score}, output,
+        candidate_name=candidate_name, comparisons=comparisons, admission=admission)
 
 
 def run_close_context_diagnosis(reference: Path, output: Path) -> Path:
