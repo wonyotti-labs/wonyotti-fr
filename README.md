@@ -432,3 +432,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v75](docs/EXPERIMENT_V75.md)는 `minute-close-diagnose --labels-run <v74 원장> --diagnosis-run <v71 진단>`으로 실행한다. 확정 시세로 분별 입력을 연결하고 기존 모델을 재현한 뒤, 기존·새 학습 모델의 5분·1분 정책을 같은 포지션과 기준 순자산에서 비교한다. 후보는 새 1분 정책 하나이며 열다섯 조건과 기존 실패를 보존한다.
 
 [v76](docs/EXPERIMENT_V76.md)은 `visited-close-diagnose --diagnosis-run <v75 진단>`으로 실행한다. 자기 포지션을 제외한 다섯 보조 모델의 최초 청산까지 학습 기여를 맞추고, 기존 전체 진단 원장에서 후보 하나와 기존 정책·상수를 비교한다. 원래 정답·학습 제외 행·평가 비중·실패 기록과 스무 조건을 보존한다.
+
+[v77](docs/EXPERIMENT_V77.md)은 `retained-weight-close-diagnose --diagnosis-run <v76 진단>`으로 실행한다. 같은 보조 점수·방문 구간에서 유지한 원래 행의 상대 비중만 보존해 구간별 재비중의 영향을 분리한다. 기존 일곱 정책과 실패를 재현하고 후보·새 상수를 더한 아홉 정책과 스물네 조건을 비교한다.

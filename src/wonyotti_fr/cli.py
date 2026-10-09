@@ -443,6 +443,11 @@ def main() -> None:
     visited_close.add_argument('--diagnosis-run', type=Path, required=True)
     visited_close.add_argument('--output', type=Path, default=Path('artifacts'))
     visited_close.set_defaults(func=lambda a: print(run_visited_close_diagnosis(a.diagnosis_run, a.output)))
+    from .retained_weight_close_diagnostics import run_retained_weight_close_diagnosis
+    retained_close = commands.add_parser('retained-weight-close-diagnose', help='방문 구간의 기존 행 비중 유지 대조')
+    retained_close.add_argument('--diagnosis-run', type=Path, required=True)
+    retained_close.add_argument('--output', type=Path, default=Path('artifacts'))
+    retained_close.set_defaults(func=lambda a: print(run_retained_weight_close_diagnosis(a.diagnosis_run, a.output)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)
