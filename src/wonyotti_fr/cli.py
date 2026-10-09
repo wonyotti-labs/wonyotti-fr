@@ -458,6 +458,11 @@ def main() -> None:
     early_stopping.add_argument('--diagnosis-run', type=Path, required=True)
     early_stopping.add_argument('--output', type=Path, default=Path('artifacts'))
     early_stopping.set_defaults(func=lambda a: print(run_early_stopping_diagnosis(a.diagnosis_run, a.output)))
+    from .stopping_regression_diagnostics import run_stopping_regression_diagnosis
+    stopping_regression = commands.add_parser('stopping-regression-diagnose', help='동일한 미래 첫 청산 정답의 현금 효과 직접 회귀')
+    stopping_regression.add_argument('--diagnosis-run', type=Path, required=True)
+    stopping_regression.add_argument('--output', type=Path, default=Path('artifacts'))
+    stopping_regression.set_defaults(func=lambda a: print(run_stopping_regression_diagnosis(a.diagnosis_run, a.output)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)
