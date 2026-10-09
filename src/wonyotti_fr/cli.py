@@ -506,6 +506,13 @@ def main() -> None:
     expanded_first.add_argument('--expansion-verification-sha256', required=True)
     expanded_first.add_argument('--output', type=Path, default=Path('artifacts'))
     expanded_first.set_defaults(func=lambda a: print(run_expanded_first_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.expansion_run, a.expansion_verification, a.expansion_verification_sha256, a.output)))
+    from .minute_first_diagnostics import run_minute_first_diagnosis
+    minute_first = commands.add_parser('minute-first-linear-diagnose', help='직전 확정 분봉 체결 방향의 첫 판단 비교')
+    minute_first.add_argument('--diagnosis-run', type=Path, required=True)
+    minute_first.add_argument('--verification', type=Path, required=True)
+    minute_first.add_argument('--verification-sha256', required=True)
+    minute_first.add_argument('--output', type=Path, default=Path('artifacts'))
+    minute_first.set_defaults(func=lambda a: print(run_minute_first_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.output)))
     from .probability_first_diagnostics import run_probability_first_diagnosis
     probability_first = commands.add_parser('probability-first-linear-diagnose', help='세 관리 확률만 사용하는 첫 판단 비교')
     probability_first.add_argument('--diagnosis-run', type=Path, required=True)
