@@ -406,6 +406,12 @@ def main() -> None:
     close_context.add_argument('--diagnosis-run', type=Path, required=True)
     close_context.add_argument('--output', type=Path, default=Path('artifacts'))
     close_context.set_defaults(func=lambda a: print(run_close_context_diagnosis(a.diagnosis_run, a.output)))
+
+    from .close_flow_diagnostics import run_close_flow_diagnosis
+    close_flow = commands.add_parser('close-flow-diagnose', help='체결 방향의 청산 비용 학습 진단')
+    close_flow.add_argument('--diagnosis-run', type=Path, required=True)
+    close_flow.add_argument('--output', type=Path, default=Path('artifacts'))
+    close_flow.set_defaults(func=lambda a: print(run_close_flow_diagnosis(a.diagnosis_run, a.output)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)

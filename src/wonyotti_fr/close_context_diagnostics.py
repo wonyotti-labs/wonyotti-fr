@@ -77,38 +77,45 @@ def reproduce_utility(reference, output):
     return reproduced
 
 
-def evaluate_context(reference, diagnosis, model, output):
+def evaluate_context(reference, diagnosis, model, output, *, candidate_name='context',
+                     comparisons=('continuation', 'utility'), admission=context_close_admission):
+    if comparisons != {'context': ('continuation', 'utility'), 'flow': ('continuation', 'utility', 'context')}.get(candidate_name):
+        raise ValueError('청산 비용 확장의 후보·비교 이름 오류')
+    score = candidate_name+'_score'
     frame = pd.read_parquet(reference/'predictions.parquet')
     keys = ['decision_time', 'position_entry_time', 'label_end', 'direction', 'original_intent', 'close_advantage_bps']
     pd.testing.assert_frame_equal(frame[keys], diagnosis[keys], check_exact=True)
-    frame['context_score'] = model.probabilities(diagnosis[model.features].to_numpy(dtype=float))[:, 0]
+    if score in frame:
+        raise ValueError('청산 비용 확장의 기존 점수 덮어쓰기 거부')
+    frame[score] = model.probabilities(diagnosis[model.features].to_numpy(dtype=float))[:, 0]
     frame.to_parquet(output/'predictions.parquet', index=False)
-    action = frame.context_score.gt(.5).to_numpy() & frame.original_intent.ne('exit').to_numpy()
+    action = frame[score].gt(.5).to_numpy() & frame.original_intent.ne('exit').to_numpy()
     values = {name: json.loads((reference/f'{name}.json').read_text()) for name in
         ['metrics', 'probability_metrics', 'first_metrics', 'breakdown', 'probability_breakdown', 'first_breakdown']}
-    values['metrics']['context'] = policy_effect_metrics(frame, action)
-    values['probability_metrics']['context'] = cost_probability_metrics(frame.close_advantage_bps, frame.sample_weight, frame.context_score)
+    values['metrics'][candidate_name] = policy_effect_metrics(frame, action)
+    values['probability_metrics'][candidate_name] = cost_probability_metrics(frame.close_advantage_bps, frame.sample_weight, frame[score])
     positions = {name: pd.read_parquet(reference/f'positions_{name}.parquet') for name in values['first_metrics']}
-    positions['context'] = first_cost_positions(diagnosis, frame.context_score)
-    values['first_metrics']['context'] = first_close_metrics(positions['context'])
+    positions[candidate_name] = first_cost_positions(diagnosis, frame[score])
+    values['first_metrics'][candidate_name] = first_close_metrics(positions[candidate_name])
     for name, part in positions.items():
         part.to_parquet(output/f'positions_{name}.parquet', index=False)
     groups = [('direction', str(k), part) for k, part in frame.groupby('direction')]
     groups += [('month', k, part) for k, part in frame.groupby(frame.decision_time.dt.strftime('%Y-%m'))]
     for kind, group, part in groups:
-        values['breakdown'].append({'kind': kind, 'group': group, 'model': 'context', **policy_effect_metrics(part, action[part.index])})
-        values['probability_breakdown'].append({'kind': kind, 'group': group, 'model': 'context',
-            **cost_probability_metrics(part.close_advantage_bps, part.sample_weight, part.context_score)})
-    first = positions['context']
+        values['breakdown'].append({'kind': kind, 'group': group, 'model': candidate_name, **policy_effect_metrics(part, action[part.index])})
+        values['probability_breakdown'].append({'kind': kind, 'group': group, 'model': candidate_name,
+            **cost_probability_metrics(part.close_advantage_bps, part.sample_weight, part[score])})
+    first = positions[candidate_name]
     groups = [('direction', str(k), part) for k, part in first.groupby('direction')]
     groups += [('entry_month', k, part) for k, part in first.groupby(first.position_entry_time.dt.strftime('%Y-%m'))]
     for kind, group, part in groups:
-        values['first_breakdown'].append({'kind': kind, 'group': group, 'model': 'context', **first_close_metrics(part)})
+        values['first_breakdown'].append({'kind': kind, 'group': group, 'model': candidate_name, **first_close_metrics(part)})
     intervals = {}
     previous_draws = pd.read_parquet(reference/'block_draws.parquet')
-    for other, prefix in [('continuation', ''), ('utility', 'utility_')]:
+    for other in comparisons:
+        prefix = '' if other == 'continuation' else other+'_'
         blocks, draws, replicates, interval = paired_week_blocks(
-            {name: positions[name] for name in ['context', other]}, model_names=['context', other])
+            {name: positions[name] for name in [candidate_name, other]}, model_names=[candidate_name, other])
         pd.testing.assert_frame_equal(draws, previous_draws, check_exact=True)
         for name, data in [('blocks', blocks), ('block_draws', draws), ('block_replicates', replicates)]:
             data.to_parquet(output/f'{prefix}{name}.parquet', index=False)
@@ -116,8 +123,8 @@ def evaluate_context(reference, diagnosis, model, output):
         intervals[other] = interval
     for name, value in values.items():
         save_json(output/f'{name}.json', value)
-    return context_close_admission(values['metrics'], values['probability_metrics'], values['first_metrics'],
-        intervals['continuation'], intervals['utility'])
+    return admission(values['metrics'], values['probability_metrics'], values['first_metrics'],
+        *[intervals[name] for name in comparisons])
 
 
 def run_close_context_diagnosis(reference: Path, output: Path) -> Path:

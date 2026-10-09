@@ -75,14 +75,14 @@ def attach_close_context(rows, bars):
     return output
 
 
-def context_close_admission(metrics, probability, first, intervals, utility_intervals):
-    base = utility_admission(metrics, probability, first, intervals, candidate_name='context')
+def context_close_admission(metrics, probability, first, intervals, utility_intervals, *, candidate_name="context"):
+    base = utility_admission(metrics, probability, first, intervals, candidate_name=candidate_name)
     checks = dict(base['checks'])
-    candidate, previous = probability['context'], probability['utility']
+    candidate, previous = probability[candidate_name], probability['utility']
     low = utility_intervals['intervals']['paired_difference']['lower']
     checks.update(cost_log_loss_vs_utility=candidate['cost_log_loss'] is not None and previous['cost_log_loss'] is not None and candidate['cost_log_loss'] < previous['cost_log_loss']*.99,
         cost_brier_vs_utility=candidate['cost_brier'] is not None and previous['cost_brier'] is not None and candidate['cost_brier'] <= previous['cost_brier']+1e-12,
-        weighted_regret_vs_utility=metrics['context']['weighted_regret_bps'] < metrics['utility']['weighted_regret_bps'],
-        first_mean_vs_utility=first['context']['all_position_mean_common_bps'] > first['utility']['all_position_mean_common_bps'],
+        weighted_regret_vs_utility=metrics[candidate_name]['weighted_regret_bps'] < metrics['utility']['weighted_regret_bps'],
+        first_mean_vs_utility=first[candidate_name]['all_position_mean_common_bps'] > first['utility']['all_position_mean_common_bps'],
         positive_utility_paired_interval_lower=bool(low is not None and np.isfinite(low) and low > 0))
     return {'checks': checks, 'context_admitted': all(checks.values()), 'trading_returns_evaluated': False}
