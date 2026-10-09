@@ -13,9 +13,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  checks:
+  quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -27,7 +29,29 @@ jobs:
           enable-cache: false
       - run: uv sync --locked
       - run: uv run ruff check .
-      - run: uv run pytest
       - run: uv run python scripts/check_public_tree.py
       - run: uv run wonyotti demo --output "${RUNNER_TEMP}/wonyotti-demo"
       - run: uv run pip-audit --skip-editable
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: "0.11.12"
+          python-version: "3.12.13"
+          enable-cache: false
+      - run: uv sync --locked
+      - name: 전체 검사 분할 실행
+        env:
+          SHARD_INDEX: ${{ matrix.shard }}
+        run: uv run python scripts/run_test_shard.py --index "$SHARD_INDEX" --count 4 --manifest "${RUNNER_TEMP}/test-shard-${SHARD_INDEX}.json"
