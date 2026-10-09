@@ -452,3 +452,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v85](docs/EXPERIMENT_V85.md)은 `expanded-first-linear-diagnose --diagnosis-run <v83 실패 진단> --verification <v83 독립 검산 JSON> --verification-sha256 <신뢰한 SHA-256> --expansion-run <v84 확장 자료> --expansion-verification <v84 독립 검산 JSON> --expansion-verification-sha256 <신뢰한 SHA-256>`으로 실행한다. 같은 첫 판단 선형 설정에 과거의 확정 정답을 추가하며 기존 열한 정책·새 모델·새 상수와 열 가지 내부 조건을 비교한다. 과거 전체 원장·미확정·기회 없음을 보존하고 보정 후 재학습·문턱 탐색·마지막 진단은 수행하지 않는다.
 
 [v86](docs/EXPERIMENT_V86.md)은 `expanded-first-tree-diagnose --diagnosis-run <v85 실패 진단> --verification <v85 독립 검산 JSON> --verification-sha256 <신뢰한 SHA-256>`으로 실행한다. 같은 통합 첫 원장과 비용에 기존 64개 깊이 2 트리를 적합한다. 기존 열세 정책의 저장된 점수에서 선택·효과를 다시 계산해 보존하고 열네 정책·열한 조건을 비교한다. 추가 표본·특징·문턱 탐색과 마지막 진단은 없다.
+
+[v87](docs/EXPERIMENT_V87.md)은 `managed-first-linear-diagnose --diagnosis-run <v86 실패 진단> --verification <v86 독립 검산 JSON> --verification-sha256 <신뢰한 SHA-256>`으로 실행한다. 기존 자료를 생성한 부모의 현재 관리 확률 세 개를 74개 특징에 추가하고 같은 선형 설정으로 한 번 학습한다. 부모·확률·비용·이전 열네 정책을 보존하며 열다섯 정책·열두 조건을 비교한다. 마지막 진단과 매매 적용은 없다.
