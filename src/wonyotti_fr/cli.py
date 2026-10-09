@@ -448,6 +448,11 @@ def main() -> None:
     retained_close.add_argument('--diagnosis-run', type=Path, required=True)
     retained_close.add_argument('--output', type=Path, default=Path('artifacts'))
     retained_close.set_defaults(func=lambda a: print(run_retained_weight_close_diagnosis(a.diagnosis_run, a.output)))
+    from .close_threshold_diagnostics import run_close_threshold_diagnosis
+    threshold_close = commands.add_parser('close-threshold-diagnose', help='별도 보정 구간의 최초 청산 손익으로 비용 점수 문턱 선택')
+    threshold_close.add_argument('--diagnosis-run', type=Path, required=True)
+    threshold_close.add_argument('--output', type=Path, default=Path('artifacts'))
+    threshold_close.set_defaults(func=lambda a: print(run_close_threshold_diagnosis(a.diagnosis_run, a.output)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)
