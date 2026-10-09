@@ -506,6 +506,19 @@ def main() -> None:
     expanded_first.add_argument('--expansion-verification-sha256', required=True)
     expanded_first.add_argument('--output', type=Path, default=Path('artifacts'))
     expanded_first.set_defaults(func=lambda a: print(run_expanded_first_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.expansion_run, a.expansion_verification, a.expansion_verification_sha256, a.output)))
+    from .first_exit_verification import verify_first_exit_run
+    first_exit_verify = commands.add_parser('first-exit-verify', help='첫 청산 대조의 전체 판단·체결·계좌 독립 재생')
+    first_exit_verify.add_argument('--run', type=Path, required=True)
+    first_exit_verify.add_argument('--run-sha256', required=True)
+    first_exit_verify.add_argument('--output', type=Path, default=Path('artifacts'))
+    first_exit_verify.set_defaults(func=lambda a: print(verify_first_exit_run(a.run, a.run_sha256, a.output)))
+    from .first_exit_research import run_first_exit_control
+    first_exit = commands.add_parser('first-exit-control', help='첫 청산 기준의 두 기간 연속 계좌 대조')
+    first_exit.add_argument('--diagnosis-run', type=Path, required=True)
+    first_exit.add_argument('--verification', type=Path, required=True)
+    first_exit.add_argument('--verification-sha256', required=True)
+    first_exit.add_argument('--output', type=Path, default=Path('artifacts'))
+    first_exit.set_defaults(func=lambda a: print(run_first_exit_control(a.diagnosis_run, a.verification, a.verification_sha256, a.output)))
     from .regularized_first_diagnostics import run_regularized_first_diagnosis
     regularized_first = commands.add_parser('regularized-first-linear-diagnose', help='앞 학습 시간순 검증으로 정규화 강도 선택')
     regularized_first.add_argument('--diagnosis-run', type=Path, required=True)

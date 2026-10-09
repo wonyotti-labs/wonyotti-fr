@@ -460,3 +460,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v89](docs/EXPERIMENT_V89.md)은 `minute-first-linear-diagnose --diagnosis-run <v88 실패 진단> --verification <v88 독립 검산 JSON> --verification-sha256 <신뢰한 SHA-256>`으로 실행한다. 기존 시세에서 판단 시각에 정확히 종료된 1분 봉의 체결 불균형 두 값을 같은 77개 입력에 추가한다. 출처·분봉 연결·기존 원장·열일곱 정책·열네 조건을 검증하며 미래 봉과 마지막 진단의 유입을 차단한다.
 
 [v90](docs/EXPERIMENT_V90.md)은 `regularized-first-linear-diagnose --diagnosis-run <v89 실패 진단> --verification <v89 독립 검산 JSON> --verification-sha256 <신뢰한 SHA-256>`으로 실행한다. 같은 79개 입력과 첫 정답에서 앞 학습의 세 시간 구간으로 네 정규화 강도를 비교한다. 전체 검증 행의 비용 로그 손실로 하나를 고른 뒤 외부 보정을 평가한다. 회차별 시간 경계·전체 소속·모든 모델·선택 근거와 열여덟 정책·열다섯 조건을 보존한다.
+
+[v91](docs/EXPERIMENT_V91.md)은 `first-exit-control --diagnosis-run <v90 실패 진단> --verification <v90 독립 검산 JSON> --verification-sha256 <신뢰한 SHA-256>`으로 실행한다. 고정 부모와 항상 첫 적격 청산을 같은 두 기간의 연속 계좌에서 대조한다. 조기 종료 뒤 재진입·비용·위험 한도를 포함하고 부모의 기존 전체 출력을 재현한다. `first-exit-verify --run <대조 실행> --run-sha256 <신뢰한 files.json SHA-256>`은 별도 판단 계산으로 네 실행의 모든 체결·계좌·판단 기록과 현금 흐름을 검산한다. 실패한 v90 학습 모델은 사용하지 않는다.
