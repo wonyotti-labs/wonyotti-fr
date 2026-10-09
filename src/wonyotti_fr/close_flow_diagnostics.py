@@ -24,6 +24,7 @@ from .close_utility_diagnostics import fit_utility
 from .common import new_run, save_json, sha256
 from .continuation_diagnostics import same_outputs
 from .histogram_management import HISTOGRAM_SETTINGS
+from .research_paths import reproduction_root
 
 CONTEXT_COMMON_FILES = {'metrics.json', 'diagnosis_used.parquet', 'positions_utility.parquet', 'block_intervals.json',
     'block_replicates.parquet', 'exclusion_ledger.parquet', 'utility_block_intervals.json', 'summary.json', 'model.json',
@@ -84,7 +85,7 @@ def run_close_flow_diagnosis(reference: Path, output: Path) -> Path:
         'trading_returns_evaluated': False, 'whole_system_periods_already_observed': True})
     print(f'체결 방향의 청산 비용 학습 진단: {out}', flush=True)
     try:
-        reproduced = reproduce_context(reference, out/'reference-reproduction')
+        reproduced = reproduce_context(reference, reproduction_root(out))
         save_json(out/'reference_parity.json', {'complete': True, 'reproduction': str(reproduced),
             'all_previous_outputs_exact': True, 'reproduced_files_sha256': sha256(reproduced/'files.json')})
         bars, source = close_flow_source(reference)

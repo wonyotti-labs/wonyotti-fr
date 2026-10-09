@@ -12,6 +12,7 @@ from .close_learning import close_metrics
 from .close_learning_inputs import CLOSE_SPLITS
 from .common import new_run, save_json, sha256
 from .entry_regression import REGRESSION_SETTINGS
+from .research_paths import reproduction_root
 
 ECONOMIC_FILES = {'manifest.json', 'input_verification.json', 'economic_ledger.parquet', 'exclusion_ledger.parquet',
     'training_used.parquet', 'training_weights.parquet', 'diagnosis_used.parquet', 'diagnosis_weights.parquet',
@@ -152,7 +153,7 @@ def run_first_close_diagnosis(reference: Path, output: Path) -> Path:
         'whole_system_periods_already_observed': True})
     print(f'포지션당 최초 청산 선택 진단: {out}', flush=True)
     try:
-        reproduced = reproduce_economic_diagnosis(reference, out/'reference-reproduction')
+        reproduced = reproduce_economic_diagnosis(reference, reproduction_root(out))
         save_json(out/'reference_parity.json', {'complete': True, 'reproduction': str(reproduced),
             'all_previous_outputs_exact': True, 'reproduced_files_sha256': sha256(reproduced/'files.json')})
         frame = pd.read_parquet(reproduced/'diagnosis_used.parquet')

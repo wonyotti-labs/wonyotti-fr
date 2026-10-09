@@ -18,6 +18,7 @@ from .exposure_close import (
     exposure_training,
 )
 from .first_close_diagnostics import first_close_metrics, first_close_positions, paired_week_blocks
+from .research_paths import reproduction_root
 
 CONTINUATION_FILES = {'manifest.json', 'reference_parity.json', 'continuation_ledger.parquet',
     'exclusion_ledger.parquet', 'training_used.parquet', 'diagnosis_used.parquet',
@@ -83,7 +84,7 @@ def run_exposure_close_diagnosis(reference: Path, output: Path) -> Path:
         'trading_returns_evaluated': False, 'whole_system_periods_already_observed': True})
     print(f'현재 노출을 반영한 청산 가치 진단: {out}', flush=True)
     try:
-        reproduced = reproduce_continuation(reference, out/'reference-reproduction')
+        reproduced = reproduce_continuation(reference, reproduction_root(out))
         save_json(out/'reference_parity.json', {'complete': True, 'reproduction': str(reproduced),
             'all_previous_outputs_exact': True, 'reproduced_files_sha256': sha256(reproduced/'files.json')})
         rows, weights, values = {}, {}, {}

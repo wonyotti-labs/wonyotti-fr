@@ -16,6 +16,7 @@ from .continuation_diagnostics import same_outputs
 from .continuation_inputs import ContinuationCloseModel
 from .entry_regression import REGRESSION_SETTINGS
 from .first_close_diagnostics import first_close_metrics, first_close_positions, paired_week_blocks
+from .research_paths import reproduction_root
 from .weekly_close import WEEKLY_SETTINGS, fit_weekly_close
 
 CAPACITY_FILES = {'summary.json', 'manifest.json', 'block_replicates.parquet', 'previous_models.json', 'exclusion_ledger.parquet', 'breakdown.json', 'selection_exclusion_ledger.parquet', 'positions_capacity.parquet', 'selection_training_weights.parquet', 'first_metrics.json', 'selection_support.json', 'block_intervals.json', 'training_weights.parquet', 'reference_parity.json', 'selection_models.json', 'decision.json', 'blocks.parquet', 'selection_selection_predictions.parquet', 'diagnosis_weights.parquet', 'block_draws.parquet', 'selection_metrics.json', 'model.json', 'training_support.json', 'training_used.parquet', 'metrics.json', 'selection.json', 'REPORT.md', 'selection_selection_used.parquet', 'selection_training_used.parquet', 'first_breakdown.json', 'diagnosis_used.parquet', 'positions_continuation.parquet', 'selection_selection_weights.parquet', 'predictions.parquet', 'selection_training_predictions.parquet'}
@@ -77,7 +78,7 @@ def run_weekly_close_diagnosis(reference: Path, output: Path) -> Path:
         'trading_returns_evaluated': False, 'whole_system_periods_already_observed': True})
     print(f'확정 결과의 주간 누적 청산 학습 진단: {out}', flush=True)
     try:
-        reproduced = reproduce_capacity(reference, out/'reference-reproduction')
+        reproduced = reproduce_capacity(reference, reproduction_root(out))
         save_json(out/'reference_parity.json', {'complete': True, 'reproduction': str(reproduced),
             'all_previous_outputs_exact': True, 'reproduced_files_sha256': sha256(reproduced/'files.json')})
         rows, weights = {}, {}

@@ -18,6 +18,7 @@ from .common import new_run, save_json, sha256
 from .continuation_diagnostics import same_outputs
 from .continuation_inputs import ContinuationCloseModel
 from .histogram_management import HISTOGRAM_SETTINGS
+from .research_paths import reproduction_root
 from .weekly_close import WEEKLY_SETTINGS
 from .weekly_flow import fit_weekly_flow, weekly_flow_admission
 
@@ -105,7 +106,7 @@ def run_weekly_flow_diagnosis(reference: Path, output: Path) -> Path:
         'weekly_constant_control': True, 'trading_returns_evaluated': False, 'whole_system_periods_already_observed': True})
     print(f'확정 결과의 주간 청산 비용 재학습 진단: {out}', flush=True)
     try:
-        reproduced = reproduce_flow(reference, out/'reference-reproduction')
+        reproduced = reproduce_flow(reference, reproduction_root(out))
         save_json(out/'reference_parity.json', {'complete': True, 'reproduction': str(reproduced),
             'all_previous_outputs_exact': True, 'reproduced_files_sha256': sha256(reproduced/'files.json')})
         ledger, source = load_full_flow_ledger(reference)

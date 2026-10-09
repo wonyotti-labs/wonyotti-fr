@@ -17,6 +17,7 @@ from .entry_regression import REGRESSION_SETTINGS
 from .exposure_close import EXPOSURE_TRANSFORM
 from .exposure_close_diagnostics import CONTINUATION_FILES, run_exposure_close_diagnosis
 from .first_close_diagnostics import first_close_metrics, first_close_positions, paired_week_blocks
+from .research_paths import reproduction_root
 
 EXPOSURE_FILES = {'manifest.json', 'training_support.json', 'REPORT.md', 'decision.json', 'first_breakdown.json', 'exclusion_ledger.parquet', 'positions_exposure.parquet', 'positions_continuation.parquet', 'training_weights.parquet', 'blocks.parquet', 'training_used.parquet', 'block_replicates.parquet', 'diagnosis_used.parquet', 'reference_parity.json', 'model.json', 'breakdown.json', 'diagnosis_weights.parquet', 'block_draws.parquet', 'previous_models.json', 'training_transformation.parquet', 'predictions.parquet', 'first_metrics.json', 'block_intervals.json', 'metrics.json', 'summary.json'}
 
@@ -76,7 +77,7 @@ def run_close_capacity_diagnosis(reference: Path, output: Path) -> Path:
         'trading_returns_evaluated': False, 'whole_system_periods_already_observed': True})
     print(f'시간순 복잡도 선택 청산 진단: {out}', flush=True)
     try:
-        reproduced = reproduce_exposure(reference, out/'reference-reproduction')
+        reproduced = reproduce_exposure(reference, reproduction_root(out))
         save_json(out/'reference_parity.json', {'complete': True, 'reproduction': str(reproduced),
             'all_previous_outputs_exact': True, 'reproduced_files_sha256': sha256(reproduced/'files.json')})
         rows, weights, values = {}, {}, {}

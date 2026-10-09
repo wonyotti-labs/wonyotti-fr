@@ -17,6 +17,7 @@ from .continuation_inputs import ContinuationCloseModel
 from .entry_regression import REGRESSION_SETTINGS
 from .first_close_diagnostics import first_close_metrics, first_close_positions, paired_week_blocks
 from .first_close_margin import FIRST_MARGINS, margin_admission, select_first_margin
+from .research_paths import reproduction_root
 from .weekly_close import WEEKLY_SETTINGS
 from .weekly_close_diagnostics import CAPACITY_FILES, run_weekly_close_diagnosis
 
@@ -143,7 +144,7 @@ def run_first_close_margin_diagnosis(reference: Path, output: Path) -> Path:
         'trading_returns_evaluated': False, 'whole_system_periods_already_observed': True})
     print(f'최초 청산 선택의 실행 문턱 보정: {out}', flush=True)
     try:
-        reproduced = reproduce_weekly(reference, out/'reference-reproduction')
+        reproduced = reproduce_weekly(reference, reproduction_root(out))
         save_json(out/'reference_parity.json', {'complete': True, 'reproduction': str(reproduced),
             'all_previous_outputs_exact': True, 'reproduced_files_sha256': sha256(reproduced/'files.json')})
         capacity = Path(json.loads((reproduced/'reference_parity.json').read_text())['reproduction'])

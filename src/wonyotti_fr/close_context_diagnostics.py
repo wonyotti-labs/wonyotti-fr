@@ -29,6 +29,7 @@ from .common import new_run, save_json, sha256
 from .continuation_diagnostics import same_outputs
 from .first_close_diagnostics import first_close_metrics, paired_week_blocks
 from .histogram_management import HISTOGRAM_SETTINGS
+from .research_paths import reproduction_root
 
 UTILITY_COMMON_FILES = {'REPORT.md', 'block_draws.parquet', 'block_intervals.json', 'block_replicates.parquet', 'blocks.parquet',
     'breakdown.json', 'decision.json', 'diagnosis_used.parquet', 'diagnosis_weights.parquet', 'exclusion_ledger.parquet',
@@ -150,7 +151,7 @@ def run_close_context_diagnosis(reference: Path, output: Path) -> Path:
         'trading_returns_evaluated': False, 'whole_system_periods_already_observed': True})
     print(f'다일 시장 상태의 청산 비용 학습 진단: {out}', flush=True)
     try:
-        reproduced = reproduce_utility(reference, out/'reference-reproduction')
+        reproduced = reproduce_utility(reference, reproduction_root(out))
         save_json(out/'reference_parity.json', {'complete': True, 'reproduction': str(reproduced),
             'all_previous_outputs_exact': True, 'reproduced_files_sha256': sha256(reproduced/'files.json')})
         bars, source = close_context_source(reference)

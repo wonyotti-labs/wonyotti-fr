@@ -20,6 +20,7 @@ from .first_close_diagnostics import (
     paired_week_blocks,
     run_first_close_diagnosis,
 )
+from .research_paths import reproduction_root
 
 FIRST_CLOSE_FILES = {'manifest.json', 'reference_parity.json', 'opportunity_ledger.parquet', 'exclusion_ledger.parquet',
     'positions_economic.parquet', 'positions_boosted.parquet', 'blocks.parquet', 'block_draws.parquet',
@@ -91,7 +92,7 @@ def run_continuation_diagnosis(reference: Path, output: Path) -> Path:
         'margin_bps': 0, 'new_model_count': 1, 'trading_returns_evaluated': False, 'whole_system_periods_already_observed': True})
     print(f'현재 관리 의도별 청산 순효과 진단: {out}', flush=True)
     try:
-        reproduced = reproduce_first_close(reference, out/'reference-reproduction')
+        reproduced = reproduce_first_close(reference, reproduction_root(out))
         save_json(out/'reference_parity.json', {'complete': True, 'reproduction': str(reproduced),
             'all_previous_outputs_exact': True, 'reproduced_files_sha256': sha256(reproduced/'files.json')})
         economic = Path(json.loads((reproduced/'reference_parity.json').read_text())['reproduction'])

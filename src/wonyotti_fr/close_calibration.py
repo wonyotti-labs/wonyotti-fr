@@ -18,6 +18,7 @@ from .close_learning import (
 from .close_learning_inputs import CLOSE_SPLITS
 from .common import new_run, save_json, sha256
 from .entry_regression import REGRESSION_SETTINGS
+from .research_paths import reproduction_root
 
 CALIBRATION_SPLITS = {'training': ['2021-01-01', '2021-06-30'],
     'calibration': ['2021-07-02', '2021-09-30'], 'diagnosis': ['2021-10-02', '2021-12-31']}
@@ -182,7 +183,7 @@ def run_close_calibration_diagnosis(reference: Path, output: Path) -> Path:
         'trading_returns_evaluated': False, 'whole_system_periods_already_observed': True})
     print(f'청산 금액의 시간순 보정 진단: {out}', flush=True)
     try:
-        reproduced = reproduce_close_diagnosis(reference, out/'reference-reproduction')
+        reproduced = reproduce_close_diagnosis(reference, reproduction_root(out))
         save_json(out/'reference_parity.json', {'complete': True, 'reproduction': str(reproduced),
             'all_previous_models_predictions_rows_weights_exact': True, 'reproduced_files_sha256': sha256(reproduced/'files.json')})
         rows, assignments = calibration_splits(pd.read_parquet(reproduced/'exclusion_ledger.parquet').drop(columns='split'))

@@ -21,6 +21,7 @@ from .first_close_diagnostics import first_close_metrics, paired_week_blocks
 from .first_close_margin import FIRST_MARGINS
 from .first_close_margin_diagnostics import WEEKLY_FILES, run_first_close_margin_diagnosis
 from .histogram_management import HISTOGRAM_SETTINGS
+from .research_paths import reproduction_root
 
 MARGIN_COMMON_FILES = {'manifest.json', 'reference_parity.json', 'half_training_used.parquet', 'half_training_weights.parquet',
     'calibration_used.parquet', 'calibration_weights.parquet', 'calibration_predictions.parquet', 'frozen_half_model.json',
@@ -141,7 +142,7 @@ def run_close_utility_diagnosis(reference: Path, output: Path) -> Path:
         'trading_returns_evaluated': False, 'whole_system_periods_already_observed': True})
     print(f'청산 오류의 손익 비용 학습 진단: {out}', flush=True)
     try:
-        reproduced = reproduce_margin(reference, out/'reference-reproduction')
+        reproduced = reproduce_margin(reference, reproduction_root(out))
         save_json(out/'reference_parity.json', {'complete': True, 'reproduction': str(reproduced),
             'all_previous_outputs_exact': True, 'reproduced_files_sha256': sha256(reproduced/'files.json')})
         weekly = Path(json.loads((reproduced/'reference_parity.json').read_text())['reproduction'])

@@ -15,6 +15,7 @@ from .entry_regression_diagnostics import (
 from .event_features import MARKET_FEATURES
 from .histogram_management import HISTOGRAM_SETTINGS, HistogramManagementModels
 from .net_edge_model import NET_FEATURES, net_values
+from .research_paths import reproduction_root
 
 REGRESSION_FILES = {'manifest.json', 'models.json', 'summary.json', 'decision.json', 'metrics.json',
     'breakdown.json', 'training_support.json', 'training_used.parquet', 'diagnosis_used.parquet',
@@ -116,7 +117,7 @@ def run_entry_stop_diagnosis(diagnosis: Path, output: Path) -> Path:
         'whole_system_periods_already_observed': True})
     print(f'신규 진입의 손절 위험 분리 진단: {out}', flush=True)
     try:
-        reproduced = reproduce_regression(diagnosis, out/'reference-reproduction')
+        reproduced = reproduce_regression(diagnosis, reproduction_root(out))
         save_json(out/'reference_parity.json', {'complete': True, 'reproduction': str(reproduced),
             'all_previous_models_predictions_rows_weights_exact': True,
             'reproduced_files_sha256': sha256(reproduced/'files.json')})

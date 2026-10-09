@@ -16,6 +16,7 @@ from .common import new_run, save_json, sha256
 from .engine import EngineConfig
 from .entry_regression import REGRESSION_SETTINGS, EntryRegressionModel
 from .journal import canonical, digest
+from .research_paths import reproduction_root
 
 ECONOMIC_FEATURES = ['current_gross_exposure', 'current_exit_net_bps']
 
@@ -110,7 +111,7 @@ def run_close_economic_diagnosis(reference: Path, output: Path) -> Path:
         'margin_bps': 0, 'new_model_count': 1, 'trading_returns_evaluated': False, 'whole_system_periods_already_observed': True})
     print(f'현재 경제적 상태의 청산 순효과 진단: {out}', flush=True)
     try:
-        reproduced = reproduce_close_diagnosis(reference, out/'reference-reproduction')
+        reproduced = reproduce_close_diagnosis(reference, reproduction_root(out))
         save_json(out/'reference_parity.json', {'complete': True, 'reproduction': str(reproduced),
             'all_previous_models_predictions_rows_weights_exact': True, 'reproduced_files_sha256': sha256(reproduced/'files.json')})
         labels = Path(json.loads((reference/'manifest.json').read_text())['settings']['labels'])
