@@ -506,6 +506,13 @@ def main() -> None:
     expanded_first.add_argument('--expansion-verification-sha256', required=True)
     expanded_first.add_argument('--output', type=Path, default=Path('artifacts'))
     expanded_first.set_defaults(func=lambda a: print(run_expanded_first_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.expansion_run, a.expansion_verification, a.expansion_verification_sha256, a.output)))
+    from .regularized_first_diagnostics import run_regularized_first_diagnosis
+    regularized_first = commands.add_parser('regularized-first-linear-diagnose', help='앞 학습 시간순 검증으로 정규화 강도 선택')
+    regularized_first.add_argument('--diagnosis-run', type=Path, required=True)
+    regularized_first.add_argument('--verification', type=Path, required=True)
+    regularized_first.add_argument('--verification-sha256', required=True)
+    regularized_first.add_argument('--output', type=Path, default=Path('artifacts'))
+    regularized_first.set_defaults(func=lambda a: print(run_regularized_first_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.output)))
     from .minute_first_diagnostics import run_minute_first_diagnosis
     minute_first = commands.add_parser('minute-first-linear-diagnose', help='직전 확정 분봉 체결 방향의 첫 판단 비교')
     minute_first.add_argument('--diagnosis-run', type=Path, required=True)
