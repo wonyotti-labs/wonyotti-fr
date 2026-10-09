@@ -484,6 +484,18 @@ def main() -> None:
     weekly_first.add_argument('--verification-sha256', required=True)
     weekly_first.add_argument('--output', type=Path, default=Path('artifacts'))
     weekly_first.set_defaults(func=lambda a: print(run_weekly_first_linear_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.output)))
+    from .first_opportunity_expansion import run_first_opportunity_expansion
+    first_expansion = commands.add_parser('first-opportunity-expand-labels', help='고정 정책의 2021년 첫 기회 대조와 2020년 정답 확장')
+    first_expansion.add_argument('--selection-run', type=Path, required=True)
+    first_expansion.add_argument('--diagnosis-run', type=Path, required=True)
+    first_expansion.add_argument('--verification', type=Path, required=True)
+    first_expansion.add_argument('--verification-sha256', required=True)
+    first_expansion.add_argument('--market', type=Path, required=True)
+    first_expansion.add_argument('--features', type=Path, required=True)
+    first_expansion.add_argument('--output', type=Path, default=Path('artifacts'))
+    first_expansion.add_argument('--resume-run', type=Path)
+    first_expansion.add_argument('--max-opportunities', type=int)
+    first_expansion.set_defaults(func=lambda a: print(run_first_opportunity_expansion(a.selection_run, a.diagnosis_run, a.verification, a.verification_sha256, a.market, a.features, a.output, resume=a.resume_run, max_opportunities=a.max_opportunities)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)
