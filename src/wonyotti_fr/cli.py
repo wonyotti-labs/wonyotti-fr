@@ -438,6 +438,11 @@ def main() -> None:
     minute_diagnosis.add_argument('--diagnosis-run', type=Path, required=True)
     minute_diagnosis.add_argument('--output', type=Path, default=Path('artifacts'))
     minute_diagnosis.set_defaults(func=lambda a: print(run_minute_close_diagnosis(a.labels_run, a.diagnosis_run, a.output)))
+    from .visited_close_diagnostics import run_visited_close_diagnosis
+    visited_close = commands.add_parser('visited-close-diagnose', help='최초 청산까지의 방문 구간 비용 학습')
+    visited_close.add_argument('--diagnosis-run', type=Path, required=True)
+    visited_close.add_argument('--output', type=Path, default=Path('artifacts'))
+    visited_close.set_defaults(func=lambda a: print(run_visited_close_diagnosis(a.diagnosis_run, a.output)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)

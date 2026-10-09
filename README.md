@@ -430,3 +430,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v74](docs/EXPERIMENT_V74.md)는 `minute-close-labels --labels-run <v59 원장>`으로 분별 청산 기회를 복원한다. 기존 5분 원장의 전체 행·정답을 그대로 대조하고, 누락된 분별 시점을 같은 계좌 상태·비용으로 계산한다. `--max-opportunities`와 `--resume`으로 중단·재개할 수 있으며 새 모델이나 수익성 평가는 포함하지 않는다.
 
 [v75](docs/EXPERIMENT_V75.md)는 `minute-close-diagnose --labels-run <v74 원장> --diagnosis-run <v71 진단>`으로 실행한다. 확정 시세로 분별 입력을 연결하고 기존 모델을 재현한 뒤, 기존·새 학습 모델의 5분·1분 정책을 같은 포지션과 기준 순자산에서 비교한다. 후보는 새 1분 정책 하나이며 열다섯 조건과 기존 실패를 보존한다.
+
+[v76](docs/EXPERIMENT_V76.md)은 `visited-close-diagnose --diagnosis-run <v75 진단>`으로 실행한다. 자기 포지션을 제외한 다섯 보조 모델의 최초 청산까지 학습 기여를 맞추고, 기존 전체 진단 원장에서 후보 하나와 기존 정책·상수를 비교한다. 원래 정답·학습 제외 행·평가 비중·실패 기록과 스무 조건을 보존한다.
