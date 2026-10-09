@@ -456,3 +456,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v87](docs/EXPERIMENT_V87.md)은 `managed-first-linear-diagnose --diagnosis-run <v86 실패 진단> --verification <v86 독립 검산 JSON> --verification-sha256 <신뢰한 SHA-256>`으로 실행한다. 기존 자료를 생성한 부모의 현재 관리 확률 세 개를 74개 특징에 추가하고 같은 선형 설정으로 한 번 학습한다. 부모·확률·비용·이전 열네 정책을 보존하며 열다섯 정책·열두 조건을 비교한다. 마지막 진단과 매매 적용은 없다.
 
 [v88](docs/EXPERIMENT_V88.md)은 `probability-first-linear-diagnose --diagnosis-run <v87 실패 진단> --verification <v87 독립 검산 JSON> --verification-sha256 <신뢰한 SHA-256>`으로 실행한다. 전체 원장과 기존 77개 입력은 보존하고 세 관리 확률만으로 같은 선형 모델을 학습한다. 열여섯 정책·열세 조건을 비교하며 부모·비용·문턱·마지막 진단의 차단을 유지한다.
+
+[v89](docs/EXPERIMENT_V89.md)은 `minute-first-linear-diagnose --diagnosis-run <v88 실패 진단> --verification <v88 독립 검산 JSON> --verification-sha256 <신뢰한 SHA-256>`으로 실행한다. 기존 시세에서 판단 시각에 정확히 종료된 1분 봉의 체결 불균형 두 값을 같은 77개 입력에 추가한다. 출처·분봉 연결·기존 원장·열일곱 정책·열네 조건을 검증하며 미래 봉과 마지막 진단의 유입을 차단한다.
