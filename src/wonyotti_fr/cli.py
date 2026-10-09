@@ -477,6 +477,13 @@ def main() -> None:
     first_linear.add_argument('--verification-sha256', required=True)
     first_linear.add_argument('--output', type=Path, default=Path('artifacts'))
     first_linear.set_defaults(func=lambda a: print(run_first_linear_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.output)))
+    from .weekly_first_linear_diagnostics import run_weekly_first_linear_diagnosis
+    weekly_first = commands.add_parser('weekly-first-linear-diagnose', help='첫 판단 모델의 확정 결과 주간 갱신')
+    weekly_first.add_argument('--diagnosis-run', type=Path, required=True)
+    weekly_first.add_argument('--verification', type=Path, required=True)
+    weekly_first.add_argument('--verification-sha256', required=True)
+    weekly_first.add_argument('--output', type=Path, default=Path('artifacts'))
+    weekly_first.set_defaults(func=lambda a: print(run_weekly_first_linear_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.output)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)

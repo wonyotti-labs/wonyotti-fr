@@ -444,3 +444,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v81](docs/EXPERIMENT_V81.md)은 `first-opportunity-diagnose --diagnosis-run <v80 실패 진단> --verification <독립 검산 기록 JSON> --verification-sha256 <신뢰한 검산 기록 SHA-256>`으로 실행한다. 포지션의 첫 적격 기회만 동일 비중으로 학습하고 한 번만 판단한다. 기존 검산 근거를 지문으로 재사용하며 여덟 보정 정책·여섯 조건을 기록한다. 마지막 진단과 연속 매매 적용은 이번 단계에 포함하지 않는다.
 
 [v82](docs/EXPERIMENT_V82.md)은 `first-linear-diagnose --diagnosis-run <v81 실패 진단> --verification <독립 검산 기록 JSON> --verification-sha256 <신뢰한 검산 기록 SHA-256>`으로 실행한다. 같은 첫 기회·현금·비용으로 표준화한 L2 로지스틱 모델 하나를 비교한다. 기존 여덟 정책을 보존하고 아홉 정책·일곱 내부 조건을 기록하며 마지막 진단과 매매 적용은 수행하지 않는다.
+
+[v83](docs/EXPERIMENT_V83.md)은 `weekly-first-linear-diagnose --diagnosis-run <v82 실패 진단> --verification <독립 검산 기록 JSON> --verification-sha256 <신뢰한 검산 기록 SHA-256>`으로 실행한다. 매주 이틀 전에 확정된 첫 기회만 같은 선형 모델에 누적 반영한다. 아홉 주간 모델과 주간 상수를 열한 정책·아홉 조건으로 비교하며 이후 주의 학습에 포함되는 과거 보정 결과를 명시한다.
