@@ -36,16 +36,21 @@ def snapshot_close_values(opportunity, event):
         minute, minute*direction, history]
 
 
-def load_close_training(labels: Path):
+def load_close_training(labels: Path, *, decision_seconds=300):
+    if type(decision_seconds) is not int or decision_seconds not in (60, 300):
+        raise ValueError('청산 학습의 수집 간격 오류')
     hashes = json.loads((labels/'files.json').read_text())
-    if (set(hashes) != CLOSE_FILES or (labels/'files.json').is_symlink()
+    expected_files = CLOSE_FILES | ({'legacy_parity.json'} if decision_seconds == 60 else set())
+    if (set(hashes) != expected_files or (labels/'files.json').is_symlink()
         or any((labels/n).is_symlink() or sha256(labels/n) != h for n, h in hashes.items())):
         raise ValueError('청산 학습 원장의 필수 파일·지문 오류')
     settings = json.loads((labels/'manifest.json').read_text())['settings']
     summary = json.loads((labels/'summary.json').read_text())
+    protocol = 'docs/EXPERIMENT_V74.md' if decision_seconds == 60 else 'docs/EXPERIMENT_V59.md'
     if (summary['complete'] is not True or summary['new_models_fitted'] is not False
         or summary['forced_boundary_closes'] is not False or summary['profitability_accepted'] is not False
-        or settings['period'] != CLOSE_PERIOD or settings['protocol_sha256'] != sha256(Path('docs/EXPERIMENT_V59.md'))
+        or settings['period'] != CLOSE_PERIOD or settings['protocol_sha256'] != sha256(Path(protocol))
+        or settings.get('decision_seconds', 300) != decision_seconds
         or settings['new_models_fitted'] is not False or settings['forced_boundary_closes'] is not False):
         raise ValueError('청산 학습의 미완료·기간·사전 가정 오류')
     sources = settings['implementation_sha256']
@@ -83,12 +88,12 @@ def load_close_training(labels: Path):
         or ledger.label_status.value_counts().to_dict() != summary['statuses']
         or parity['processed_bars'] != len(bars) or parity['counts'] != summary['counts']
         or summary['counts']['opportunities'] != len(ledger)
-        or summary['counts']['boundaries'] != len(bars)//5):
+        or summary['counts']['boundaries'] != len(bars)//(decision_seconds//60)):
         raise ValueError('청산 학습의 전체 기회·정답 지원 오류')
     equity = pd.read_parquet(replay/'equity.parquet', columns=['time', 'quantity', 'equity', 'policy_state', 'policy_event'])
     equity['time'] = pd.to_datetime(equity.time, utc=True).astype('datetime64[ns, UTC]')
     equity = equity.set_index('time')
-    eligible = equity.index[(equity.index.asi8 % (5*60*10**9) == 0) & equity.quantity.ne(0)
+    eligible = equity.index[(equity.index.asi8 % (decision_seconds*10**9) == 0) & equity.quantity.ne(0)
         & equity.policy_event.isin(['action_hold', 'action_exit', 'action_reduce', 'action_sized_reduce',
                                    'action_zero_reduction', 'action_increase', 'action_unavailable'])]
     np.testing.assert_array_equal(ledger.decision_time.astype('datetime64[ns, UTC]').array.asi8, eligible.asi8)
@@ -142,8 +147,16 @@ def load_close_training(labels: Path):
         connection.close()
     if before != sha256(labels/'outcomes.sqlite') or count != len(ledger):
         raise ValueError('청산 학습의 읽기 전용 검증·행 수 오류')
-    return ledger, {'rows': len(ledger), 'closed': len(training), 'all_actual_inputs_and_cashflows_verified': True,
+    verification = {'rows': len(ledger), 'closed': len(training), 'all_actual_inputs_and_cashflows_verified': True,
         'journal_read_only': True, 'generation_implementation_sha256': sources, 'labels_files_sha256': sha256(labels/'files.json')}
+    if decision_seconds == 60:
+        from .minute_close_effects import validate_legacy_reference, verify_legacy_grid
+        legacy = validate_legacy_reference(Path(settings['legacy_labels']), settings)
+        proof = verify_legacy_grid(ledger, legacy, True)
+        if proof != json.loads((labels/'legacy_parity.json').read_text()):
+            raise ValueError('분별 청산의 기존 격자 대조 기록 불일치')
+        verification['legacy_grid'] = proof
+    return ledger, verification
 
 
 def close_learning_splits(ledger):

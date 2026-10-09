@@ -168,7 +168,8 @@ def test_collection_resume_matches_full_and_all_original_outputs(tmp_path):
     assert all(r['close_advantage_pnl'] is not None for r in fresh if r['label_status'] == 'closed')
 
 
-def test_real_history_policy_features_and_future_price_invariance(tmp_path):
+@pytest.mark.parametrize('decision_seconds', [300, 60])
+def test_real_history_policy_features_and_future_price_invariance(tmp_path, decision_seconds):
     frame = ready_bars().assign(count=1, volume=1.)
     frame[['time', 'end']] += pd.Timedelta(days=366)
     cfg = config(bar_seconds=60, max_hold_bars=20, fee_bps=5, slippage_bps=3)
@@ -183,7 +184,7 @@ def test_real_history_policy_features_and_future_price_invariance(tmp_path):
         streaming_backtest(data, policy, cfg, reference, 8192)
         with OutcomeJournal(tmp_path/(name+'.sqlite'), {'case': name}) as journal:
             rows, _, complete = collect_close_effects(data, policy, cfg, reference, tmp_path/(name+'-replay'),
-                journal, pd.Timestamp('2021-12-31', tz='UTC'))
+                journal, pd.Timestamp('2021-12-31', tz='UTC'), decision_seconds=decision_seconds)
             assert complete and rows
             records = [json.loads(r[0]) for r in journal.connection.execute('SELECT payload FROM outcomes ORDER BY sequence')]
         outputs.append([r['opportunity'] for r in records if pd.Timestamp(r['opportunity']['decision_time']) <= data.time.iloc[40]])

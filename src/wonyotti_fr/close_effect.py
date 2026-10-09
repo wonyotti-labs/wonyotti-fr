@@ -159,11 +159,11 @@ def validate_close_record(opportunity, record, trade, config, cutoff, events):
         raise ValueError('청산 순효과의 제외 행에 반사실 존재')
 
 
-def collect_close_effects(bars, policy, config, reference, output, journal, cutoff, max_new=None):
+def collect_close_effects(bars, policy, config, reference, output, journal, cutoff, max_new=None, *, decision_seconds=300):
     validate_minutes(bars, 1)
     if (config.bar_seconds != 60 or config.signal_delay_bars != 0
         or not bars.time.diff().iloc[1:].eq(pd.Timedelta(minutes=1)).all()
-        or policy.manager.features != CLOSE_FEATURES):
+        or policy.manager.features != CLOSE_FEATURES or type(decision_seconds) is not int or decision_seconds not in (60, 300)):
         raise ValueError('청산 기회 수집의 시세·특징·지연 오류')
     output.mkdir(parents=True, exist_ok=False)
     writers = {name: ParquetRows(output/f'{name}.parquet', 8192) for name in ['equity', 'trades', 'fills']}
@@ -175,7 +175,7 @@ def collect_close_effects(bars, policy, config, reference, output, journal, cuto
 
     def record_features(bar, view):
         values = original(bar, view)
-        if pd.Timestamp(bar['end']).value % (5*60*10**9) == 0:
+        if pd.Timestamp(bar['end']).value % (decision_seconds*10**9) == 0:
             captured.append(np.asarray(values, dtype=float).copy())
         return values
 
@@ -194,7 +194,7 @@ def collect_close_effects(bars, policy, config, reference, output, journal, cuto
                     writers[name].append(item)
             result.pop('rejected')
             writers['equity'].append(result)
-            if pd.Timestamp(event['end']).value % (5*60*10**9):
+            if pd.Timestamp(event['end']).value % (decision_seconds*10**9):
                 continue
             counts['boundaries'] += 1
             if not captured or not engine.state['quantity']:
@@ -262,9 +262,12 @@ def collect_close_effects(bars, policy, config, reference, output, journal, cuto
 
 
 def run_close_effect_labels(reference: Path, market: Path, features: Path, output: Path,
-                            *, resume: Path | None = None, max_opportunities: int | None = None) -> Path:
+                            *, resume: Path | None = None, max_opportunities: int | None = None,
+                            decision_seconds: int = 300, legacy_labels: Path | None = None) -> Path:
     frozen, policy = load_selection(reference)
-    if frozen['protocol'] != 'exit_move_v54' or (max_opportunities is not None and (type(max_opportunities) is not int or max_opportunities < 1)):
+    if (frozen['protocol'] != 'exit_move_v54' or (max_opportunities is not None and (type(max_opportunities) is not int or max_opportunities < 1))
+        or type(decision_seconds) is not int or decision_seconds not in (60, 300)
+        or (decision_seconds == 60) != (legacy_labels is not None)):
         raise ValueError('청산 순효과의 고정 부모·처리 한도 오류')
     previous = reference/'candidate-00'
     settings = {'reference': str(reference), 'reference_sha256': sha256(reference/'frozen_selection.json'),
@@ -274,12 +277,24 @@ def run_close_effect_labels(reference: Path, market: Path, features: Path, outpu
         'protocol_sha256': sha256(Path('docs/EXPERIMENT_V59.md')),
         'implementation_sha256': {p.name: sha256(p) for p in sorted(Path(__file__).parent.glob('*.py'))},
         'new_models_fitted': False, 'forced_boundary_closes': False}
-    out = resume if resume is not None else new_run(output, 'close-effect-labels', settings)
+    if decision_seconds == 60:
+        settings.update(decision_seconds=60, legacy_labels=str(legacy_labels), legacy_files_sha256=sha256(legacy_labels/'files.json'),
+            protocol_sha256=sha256(Path('docs/EXPERIMENT_V74.md')))
+    label = 'minute-close-effect-labels' if decision_seconds == 60 else 'close-effect-labels'
+    out = resume if resume is not None else new_run(output, label, settings)
     if resume is not None and (json.loads((out/'manifest.json').read_text())['settings'] != settings
         or ((out/'summary.json').exists() and json.loads((out/'summary.json').read_text())['complete'])):
         raise ValueError('청산 순효과 재개의 변경 입력 또는 완료 실행')
     print(f'보유 유지와 청산의 순효과 정답: {out}', flush=True)
     try:
+        if decision_seconds == 60:
+            from .minute_close_effects import (
+                preserve_generation_source,
+                validate_legacy_reference,
+                verify_legacy_grid,
+            )
+            preserve_generation_source(out, settings['implementation_sha256'])
+            legacy = validate_legacy_reference(legacy_labels, settings)
         bars, checks = prepare_minute_period(market, features, 'BTCUSDT', *CLOSE_PERIOD, minute_inputs=True)
         if (out/'input_verification.json').exists() and canonical(checks) != canonical(json.loads((out/'input_verification.json').read_text())):
             raise ValueError('청산 순효과의 시세 검증 변경')
@@ -287,13 +302,21 @@ def run_close_effect_labels(reference: Path, market: Path, features: Path, outpu
         replay = out/f'replay-{uuid4().hex[:12]}'
         with OutcomeJournal(out/'outcomes.sqlite', settings) as journal:
             rows, counts, complete = collect_close_effects(bars, policy, EngineConfig(**frozen['risk']), previous,
-                replay, journal, pd.Timestamp('2021-12-31', tz='UTC'), max_opportunities)
+                replay, journal, pd.Timestamp('2021-12-31', tz='UTC'), max_opportunities, decision_seconds=decision_seconds)
             journal.verify()
         frame = pd.DataFrame(rows).reindex(columns=sorted(pd.DataFrame(rows).columns))
         for name in ['decision_time', 'position_entry_time', 'label_end', 'continue_end']:
             if name in frame:
                 frame[name] = pd.to_datetime(frame[name], utc=True)
         frame.to_parquet(out/'opportunity_ledger.parquet', index=False)
+        if decision_seconds == 60:
+            save_json(out/'legacy_parity.json', verify_legacy_grid(frame, legacy, complete))
+            if sha256(legacy_labels/'files.json') != settings['legacy_files_sha256']:
+                raise ValueError('분별 청산 생성 중 기존 원장 지문 변경')
+            if any(sha256(legacy_labels/n) != h for n, h in json.loads((legacy_labels/'files.json').read_text()).items()):
+                raise ValueError('분별 청산 생성 중 기존 출력 변경')
+            if any(sha256(Path(__file__).parent/n) != h for n, h in settings['implementation_sha256'].items()):
+                raise ValueError('분별 청산 생성 중 구현 변경')
         train = frame[frame.label_status.eq('closed')].reset_index(drop=True) if len(frame) else frame.copy()
         train.to_parquet(out/'training_labels.parquet', index=False)
         support = []
@@ -308,8 +331,11 @@ def run_close_effect_labels(reference: Path, market: Path, features: Path, outpu
             'statuses': frame.label_status.value_counts().to_dict() if len(frame) else {}, 'counts': counts,
             'replay': str(replay), 'replay_parity_sha256': sha256(replay/'parity.json'), 'profitability_accepted': False,
             'forced_boundary_closes': False, 'new_models_fitted': False})
-        save_json(out/'files.json', {n: sha256(out/n) for n in ['manifest.json', 'input_verification.json', 'outcomes.sqlite',
-            'opportunity_ledger.parquet', 'training_labels.parquet', 'support.json', 'summary.json']})
+        files = ['manifest.json', 'input_verification.json', 'outcomes.sqlite',
+            'opportunity_ledger.parquet', 'training_labels.parquet', 'support.json', 'summary.json']
+        if decision_seconds == 60:
+            files.append('legacy_parity.json')
+        save_json(out/'files.json', {n: sha256(out/n) for n in files})
         print(f'청산 순효과 {len(train)}/{len(frame)}개 확정, 전체 완료: {complete}', flush=True)
     except Exception as error:
         save_json(out/f'failure-{uuid4().hex[:12]}.json', {'type': type(error).__name__, 'message': str(error)})

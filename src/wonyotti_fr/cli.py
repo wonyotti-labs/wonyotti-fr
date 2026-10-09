@@ -424,6 +424,14 @@ def main() -> None:
     stopping_close.add_argument('--diagnosis-run', type=Path, required=True)
     stopping_close.add_argument('--output', type=Path, default=Path('artifacts'))
     stopping_close.set_defaults(func=lambda a: print(run_stopping_close_diagnosis(a.diagnosis_run, a.output)))
+    from .minute_close_effects import run_minute_close_effect_labels
+    minute_close = commands.add_parser('minute-close-labels', help='분별 청산 기회의 전체 정답 복원')
+    minute_close.add_argument('--labels-run', type=Path, required=True)
+    minute_close.add_argument('--output', type=Path, default=Path('artifacts'))
+    minute_close.add_argument('--resume', type=Path)
+    minute_close.add_argument('--max-opportunities', type=int)
+    minute_close.set_defaults(func=lambda a: print(run_minute_close_effect_labels(a.labels_run, a.output,
+        resume=a.resume, max_opportunities=a.max_opportunities)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)
