@@ -506,6 +506,13 @@ def main() -> None:
     expanded_first.add_argument('--expansion-verification-sha256', required=True)
     expanded_first.add_argument('--output', type=Path, default=Path('artifacts'))
     expanded_first.set_defaults(func=lambda a: print(run_expanded_first_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.expansion_run, a.expansion_verification, a.expansion_verification_sha256, a.output)))
+    from .expanded_tree_diagnostics import run_expanded_tree_diagnosis
+    expanded_tree = commands.add_parser('expanded-first-tree-diagnose', help='같은 확장 첫 기회의 고정 트리 비교')
+    expanded_tree.add_argument('--diagnosis-run', type=Path, required=True)
+    expanded_tree.add_argument('--verification', type=Path, required=True)
+    expanded_tree.add_argument('--verification-sha256', required=True)
+    expanded_tree.add_argument('--output', type=Path, default=Path('artifacts'))
+    expanded_tree.set_defaults(func=lambda a: print(run_expanded_tree_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.output)))
     from .first_close_margin_diagnostics import run_first_close_margin_diagnosis
     first_margin = commands.add_parser('first-close-margin-diagnose', help='앞 구간 최초 청산 효과에 따른 실행 문턱 보정')
     first_margin.add_argument('--diagnosis-run', type=Path, required=True)
