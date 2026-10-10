@@ -506,6 +506,17 @@ def main() -> None:
     expanded_first.add_argument('--expansion-verification-sha256', required=True)
     expanded_first.add_argument('--output', type=Path, default=Path('artifacts'))
     expanded_first.set_defaults(func=lambda a: print(run_expanded_first_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.expansion_run, a.expansion_verification, a.expansion_verification_sha256, a.output)))
+    from .holding_ablation_research import run_holding_ablation, verify_holding_ablation
+    ablation = commands.add_parser('holding-ablation', help='기존 보유 정책의 다른 시장·관리 기여 대조')
+    ablation.add_argument('--reference', type=Path, required=True)
+    ablation.add_argument('--reference-sha256', required=True)
+    ablation.add_argument('--output', type=Path, default=Path('artifacts'))
+    ablation.set_defaults(func=lambda a: print(run_holding_ablation(a.reference, a.reference_sha256, a.output)))
+    ablation_verify = commands.add_parser('holding-ablation-verify', help='다른 시장·관리 대조 스물여덟 계좌의 독립 재생')
+    ablation_verify.add_argument('--run', type=Path, required=True)
+    ablation_verify.add_argument('--run-sha256', required=True)
+    ablation_verify.add_argument('--output', type=Path, default=Path('artifacts'))
+    ablation_verify.set_defaults(func=lambda a: print(verify_holding_ablation(a.run, a.run_sha256, a.output)))
     from .holding_stress import run_holding_stress, verify_holding_stress
     holding_stress = commands.add_parser('holding-stress', help='기존 보유 정책의 세 기간 비용·지연 대조')
     holding_stress.add_argument('--reference', type=Path, required=True)
