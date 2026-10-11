@@ -262,3 +262,13 @@ python -m wonyotti_fr.score_fusion_research --reference <v130_완료_증거_JSON
 ```
 
 과거 창 및 16개 재적합·전체 확률·기존 판단 보존·모든 월·39개 조건을 독립 검산한다. 원본 상태의 오프라인 연구이며 자체 계좌·실거래 연결은 포함하지 않는다.
+
+## v132 과거 관리 주문의 가격 기준 복원
+
+`order_price_history.attach_order_prices(frame, actions)`는 같은 포지션의 엄격히 이전인 각 주문 첫 관측 묶음 가격으로 네 로그 변화 입력과 연결 원장을 반환한다. `order_price_reference`는 원본 체결의 가격 재집계·별도 순회 연결·상태별 지원과 분포를 검산한다.
+
+```sh
+python -m wonyotti_fr.order_price_research --reference <v131_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+원본 열·정답·행을 유지하며 가격·원장·개별 입력은 로컬에만 기록한다. 예측 학습과 자체 계좌 실행은 포함하지 않는다.
