@@ -125,3 +125,8 @@ for extra_days in (0, 1):
 `PairedManagementModel`은 고정된 독립 이진 부스팅 3개, `PairedManagementLinear`는 같은 입력의 표준화 선형 대조다. 선형 합산의 재현성을 위해 연속 C 배열과 단일 계산 스레드를 사용한다. `direct_requests`는 공통 활동 관문 없이 청산·축소·추가 요청과 우선순위 행동을 반환한다. 평가·문턱과 별도 원가 재생·전체 트리 및 선형 재학습은 `paired_management_evaluation`·`paired_management_reference`에 제공한다. 원본 상태 진단용이며 실제 매매 연결은 없다.
 
 선형 대조의 요청 검산은 저장된 세 출력 동시 행렬 연산을 따른다. 라이브러리의 독립 단일 출력 확률은 1e-12 이내 수치 일치를 확인하며, 그 작은 차이로 문턱과 같은 요청을 다시 분류하지 않는다. 숫자 모형·문턱 자체를 반올림하거나 변경하지 않는다.
+
+
+## 고정 관리 정책의 입력 지원 범위
+
+`management_support.ManagementInputTrace`는 부모의 실제 관리 입력을 관찰하고 같은 판단을 반환한다. `training_profile`과 `SupportCounts`는 학습 경계와 비교 집계를 분리한다. `python -m wonyotti_fr.management_support_research --reference <로컬 출처 JSON> --sha256 <SHA-256>`은 고정 v48 두 계좌의 기존 출력 전체와 비교하고 새 폴더에 입력 기록·집계·지문을 저장한다. 새 모델 학습이나 실거래 기능은 없다. [계획](EXPERIMENT_V113.md)과 [결과](EXPERIMENT_V113_RESULTS.md)를 참조한다.
