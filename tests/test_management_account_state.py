@@ -138,3 +138,20 @@ def test_independent_reference_rejects_inconsistent_satoshi_conversion():
     result = account_state_frame(f, ledger, a, p)
     with pytest.raises(AssertionError):
         verify_account_state(f, ledger, a, p, result)
+
+
+def test_pre_position_unknown_episode_retained_in_denominator():
+    frame, ledger, activity, prices = source()
+    frame.state_episode_id = frame.state_episode_id.astype(object)
+    frame.loc[0, 'state_episode_id'] = None
+    frame.loc[0, 'paired_usable'] = False
+    frame.state_quantity = frame.state_quantity.astype(float)
+    frame.loc[0, 'state_quantity'] = np.nan
+    ledger = ledger.iloc[1:]
+    result = account_state_frame(frame, ledger, activity, prices)
+    verify_account_state(frame, ledger, activity, prices, result)
+    summary = summarize_account_state(result)
+    verify_account_summary(result, summary)
+    assert summary['all_rows'] == 8
+    assert summary['groups'][0]['all']['episodes'] == 5
+    assert result.account_reason.iloc[0] == 'missing_boundary'

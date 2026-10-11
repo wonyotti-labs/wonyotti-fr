@@ -68,7 +68,7 @@ def verify_account_summary(frame, actual):
         'account_usable', 'account_reason', 'account_band', 'futures_leverage',
         'all_y_exit', 'all_y_reduce', 'all_y_increase']].to_dict('records')
     def count(rows):
-        return {'rows': len(rows), 'episodes': len({r['state_episode_id'] for r in rows if r['state_episode_id'] > 0}),
+        return {'rows': len(rows), 'episodes': len({r['state_episode_id'] for r in rows if r['state_episode_id'] is not None and r['state_episode_id'] > 0}),
             'positive': {a: sum(bool(r['all_y_'+a]) for r in rows) for a in ['exit', 'reduce', 'increase']}}
     groups = []
     for kind in ['year', 'split']:
