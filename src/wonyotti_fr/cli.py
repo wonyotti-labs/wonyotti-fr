@@ -506,6 +506,17 @@ def main() -> None:
     expanded_first.add_argument('--expansion-verification-sha256', required=True)
     expanded_first.add_argument('--output', type=Path, default=Path('artifacts'))
     expanded_first.set_defaults(func=lambda a: print(run_expanded_first_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.expansion_run, a.expansion_verification, a.expansion_verification_sha256, a.output)))
+    from .collateral_diagnostics import run_collateral, verify_collateral
+    collateral = commands.add_parser('collateral-direction-diagnose', help='BTC 담보 포함 방향과 기존 선물 방향의 비교')
+    collateral.add_argument('--reference', type=Path, required=True)
+    collateral.add_argument('--reference-sha256', required=True)
+    collateral.add_argument('--output', type=Path, default=Path('artifacts'))
+    collateral.set_defaults(func=lambda a: print(run_collateral(a.reference, a.reference_sha256, a.output)))
+    collateral_verify = commands.add_parser('collateral-direction-verify', help='담보 포함 방향의 독립 원장·기간 검산')
+    collateral_verify.add_argument('--run', type=Path, required=True)
+    collateral_verify.add_argument('--run-sha256', required=True)
+    collateral_verify.add_argument('--output', type=Path, default=Path('artifacts'))
+    collateral_verify.set_defaults(func=lambda a: print(verify_collateral(a.run, a.run_sha256, a.output)))
     from .position_boost_diagnostics import run_position_boost
     from .position_boost_verification import verify_position_boost
     position_boost = commands.add_parser('position-boost-diagnose', help='보유 방향의 고정 비선형 시장 모형 진단')
