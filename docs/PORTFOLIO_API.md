@@ -117,3 +117,9 @@ for extra_days in (0, 1):
 `state_action_windows_reference.verify_requests`·`verify_windows`·`independent_summary`는 원본 순회·별도 이진 검색·수동 집계로 모든 주문·창·특징·상태·정답·요약을 대조한다. 같은 시각의 후속 주문도 순서로 구분한다. 원본 상태는 오프라인 정답 구축용이며 실행 봇의 입력이 아니다. 새 모형이나 실제 체결 가격은 이 API의 범위에 포함하지 않는다.
 
 `summarize_request_sequence`와 `independent_request_sequence`는 첫 독립 주문 뒤에 오는 같은 에피소드의 관리 요청을 전체·지원 구간으로 나누어 학습·진단·연도·월별로 집계한다. 동일 시각의 후속 주문도 포함하며 전체 정답 표를 다시 선택하거나 변경하지 않는다.
+
+## 첫 주문과 복수 관리 정답의 같은 입력 비교
+
+`paired_management.management_frame`은 v107 전체 표를 보존하며 엄격한 이전 원가·보유 시간·추가 주문 수와 창 시작의 원거래소 시세로 32개 입력을 구성한다. 첫 정상 주문과 모든 같은 에피소드 요청의 정답을 각각 보존한다. `split_support`는 학습·문턱 보정·진단을 24시간과 현재·관련 에피소드 경계로 분리한다.
+
+`PairedManagementModel`은 고정된 독립 이진 부스팅 3개, `PairedManagementLinear`는 같은 입력의 표준화 선형 대조다. 선형 합산의 재현성을 위해 연속 C 배열과 단일 계산 스레드를 사용한다. `direct_requests`는 공통 활동 관문 없이 청산·축소·추가 요청과 우선순위 행동을 반환한다. 평가·문턱과 별도 원가 재생·전체 트리 및 선형 재학습은 `paired_management_evaluation`·`paired_management_reference`에 제공한다. 원본 상태 진단용이며 실제 매매 연결은 없다.
