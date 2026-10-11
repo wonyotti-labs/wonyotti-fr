@@ -252,3 +252,13 @@ python -m wonyotti_fr.causal_management_research --reference <v129_완료_증거
 ```
 
 별도 누적 수·보간·절편·문턱·결합·모든 월·35개 조건을 검산한다. 원본 상태의 오프라인 연구이며 자체 계좌나 실거래 연결은 포함하지 않는다.
+
+## v131 절대 점수와 과거 분포의 결합 보정
+
+`management_score_fusion.fit_score_fusion(calibration, ledger)`는 동일 지원 행의 단독/결합 로지스틱 16개와 추가 절편·문턱을 적합한다. `fusion_probabilities`는 행동·상태·기본 출처·보정 종류·특징 순서·숫자 매개변수를 검증한다. `fusion_predictions`는 지원된 quiet 행에만 새 보정기를 적용한다.
+
+```sh
+python -m wonyotti_fr.score_fusion_research --reference <v130_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+과거 창 및 16개 재적합·전체 확률·기존 판단 보존·모든 월·39개 조건을 독립 검산한다. 원본 상태의 오프라인 연구이며 자체 계좌·실거래 연결은 포함하지 않는다.
