@@ -242,3 +242,13 @@ python -m wonyotti_fr.management_rank_research --reference <v128_완료_증거_J
 ```
 
 `management_rank_reference.verify_score_audit`는 별도 점수 빈도·누적 수·혼동 집계·분위수 보간으로 대조한다. 사후 절단점은 미래 점수를 포함하는 진단이며 실행 정책으로 사용하지 않는다.
+
+## v130 과거 점수 창의 관리 분포 보정
+
+`causal_score_distribution.PastScoreWindow.observe(timestamp, score)`는 현재 삽입 전에 직전 30일의 개수·낮은 수·동점 수를 반환한다. `causal_management.map_management_history`는 2020년 기준 분포로 변환한 로컬 원장을 만들고, `fit_causal_calibration`은 상반기 지원 행만 적합한다. 미지원 행과 청산·recent는 기존 판단을 유지한다.
+
+```sh
+python -m wonyotti_fr.causal_management_research --reference <v129_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+별도 누적 수·보간·절편·문턱·결합·모든 월·35개 조건을 검산한다. 원본 상태의 오프라인 연구이며 자체 계좌나 실거래 연결은 포함하지 않는다.
