@@ -167,3 +167,8 @@ for extra_days in (0, 1):
 ## 첫 추가·축소의 분리 학습
 
 `python -m wonyotti_fr.first_state_learning --reference <기존 경로·원본 모형 완료 참조 JSON> --sha256 <신뢰한 SHA-256>`은 기존 전체 분할을 보존하고 첫 상태 두 모형·보정·문턱을 비교한다. 독립 재적합·모든 확률·월별 지표·보존 요청과 21개 조건을 검산한다. 기존 `first_state_research` 계좌 실행과 구분하며 새 계좌나 실제 주문은 실행하지 않는다. [계획](EXPERIMENT_V119.md)과 [결과](EXPERIMENT_V119_RESULTS.md)를 참조한다.
+
+
+## 추가·축소 체결 이력 조합
+
+`python -m wonyotti_fr.joint_history_learning --reference <v119 완료 검산 JSON> --sha256 <신뢰한 SHA-256>`은 원본 50개에 네 이력 조합 표시를 추가한 전체 모델을 비교한다. 세 분할·모든 확률·첫/전체 문턱·네 조합·월별 지표·25개 조건을 독립 검산하며 실제 주문이나 새 계좌는 실행하지 않는다. [계획](EXPERIMENT_V120.md)과 [결과](EXPERIMENT_V120_RESULTS.md)를 참조한다.
