@@ -506,6 +506,18 @@ def main() -> None:
     expanded_first.add_argument('--expansion-verification-sha256', required=True)
     expanded_first.add_argument('--output', type=Path, default=Path('artifacts'))
     expanded_first.set_defaults(func=lambda a: print(run_expanded_first_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.expansion_run, a.expansion_verification, a.expansion_verification_sha256, a.output)))
+    from .portfolio_prices import collect_price_file
+    from .portfolio_prices_review import verify_price_collection
+    portfolio_prices = commands.add_parser('portfolio-prices-collect', help='고정 요청의 공동 계약 공개 과거 종가 수집·재개')
+    portfolio_prices.add_argument('--requests', type=Path, required=True)
+    portfolio_prices.add_argument('--requests-sha256', required=True)
+    portfolio_prices.add_argument('--output', type=Path, required=True)
+    portfolio_prices.set_defaults(func=lambda a: print(collect_price_file(a.requests, a.requests_sha256, a.output)))
+    portfolio_review = commands.add_parser('portfolio-prices-verify', help='공동 계약 원응답·보존 BTC·전체 필요 가격 독립 검산')
+    portfolio_review.add_argument('--collection', type=Path, required=True)
+    portfolio_review.add_argument('--final-sha256', required=True)
+    portfolio_review.add_argument('--output', type=Path, default=Path('artifacts'))
+    portfolio_review.set_defaults(func=lambda a: print(verify_price_collection(a.collection, a.final_sha256, a.output)))
     from .collateral_diagnostics import run_collateral, verify_collateral
     collateral = commands.add_parser('collateral-direction-diagnose', help='BTC 담보 포함 방향과 기존 선물 방향의 비교')
     collateral.add_argument('--reference', type=Path, required=True)
