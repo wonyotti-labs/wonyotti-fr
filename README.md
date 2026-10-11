@@ -472,3 +472,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v95](docs/EXPERIMENT_V95.md)는 `collateral-direction-diagnose --reference <출처 JSON> --reference-sha256 <신뢰한 SHA-256>`으로 실행한다. 출처에는 `audit`(원본 정규화 원장)·`portfolio`(기존 포트폴리오 재구성)·`v44`(보유 정답 진단)·`v44_reference`(v94와 같은 검산 출처 JSON)·`original`(읽기 전용 원본 폴더)·`sha256`(각 입력 경로와 지문)이 필요하다. 입력 지문에는 원본 5개, 원장·감사·포트폴리오 설정, v44 참조 JSON과 연결한 전체 검산 근거가 포함된다. BTC 담보와 선물의 순방향을 기본·확장 입출금 날짜 구간에서 비교하며 다른 계약이 열려 있으면 미지원 상태를 보존한다. `collateral-direction-verify --run <실행> --run-sha256 <신뢰한 files.json SHA-256>`은 모든 경계의 독립 현금·원가 원장과 전체 비교·월별 분모를 검산한다. 새 학습이나 매매 실행은 포함하지 않는다.
 
 [v96](docs/EXPERIMENT_V96.md)의 공동 계약 가격·활동·계좌 평가와 독립 검산은 [포트폴리오 API](docs/PORTFOLIO_API.md)로 제공한다. `portfolio-prices-collect`는 고정 요청의 공개 종가 수집·재개, `portfolio-prices-verify`는 v96 전체 수집 근거의 원응답·기존 BTC·필요 범위 대조 명령이다. 계좌 평가는 `portfolio_valuation`과 별도 `portfolio_valuation_reference`를 함께 호출한다. 거래 없는 봉·다른 계약·입출금 날짜의 불확실성을 보존한다.
+
+[v97](docs/EXPERIMENT_V97.md)의 담보 포함 순노출 정답·고정 회귀·독립 검산은 [포트폴리오 API](docs/PORTFOLIO_API.md)의 `net_exposure_targets`·`net_exposure_model`·`net_exposure_reference`로 제공한다. 원본 상태와 시장 입력을 구분하고 숫자 모형의 변조·전체 정답·시간 경계와 예측을 대조한다.

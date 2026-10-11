@@ -36,3 +36,11 @@ for extra_days in (0, 1):
 기본·확장 입출금 날짜 구간은 시각이 없는 원본에 대한 가정이다. 평가에는 수수료·펀딩과 열린 동시 계약을 포함한다. BTC 부분 민감도는 다른 USD·USDT 가격과 BTC 표시 계약의 기준 가격을 고정한 값이다. 전체 다자산 수익률이나 BTC 전용 봇의 정답과 같다고 가정하지 않는다. 거래 종가는 당시 마크 가격을 복원한 값이 아니며 ±1% 가격 대조도 보장된 오차 한계가 아니다. 가격 누락·지원되지 않는 계약·날짜 불확실성을 그대로 유지한다.
 
 검산된 전체 행과 월별 결과는 [v96 결과](EXPERIMENT_V96_RESULTS.md)에 보존한다. API 등록과 기존 결과 재현은 수익성 채택을 의미하지 않는다.
+
+## 순노출 정답과 회귀 진단
+
+[v97](EXPERIMENT_V97.md)의 `net_exposure_targets.net_exposure_targets(source, comparisons, part)`는 원본의 현재·다음 경계를 담보 포함 BTC 부분 노출 정답에 연결한다. `source`는 v44의 원래 행과 14개 확정 시장 입력, `comparisons`는 위 평가 행에 거래 활동을 연결한 v96의 확장 입출금 날짜 구간, `part`는 `training` 또는 `diagnosis`다. 날짜 불확실·무거래 가격·비양수 계좌는 행을 보존한 채 미지원 사유로 남긴다.
+
+`net_exposure_model.NetExposureModel.fit(x, y, validation)`과 `fit_ridge`는 고정한 부스팅·선형 대조를 학습한다. `x`는 `event_features.MARKET_FEATURES` 순서의 시장 입력만 사용하며 원본 현재 노출을 섞지 않는다. 모형은 `to_dict`와 `from_dict`의 숫자 트리로 저장·복원한다. `net_exposure_reference`의 `independent_target_check`·`independent_model_check`·`independent_metrics`는 정답 연결·독립 재학습·전체 예측과 지표를 검산한다. 현재 원본 노출 유지 대조는 실행 가능한 봇의 입력이 아니다.
+
+2020년 학습·2021년 진단의 기존 실패와 모든 월을 보존하며, 예측 오차 감소를 수익성으로 판정하지 않는다. 기존 모형의 실제 계좌 적용과 손실은 [v98 결과](EXPERIMENT_V98_RESULTS.md)에 별도로 기록한다.
