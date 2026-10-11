@@ -135,3 +135,8 @@ for extra_days in (0, 1):
 ## 관리 점수와 반복 문턱의 고정 비교
 
 `python -m wonyotti_fr.management_score_research --reference <v113 검산 JSON> --sha256 <SHA-256>`은 원본 세 구간과 두 봇의 봉인 입력에서 같은 모델을 재계산한다. 반복 가산의 유무, 행동 우선순위·수량·대기 영향을 분리하며 새 모델이나 계좌 수익을 만들지 않는다. 별도 말단 경로·문턱·집계 검산을 포함한다. [계획](EXPERIMENT_V114.md)과 [결과](EXPERIMENT_V114_RESULTS.md)를 참조한다.
+
+
+## 관리 모델의 거래소 시장 입력 정렬
+
+`management_market.connect_market`은 기존 50개 입력 중 시장 관측 36개만 교체하고 원본 상태·정답을 보존한다. `python -m wonyotti_fr.management_market_research --reference <고정 출처 JSON> --sha256 <SHA-256>`은 원래 BitMEX 입력을 재현하고 Binance 입력의 시각·공동 지원을 별도 계산으로 대조한다. 모든 원본 행과 제외 사유를 저장한다. 현재 명령은 [v116 계획](EXPERIMENT_V116.md)의 입력 검산 단계이며 새 모델 적합이나 매매 실행을 수행하지 않는다.
