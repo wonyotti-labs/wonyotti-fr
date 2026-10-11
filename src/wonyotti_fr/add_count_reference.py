@@ -74,7 +74,7 @@ def requested_metrics(y, p, requested, beta):
     return value
 
 
-def verify_count_strata(frame, predictions, saved):
+def verify_count_strata(frame, predictions, saved, model_names=("v127", "v133")):
     bucket_names = ["all", "0", "1", "2", "3", "4", "5", ">5"]
     expected = {}
     for action, beta in [("reduce", 1.), ("increase", .5)]:
@@ -92,7 +92,7 @@ def verify_count_strata(frame, predictions, saved):
                     "negative": int(np.count_nonzero(y == 0)), "episodes": len(set(part.episode_id)),
                     "distinct_counts": len(actual_counts), "minimum_adds": min(actual_counts) if len(y) else None,
                     "maximum_adds": max(actual_counts) if len(y) else None}, "models": {}}
-                for name in ["v127", "v133"]:
+                for name in model_names:
                     selected = predictions[name].iloc[positions]
                     value["models"][name] = requested_metrics(y, selected[action + "_tree_score"].to_numpy(),
                         selected[action + "_tree_request"].to_numpy(bool), beta)
@@ -102,7 +102,7 @@ def verify_count_strata(frame, predictions, saved):
                 raise ValueError("추가 횟수 진단의 고정 구간 변경")
             for key in ["rows", "positive", "negative"]:
                 assert sum(buckets[b]["support"][key] for b in bucket_names[1:]) == buckets["all"]["support"][key]
-            for name in ["v127", "v133"]:
+            for name in model_names:
                 total = buckets["all"]["models"][name]
                 parts = [buckets[b]["models"][name] for b in bucket_names[1:] if buckets[b]["models"][name] is not None]
                 if total is None:

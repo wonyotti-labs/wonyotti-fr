@@ -72,11 +72,13 @@ def count_masks(frame):
     return {"all": np.ones(len(frame), dtype=bool), **{str(i): counts == i for i in range(6)}, ">5": counts > 5}
 
 
-def validate_count_predictions(frame, predictions):
-    if set(predictions) != set(MODELS):
+def validate_count_predictions(frame, predictions, model_names=MODELS):
+    if (len(model_names) != 2 or len(set(model_names)) != 2
+        or any(not isinstance(name, str) or not name for name in model_names)
+        or set(predictions) != set(model_names)):
         raise ValueError("누적 횟수 진단의 고정 대조 누락")
     count_masks(frame)
-    for name in MODELS:
+    for name in model_names:
         saved = predictions[name]
         pd.testing.assert_frame_equal(frame[CONTEXT], saved[CONTEXT], check_exact=True)
         for action in ACTIONS:
@@ -88,8 +90,8 @@ def validate_count_predictions(frame, predictions):
                 raise ValueError("누적 횟수 진단의 정답·점수·요청 오류")
 
 
-def audit_count_strata(frame, predictions):
-    validate_count_predictions(frame, predictions)
+def audit_count_strata(frame, predictions, model_names=MODELS):
+    validate_count_predictions(frame, predictions, model_names)
     counts = count_masks(frame)
     result = {}
     for action in ACTIONS:
