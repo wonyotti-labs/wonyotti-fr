@@ -96,3 +96,13 @@ def test_future_changes_and_original_state_do_not_change_earlier_market_inputs()
 def test_period_boundary_validation(first, last):
     with pytest.raises(ValueError):
         align_market(source(), features(), first, last)
+
+
+def test_original_market_columns_are_preserved_but_never_used_as_new_features():
+    original, market = source(), features()
+    original[MARKET_FEATURES] = 1e9
+    aligned = align_market(original, market, FIRST, LAST)
+    verify_alignment(original, market, aligned, FIRST, LAST)
+    assert aligned[MARKET_FEATURES].eq(1e9).all().all()
+    assert np.max(np.abs(aligned_matrix(aligned, 'window_start'))) < 1000
+    assert np.max(np.abs(aligned_matrix(aligned, 'window_end'))) < 1000
