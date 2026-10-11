@@ -128,7 +128,11 @@ def streaming_extrema(frame, initial=None):
         "minutes_since_worst",
         *EXTRA_FEATURES,
     ]
-    return pd.DataFrame(result, columns=names), state
+    result = pd.DataFrame(result, columns=names)
+    # 문자열로 복원한 시각도 원본 분 경계의 저장 단위를 유지한다.
+    time_names = ["end", "path_first_end", "best_record_end", "worst_record_end"]
+    result = result.astype(dict.fromkeys(time_names, frame.end.dtype))
+    return result, state
 
 
 def verify_extrema_inputs(source, table, rows, expanded, links):

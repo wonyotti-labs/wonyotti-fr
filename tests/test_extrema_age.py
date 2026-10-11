@@ -229,6 +229,21 @@ def test_restart_gap_is_rejected_after_flat():
         streaming_extrema(later, state)
 
 
+@pytest.mark.parametrize("unit", ["ns", "us"])
+def test_original_datetime_unit_preserved_by_stream(unit):
+    source = basic_source()
+    for name in ["end", "entry_time"]:
+        source[name] = source[name].astype(f"datetime64[{unit}, UTC]")
+    table = extrema_clock_table(source)
+    direct, _ = streaming_extrema(source)
+    pd.testing.assert_frame_equal(table[direct.columns], direct, check_exact=False, atol=1e-12, rtol=0)
+    for name in ["end", "path_first_end", "best_record_end", "worst_record_end"]:
+        assert direct[name].dtype == source.end.dtype
+    _, state = streaming_extrema(source.iloc[:3])
+    after, _ = streaming_extrema(source.iloc[3:], json.loads(json.dumps(state)))
+    pd.testing.assert_frame_equal(direct.iloc[3:].reset_index(drop=True), after, check_exact=True)
+
+
 def test_future_price_and_label_changes_preserve_past(study):
     source, table, rows, expanded = study[:4]
     changed = source.copy()
