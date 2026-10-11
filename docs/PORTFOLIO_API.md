@@ -192,3 +192,13 @@ for extra_days in (0, 1):
 ## 보유 극값 갱신 후 경과 시간
 
 `python -m wonyotti_fr.extrema_age_learning --reference <v123 완료 검산 JSON> --sha256 <신뢰한 SHA-256>`은 전체 원본 분별 경로에서 최선·최악 종가의 엄격한 갱신 후 경과 시간을 복원한다. 기존 50개 입력과 정답을 보존하고 두 시간 입력·52개 입력 모형·선형 대조를 비교한다. 전체 경로의 배치/상태 갱신, 원래 세 모형의 점수·요청·월 지표, 새 모델·시간 구간·31개 조건을 검산한다. 실제 계좌나 주문은 실행하지 않는다. [계획](EXPERIMENT_V124.md)과 [결과](EXPERIMENT_V124_RESULTS.md)를 참조한다.
+
+## v125 고정 관리 요청의 시간 진단
+
+`request_timing.audit_action(frame, request, label)`은 UTC 분 경계·연속 포지션과 이진 요청·정답을 검증하고 정확한 분 혼동 수, FP의 앞뒤 14분 분류, 정확한 분을 먼저 고정한 최대 일대일 대응, 3분 간격 군집을 반환한다. 군집은 실제 대기 정책 재생이 아니다. `request_timing_reference.verify_action`은 별도 증대 경로 최대 대응과 직접 시간 차이·순회로 모든 집계 및 원장을 검사한다.
+
+```sh
+python -m wonyotti_fr.request_timing_research --reference <v124_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+실행은 새 폴더에서만 출력하며 v124·교사 자료의 봉인과 원본 행·기존 문턱 통과·혼동 수, 실행 전후 입력·코드 지문을 검증한다. 학습·주문 실행·수익성 판정은 포함하지 않는다.
