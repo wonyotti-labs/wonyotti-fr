@@ -145,3 +145,8 @@ for extra_days in (0, 1):
 ## 반복 관리 가산 제거의 자체 계좌
 
 `RepeatDirectPolicy`는 고정 v48의 반복 추가·축소 문턱만 직접 적용한다. `ReferenceRepeatPolicy`는 원래 부모의 문턱 호출을 감싸 별도 계좌 검산에 사용한다. `python -m wonyotti_fr.repeat_direct_research --reference <고정 입력 JSON> --sha256 <SHA-256>`은 v114의 선행 통과를 확인하고 다섯 계좌와 비용·위험·집중 집계를 새 폴더에 저장한다. [계획](EXPERIMENT_V115.md)과 [결과](EXPERIMENT_V115_RESULTS.md)를 참조한다.
+
+
+## 같은 행의 거래소 관리 모형 학습
+
+`python -m wonyotti_fr.management_market_learning --reference <v116 입력 검산 JSON> --sha256 <SHA-256>`은 검산된 공동 지원 행에서 원본·정렬 부스팅과 정렬 선형 모형을 적합한다. 상반기 절편·문턱 보정 뒤 하반기와 월별 지표를 평가하며, 별도 재학습의 384개 트리·선형 계수·전체 확률·선택·판정을 대조한다. 진단 자료는 모형·절편 적합에 사용하지 않는다. 기존 모델과 원본 입력·정답·제외 행은 보존하며 자체 계좌 매매 실행은 포함하지 않는다.
