@@ -202,3 +202,13 @@ python -m wonyotti_fr.request_timing_research --reference <v124_완료_증거_JS
 ```
 
 실행은 새 폴더에서만 출력하며 v124·교사 자료의 봉인과 원본 행·기존 문턱 통과·혼동 수, 실행 전후 입력·코드 지문을 검증한다. 학습·주문 실행·수익성 판정은 포함하지 않는다.
+
+## v126 최근 관리 행동 부재 상태의 분리 학습
+
+`quiet_management.quiet_mask`는 기존 과거 15분 독립 첫 체결 로그 횟수에서 행동별 quiet 상태를 고르고 유한·비음수·정수 복원을 검증한다. `fit_quiet_models(training, calibration)`은 진단 자료를 받지 않고 축소·추가의 256회 부스팅·선형, 절편·문턱을 적합한다. `quiet_predictions`는 quiet만 새 모델로 바꾸고 청산과 recent 상태의 기존 native 점수·요청을 보존한다. capacity 대조도 quiet에서만 교체한다.
+
+```sh
+python -m wonyotti_fr.quiet_management_learning --reference <v125_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+실행은 원본 분할·파일 봉인과 v125→v124 출처를 확인하고, 새 512개 트리·선형·모든 확률·월별 지표·27개 조건을 독립 검산한다. 새 계좌 실행과 주문 연결은 포함하지 않는다.
