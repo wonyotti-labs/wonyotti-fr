@@ -239,3 +239,35 @@ def independent_summary(windows, filled, requested):
     result['requested_vs_first_fill_action_mismatches'] = mismatches
     result['profitability_accepted'] = False
     return result
+
+
+def independent_request_sequence(windows, requested):
+    supported = {i for i, row in enumerate(windows.itertuples(index=False)) if row.usable}
+    seen = set()
+
+    def empty():
+        return {'orders': 0, 'supported_orders': 0, 'scopes': Counter(),
+            'later_management': {scope: dict.fromkeys(('exit', 'reduce', 'increase'), 0) for scope in ('all', 'supported')}}
+
+    groups = defaultdict(empty)
+    for row in requested.itertuples(index=False):
+        later = row.window_index >= 0 and row.window_index in seen
+        seen.add(row.window_index)
+        available = row.window_index in supported
+        keys = ['all', row.time.strftime('%Y'), row.time.strftime('%Y-%m')]
+        if 2018 <= row.time.year < 2021:
+            keys.append('training')
+        elif row.time.year == 2021:
+            keys.append('diagnosis')
+        for key in keys:
+            g = groups[key]
+            g['orders'] += 1
+            g['supported_orders'] += int(available)
+            g['scopes'][row.label_scope] += 1
+            for target in ('exit', 'reduce', 'increase'):
+                if later and getattr(row, target):
+                    g['later_management']['all'][target] += 1
+                    g['later_management']['supported'][target] += int(available)
+    return {'all': groups['all'], 'periods': {p: groups[p] for p in ('training', 'diagnosis')},
+        'yearly': [{'period': k, **groups[k]} for k in sorted(groups) if len(k) == 4],
+        'monthly': [{'period': k, **groups[k]} for k in sorted(groups) if len(k) == 7]}

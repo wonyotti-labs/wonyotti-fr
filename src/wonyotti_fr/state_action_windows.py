@@ -186,3 +186,22 @@ def summarize_windows(windows, filled, requested):
     result['requested_vs_first_fill_action_mismatches'] = int(requested.requested_action.ne(requested.first_filled_action).sum())
     result['profitability_accepted'] = False
     return result
+
+
+def summarize_request_sequence(windows, requested):
+    rows = requested.copy()
+    rows['supported'] = rows.window_index.isin(windows.index[windows.usable])
+    rows['later'] = rows.window_index.ge(0) & rows.groupby('window_index', sort=False).cumcount().gt(0)
+
+    def summarize(frame):
+        return {'orders': len(frame), 'supported_orders': int(frame.supported.sum()),
+            'scopes': {str(k): int(v) for k, v in frame.label_scope.value_counts().items()},
+            'later_management': {scope: {target: int((frame.later & frame[target] & eligible).sum())
+                for target in ('exit', 'reduce', 'increase')}
+                for scope, eligible in [('all', True), ('supported', frame.supported)]}}
+
+    return {'all': summarize(rows),
+        'periods': {name: summarize(rows.loc[rows.time.ge(pd.Timestamp(first, tz='UTC')) & rows.time.lt(pd.Timestamp(last, tz='UTC'))])
+            for name, (first, last) in PERIODS.items()},
+        'yearly': [{'period': str(k), **summarize(v)} for k, v in rows.groupby(rows.time.dt.strftime('%Y'), sort=True)],
+        'monthly': [{'period': str(k), **summarize(v)} for k, v in rows.groupby(rows.time.dt.strftime('%Y-%m'), sort=True)]}

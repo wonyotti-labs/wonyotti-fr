@@ -115,3 +115,5 @@ for extra_days in (0, 1):
 `state_action_windows.requested_orders(executions, ledger)`는 정상 XBTUSD 주문의 최초 체결에서 관측된 요청 수량과 직전 포지션으로 요청 행동을 구분한다. 요청 반전과 첫 부분 체결의 축소는 서로 다른 의미로 보존한다. `action_windows(features, ledger, orders, episodes)`는 모든 5분 창과 실제 체결·독립 요청의 두 원장을 반환한다. 창 시작의 엄격한 이전 상태, 시작·종료 특징, 다중 행동 수와 양성 여부, 시간·에피소드 배제 사유를 보존한다.
 
 `state_action_windows_reference.verify_requests`·`verify_windows`·`independent_summary`는 원본 순회·별도 이진 검색·수동 집계로 모든 주문·창·특징·상태·정답·요약을 대조한다. 같은 시각의 후속 주문도 순서로 구분한다. 원본 상태는 오프라인 정답 구축용이며 실행 봇의 입력이 아니다. 새 모형이나 실제 체결 가격은 이 API의 범위에 포함하지 않는다.
+
+`summarize_request_sequence`와 `independent_request_sequence`는 첫 독립 주문 뒤에 오는 같은 에피소드의 관리 요청을 전체·지원 구간으로 나누어 학습·진단·연도·월별로 집계한다. 동일 시각의 후속 주문도 포함하며 전체 정답 표를 다시 선택하거나 변경하지 않는다.

@@ -7,8 +7,14 @@ from wonyotti_fr.entry_boundary_reference import independent_ledger
 from wonyotti_fr.entry_boundary_support import transition_ledger
 from wonyotti_fr.event_features import MARKET_FEATURES
 from wonyotti_fr.reconstruct import reconstruct
-from wonyotti_fr.state_action_windows import action_windows, requested_orders, summarize_windows
+from wonyotti_fr.state_action_windows import (
+    action_windows,
+    requested_orders,
+    summarize_request_sequence,
+    summarize_windows,
+)
 from wonyotti_fr.state_action_windows_reference import (
+    independent_request_sequence,
     independent_summary,
     verify_requests,
     verify_windows,
@@ -226,3 +232,19 @@ def test_one_nanosecond_before_boundary_is_state_and_exact_boundary_is_label():
     assert requested.loc[requested.order_key.eq('i'), 'window_index'].item() == 3
     verify_requests(raw, ledger, orders)
     verify_windows(features, independent_ledger(events, actions), orders, episodes, windows, filled, requested)
+
+
+@pytest.mark.parametrize('mode', ['normal', 'unsupported', 'empty'])
+def test_request_sequence_keeps_same_time_later_management_and_periods(mode):
+    *_, windows, _, requested = build()
+    if mode == 'empty':
+        requested = requested.iloc[:0].copy()
+    elif mode == 'unsupported':
+        windows.loc[3, 'usable'] = False
+    actual = summarize_request_sequence(windows, requested)
+    assert actual == independent_request_sequence(windows, requested)
+    expected = {'exit': 0 if mode == 'empty' else 1, 'reduce': 0, 'increase': 0 if mode == 'empty' else 1}
+    assert actual['all']['later_management']['all'] == expected
+    assert actual['all']['later_management']['supported'] == (expected if mode == 'normal' else dict.fromkeys(expected, 0))
+    assert actual['periods']['training'] == actual['all']
+    assert actual['periods']['diagnosis']['orders'] == 0
