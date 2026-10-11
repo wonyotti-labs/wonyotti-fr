@@ -13,7 +13,7 @@ def verify_wait_episodes(curve, fills, bars, episodes, *, offset=16, ttl=5):
     times = pd.to_datetime(curve.time, utc=True).astype("datetime64[ns, UTC]")
     pd.testing.assert_series_equal(
         times.reset_index(drop=True).rename("end"),
-        bars.end.reset_index(drop=True),
+        bars.end.astype("datetime64[ns, UTC]").reset_index(drop=True),
         check_exact=True,
     )
     starts = np.flatnonzero(curve.policy_event.eq("armed").to_numpy())

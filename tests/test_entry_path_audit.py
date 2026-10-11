@@ -186,6 +186,15 @@ def test_untrusted_reference_rejected(tmp_path):
         checked_entry_path_reference(path, "0" * 64)
 
 
+def test_equal_instants_with_microsecond_storage_match_exactly(tmp_path):
+    _, bars, curve, fills, _, episodes = make_run(tmp_path)
+    before = verify_wait_episodes(curve, fills, bars, episodes)
+    for name in ["time", "end"]:
+        bars[name] = bars[name].astype("datetime64[us, UTC]")
+    after = verify_wait_episodes(curve, fills, bars, episodes)
+    assert before == after
+
+
 def test_public_runner_preserves_source_and_records_failure(tmp_path, monkeypatch):
     import wonyotti_fr.entry_path_research as research
     from wonyotti_fr.common import sha256
