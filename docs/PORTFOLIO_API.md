@@ -232,3 +232,13 @@ python -m wonyotti_fr.management_experts_learning --reference <v127_완료_증�
 ```
 
 실행은 v126/v127 모델·보정·전체 예측·월별 결과를 재현하고 새 1,024개 트리·4개 선형·모든 지표·31개 조건을 독립 검산한다. 자체 계좌와 실거래 연결은 포함하지 않는다.
+
+## v129 관리 점수의 동점 순위와 문턱 이동
+
+`management_rank_audit.tail_cutoffs(scores)`는 정답 없이 고정 비율의 상위 점수 절단점을 계산한다. `audit_scores(frame, threshold, calibration_cutoffs)`는 기존 요청·양성 동점 순위·고정/사후 절단점·포지션 집중도와 로컬 원장을 반환한다.
+
+```sh
+python -m wonyotti_fr.management_rank_research --reference <v128_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+`management_rank_reference.verify_score_audit`는 별도 점수 빈도·누적 수·혼동 집계·분위수 보간으로 대조한다. 사후 절단점은 미래 점수를 포함하는 진단이며 실행 정책으로 사용하지 않는다.
