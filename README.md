@@ -474,3 +474,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v96](docs/EXPERIMENT_V96.md)의 공동 계약 가격·활동·계좌 평가와 독립 검산은 [포트폴리오 API](docs/PORTFOLIO_API.md)로 제공한다. `portfolio-prices-collect`는 고정 요청의 공개 종가 수집·재개, `portfolio-prices-verify`는 v96 전체 수집 근거의 원응답·기존 BTC·필요 범위 대조 명령이다. 계좌 평가는 `portfolio_valuation`과 별도 `portfolio_valuation_reference`를 함께 호출한다. 거래 없는 봉·다른 계약·입출금 날짜의 불확실성을 보존한다.
 
 [v97](docs/EXPERIMENT_V97.md)의 담보 포함 순노출 정답·고정 회귀·독립 검산은 [포트폴리오 API](docs/PORTFOLIO_API.md)의 `net_exposure_targets`·`net_exposure_model`·`net_exposure_reference`로 제공한다. 원본 상태와 시장 입력을 구분하고 숫자 모형의 변조·전체 정답·시간 경계와 예측을 대조한다.
+
+[v98](docs/EXPERIMENT_V98.md)의 변경량 학습·자체 계좌 실행은 [포트폴리오 API](docs/PORTFOLIO_API.md)의 `ExposureChangeModel`·`ExposurePolicy`·`ExposureEngine`·`backtest`·`verify_path`로 제공한다. 대조 상수는 로컬 학습 결과에서 명시적으로 전달하며 공개 코드와 합성 검사에 원본 학습값을 넣지 않는다.

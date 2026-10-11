@@ -44,3 +44,13 @@ for extra_days in (0, 1):
 `net_exposure_model.NetExposureModel.fit(x, y, validation)`과 `fit_ridge`는 고정한 부스팅·선형 대조를 학습한다. `x`는 `event_features.MARKET_FEATURES` 순서의 시장 입력만 사용하며 원본 현재 노출을 섞지 않는다. 모형은 `to_dict`와 `from_dict`의 숫자 트리로 저장·복원한다. `net_exposure_reference`의 `independent_target_check`·`independent_model_check`·`independent_metrics`는 정답 연결·독립 재학습·전체 예측과 지표를 검산한다. 현재 원본 노출 유지 대조는 실행 가능한 봇의 입력이 아니다.
 
 2020년 학습·2021년 진단의 기존 실패와 모든 월을 보존하며, 예측 오차 감소를 수익성으로 판정하지 않는다. 기존 모형의 실제 계좌 적용과 손실은 [v98 결과](EXPERIMENT_V98_RESULTS.md)에 별도로 기록한다.
+
+## 노출 변경과 자체 계좌 실행
+
+[v98](EXPERIMENT_V98.md)의 `exposure_change_targets.change_targets`는 현재·다음 순노출 정답의 차이와 양쪽 지원 여부를 보존한다. `exposure_change_model.ExposureChangeModel`은 시장 입력 14개와 현재 노출 한 개를 받으며, `predict_one`으로 동일한 숫자 트리를 단일 상태에서 계산한다. 이 변경량은 가격·펀딩 등에 의한 변화도 포함한다. 체결 의도와 같다고 가정하지 않으며 후속 v99·v100의 정답 분해 결과도 함께 확인해야 한다.
+
+`exposure_policy.ExposurePolicy`의 `change`·`absolute`는 각각 변경량·절대 노출 모형을 받는다. `change`는 봇 자신의 잔고·수량·확정 종가로 현재 노출을 구한다. `constant` 대조는 `constant_exposure`를 반드시 외부에서 전달한다. 학습 자료에서 얻은 상수나 모형을 공개 소스에 포함하지 않는다. 공개 테스트는 합성 상수를 사용한다.
+
+`exposure_engine.ExposureConfig`에 [실행 명세](EXPERIMENT_V98_EXECUTION.md)의 비용·낙폭·보유·대기 설정을 명시한 뒤 `exposure_backtest.backtest(frame, policy, config, output)`으로 새 로컬 출력 폴더에 실행한다. 입력은 `minute_data.prepare_minute_period`가 반환하는 시세·펀딩·확정 특징과 같은 형식이다. `ExposureEngine`은 다음 시가 체결·부분 감소·반전·위험 청산·무거래 대기·JSON 상태 복원을 처리한다.
+
+`exposure_backtest.verify_path(frame, kind, model_dict, config, output, review, constant_exposure=...)`는 모든 분봉·체결·거래·목표·최종 잔고를 별도 수량 방정식과 현금 흐름으로 검산한다. `model_dict`는 모형의 `to_dict()`이며 상수 대조는 `None`이다. 상수 대조의 값은 검산에도 동일하게 명시해야 하며 다른 정책에는 생략한다. 저장된 정책 설정과 다르면 검산을 거부한다. 이 실행기는 오프라인 연구용이며 실제 주문 연결은 없다.
