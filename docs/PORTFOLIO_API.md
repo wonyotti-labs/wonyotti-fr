@@ -68,3 +68,11 @@ for extra_days in (0, 1):
 `sparse_exposure_policy.SparseExposurePolicy(model)`을 `sparse_exposure_backtest.backtest(frame, policy, config, output)`에 전달한다. 최대 확률 동률과 거래 없음·숫자상 0 크기는 `None`을 반환해 수량을 유지한다. 방향 행동은 자체 계좌 노출에 예측 변경량을 더하고 [-0.5, 0.5]로 제한한다. 위험 청산·다음 시가 체결·비용·펀딩은 `ExposureEngine`을 사용한다.
 
 `sparse_exposure_backtest.verify_path(frame, "sparse_execution", model.to_dict(), config, output, review)`는 전체 분봉뿐 아니라 각 판단 시각의 확률·크기·행동·목표·미지원 사유를 독립 재생한다. 입력과 새 출력 폴더의 규약은 v98과 같다. 이 API 등록은 후보 채택이 아니다. [기존 결과](EXPERIMENT_V100_RESULTS.md)의 두 자체 계좌는 거래가 없어 수익성 기준을 충족하지 못했다.
+
+## 과거 체결 이력의 예측 진단
+
+[v101](EXPERIMENT_V101.md)의 `sparse_history.history_features(frame, source)`는 각 현재 시각에 이미 끝난 5분 창 12개만 조회한다. 양방향별 최근 행동의 존재·경과 시간·창 수를 여섯 특징으로 만든다. 창이 없거나 과거 분해가 미지원이면 0으로 채우지 않고 미지원 사유를 보존한다. 현재 정답 창과 미래 창은 특징에 포함하지 않는다.
+
+`HistoryClassifier.fit`는 `sparse_history.FEATURES` 순서의 시장·현재 노출·과거 이력 21개 입력을 받는다. `training_support`·`admission`은 고정한 표본 수와 동일 행 대조·최근 무체결 구간의 양방향 적중 조건을 검사한다. `sparse_history_reference.verify_history`·`independent_refit`·`reference_admission`은 모든 과거 참조·후보 및 대조 트리·채택 조건을 독립 확인한다.
+
+이 진단에는 원본 계좌 상태와 원본 과거 체결이 들어간다. 최근 1시간 무체결 구간은 봇의 실제 첫 진입과 같지 않다. [기존 실패](EXPERIMENT_V101_RESULTS.md)를 보존하며 자체 계좌 실행에 연결하지 않는다.
