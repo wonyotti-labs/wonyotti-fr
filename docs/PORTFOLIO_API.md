@@ -162,3 +162,8 @@ for extra_days in (0, 1):
 ## 기존 진입 대기와 보유 시간
 
 `python -m wonyotti_fr.entry_path_research --reference <v115 완료 검산 JSON> --sha256 <신뢰한 SHA-256>`은 기존 다섯 계좌를 읽고 대기·실제 진입·보유 분말·전체 월을 별도 계산으로 대조한다. 원래 계좌 파일은 변경하지 않고 새 폴더에 사본과 집계·검산 증거를 저장한다. 새 모델이나 계좌를 실행하지 않는다. [계획](EXPERIMENT_V118.md)과 [결과](EXPERIMENT_V118_RESULTS.md)를 참조한다.
+
+
+## 첫 추가·축소의 분리 학습
+
+`python -m wonyotti_fr.first_state_learning --reference <기존 경로·원본 모형 완료 참조 JSON> --sha256 <신뢰한 SHA-256>`은 기존 전체 분할을 보존하고 첫 상태 두 모형·보정·문턱을 비교한다. 독립 재적합·모든 확률·월별 지표·보존 요청과 21개 조건을 검산한다. 기존 `first_state_research` 계좌 실행과 구분하며 새 계좌나 실제 주문은 실행하지 않는다. [계획](EXPERIMENT_V119.md)과 [결과](EXPERIMENT_V119_RESULTS.md)를 참조한다.
