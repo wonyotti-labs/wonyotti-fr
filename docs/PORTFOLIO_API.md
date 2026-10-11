@@ -76,3 +76,9 @@ for extra_days in (0, 1):
 `HistoryClassifier.fit`는 `sparse_history.FEATURES` 순서의 시장·현재 노출·과거 이력 21개 입력을 받는다. `training_support`·`admission`은 고정한 표본 수와 동일 행 대조·최근 무체결 구간의 양방향 적중 조건을 검사한다. `sparse_history_reference.verify_history`·`independent_refit`·`reference_admission`은 모든 과거 참조·후보 및 대조 트리·채택 조건을 독립 확인한다.
 
 이 진단에는 원본 계좌 상태와 원본 과거 체결이 들어간다. 최근 1시간 무체결 구간은 봇의 실제 첫 진입과 같지 않다. [기존 실패](EXPERIMENT_V101_RESULTS.md)를 보존하며 자체 계좌 실행에 연결하지 않는다.
+
+## 계약별 체결 기여분
+
+[v102](EXPERIMENT_V102.md)의 `contract_components.decompose_contracts(source, events, wallet, book, specs)`는 기존 분해 행과 정규화한 원본 사건·지갑, `price_lookup`의 가격·활동 사전, 계약 명세를 받는다. 전체 원본 행에 세 계약군 기여분과 검산 잔차를 붙인 표, 사건이 있는 계약별 원가·순수량·평가액·민감도·기여분 표를 반환한다. 수수료와 펀딩을 이중 반영하지 않으며 순수량이 0인 왕복 거래도 보존한다.
+
+`contract_components_reference.verify_contracts(source, saved, details, events, wallet, prices, activity, specs)`는 별도 정수 사건 누적·유리수 계좌·가격 차분으로 전체 결과를 대조한다. `summarize_contracts`·`reference_summary`는 전체·월별 계약군 분포와 부호 교차표를 독립 비교한다. 동일한 최종 평가액을 분모로 쓰는 회계 배분이며, 실제 반사실 계좌나 인과 기여도·새 매매 정답으로 자동 채택하지 않는다.
