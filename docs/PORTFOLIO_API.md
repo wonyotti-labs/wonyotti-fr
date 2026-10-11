@@ -82,3 +82,11 @@ for extra_days in (0, 1):
 [v102](EXPERIMENT_V102.md)의 `contract_components.decompose_contracts(source, events, wallet, book, specs)`는 기존 분해 행과 정규화한 원본 사건·지갑, `price_lookup`의 가격·활동 사전, 계약 명세를 받는다. 전체 원본 행에 세 계약군 기여분과 검산 잔차를 붙인 표, 사건이 있는 계약별 원가·순수량·평가액·민감도·기여분 표를 반환한다. 수수료와 펀딩을 이중 반영하지 않으며 순수량이 0인 왕복 거래도 보존한다.
 
 `contract_components_reference.verify_contracts(source, saved, details, events, wallet, prices, activity, specs)`는 별도 정수 사건 누적·유리수 계좌·가격 차분으로 전체 결과를 대조한다. `summarize_contracts`·`reference_summary`는 전체·월별 계약군 분포와 부호 교차표를 독립 비교한다. 동일한 최종 평가액을 분모로 쓰는 회계 배분이며, 실제 반사실 계좌나 인과 기여도·새 매매 정답으로 자동 채택하지 않는다.
+
+## 기록된 변경량의 자체 계좌 진단
+
+[v103](EXPERIMENT_V103.md)의 `recorded_change_backtest.backtest(frame, source, config, output, target=..., timing=...)`는 공개된 계좌 기록의 변경량을 현재 봇 노출에 더하는 설명용 재생이다. `source`는 v102 전체 원본 행이며 추가 열·미지원·0 변경 행까지 저장한다. 표적은 `execution_change` 또는 `xbtusd_execution_change`, 공급 시각은 `window_start` 또는 `window_end`다. 창 시작은 `historical_lookahead=True`를 명시해야 하며 300초의 정보 선행을 판단 기록에 남긴다. 창 종료도 타인의 과거 기록을 공급받는 진단으로, 실시간 예측 전략이 아니다.
+
+출력에는 `source.parquet`·`decisions.parquet`·지원과 호출 차이를 집계한 `coverage.json`, 기존 `ExposureEngine`의 `account/`가 포함된다. 0 변경·미지원·정확한 창 없음은 수량을 유지한다. 가격 손절 0 설정에서도 나머지 위험·시간·기간 종료 규칙은 그대로 적용된다.
+
+`recorded_change_reference.verify_path(frame, source, config, output, review, target=..., timing=..., historical_lookahead=...)`는 별도 시각 검색·정책 계산과 현금 흐름 계좌로 모든 판단·분봉·체결·거래·지표, 두 중간 JSON 상태와 최종 상태를 대조한다. 전체 원본과 파일 목록·해시도 확인한다. 합성 검사의 통과와 실제 여덟 경로의 결과는 구분하며, 수익성 채택은 이 API의 기능이 아니다.
