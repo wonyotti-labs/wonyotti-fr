@@ -19,6 +19,7 @@ from wonyotti_fr.paired_management_reference import (
     manual_admission,
     manual_metrics,
     manual_threshold,
+    numeric_linear_scores,
     verify_frame,
 )
 from wonyotti_fr.position_boost_verification import compare_statistics
@@ -210,3 +211,16 @@ def test_future_validation_values_do_not_change_fitted_trees(models):
     x, fy, _, vx, _, a, _, _ = models
     changed, _ = PairedManagementModel.fit(x, fy, vx*100)
     assert changed.to_dict() == a.to_dict()
+
+
+def test_linear_export_score_at_exact_threshold_preserves_request(models):
+    *_, vx, _, _, _, model = models
+    actual = model.probabilities(vx)
+    expected = numeric_linear_scores(model.to_dict(), vx)
+    np.testing.assert_array_equal(actual, expected)
+    thresholds = {action: float(actual[12, i]) for i, action in enumerate(('exit', 'reduce', 'increase'))}
+    masks, chosen = direct_requests(actual, thresholds)
+    ref_masks, ref_chosen = direct_requests(expected, thresholds)
+    assert masks[12].all()
+    np.testing.assert_array_equal(masks, ref_masks)
+    np.testing.assert_array_equal(chosen, ref_chosen)

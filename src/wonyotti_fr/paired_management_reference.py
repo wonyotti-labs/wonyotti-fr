@@ -119,9 +119,19 @@ def independent_models(raw_models, linear, x, first_y, all_y, validation):
             np.testing.assert_array_equal(linear['coef'][i], learner.coef_[0])
             assert linear['intercept'][i] == float(learner.intercept_[0])
             scores.append(learner.predict_proba(scaler.transform(validation))[:, 1])
-        output['linear'] = np.column_stack(scores)
+        # 문턱과 같은 값에서는 라이브러리의 단일 열 곱셈과 공개 숫자 모형의
+        # 세 열 곱셈 차이도 요청을 바꿀 수 있으므로 직렬화된 연산을 검산한다.
+        output['linear'] = numeric_linear_scores(linear, validation)
+        np.testing.assert_allclose(output['linear'], np.column_stack(scores), rtol=0, atol=1e-12)
     output['constant'] = np.tile(all_y.mean(axis=0), (len(validation), 1))
     return output
+
+
+def numeric_linear_scores(raw, values):
+    matrix = np.asarray(values, dtype=float)
+    scaled = (matrix-np.asarray(raw['mean']))/np.asarray(raw['scale'])
+    logits = scaled@np.asarray(raw['coef']).T+np.asarray(raw['intercept'])
+    return 1/(1+np.exp(-np.clip(logits, -700, 700)))
 
 
 def independent_support(frame):
