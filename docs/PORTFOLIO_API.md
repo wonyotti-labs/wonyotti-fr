@@ -181,4 +181,4 @@ for extra_days in (0, 1):
 
 ## 관리 행동의 이진 빈도 균형 학습
 
-`python -m wonyotti_fr.balanced_management_learning --reference <v121 완료 검산 JSON> --sha256 <신뢰한 SHA-256>`은 원래 50개 입력과 깊이 2·256회를 유지하고 각 행동의 2020년 양성·음성 학습 비중만 균등화한다. 원래 빈도로 보정·평가하며 대조의 전체 확률·요청·월별 지표를 재현한다. 행별 가중치와 새 768개 트리·모든 확률·첫/전체 문턱·25개 조건을 독립 검산한다. 실제 계좌나 주문은 실행하지 않는다. [계획](EXPERIMENT_V122.md)을 참조한다.
+`python -m wonyotti_fr.balanced_management_learning --reference <v121 완료 검산 JSON> --sha256 <신뢰한 SHA-256>`은 원래 50개 입력과 깊이 2·256회를 유지하고 각 행동의 2020년 양성·음성 학습 비중만 균등화한다. 원래 빈도로 보정·평가하며 대조의 전체 확률·요청·월별 지표를 재현한다. 행별 가중치와 새 768개 트리·모든 확률·첫/전체 문턱·25개 조건을 독립 검산한다. 실제 계좌나 주문은 실행하지 않는다. [계획](EXPERIMENT_V122.md)과 [결과](EXPERIMENT_V122_RESULTS.md)를 참조한다.
