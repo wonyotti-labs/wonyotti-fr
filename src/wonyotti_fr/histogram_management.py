@@ -20,6 +20,7 @@ class HistogramManagementModels:
     actions = ACTIONS
     format = 'histogram_management_v1'
     kind = 'histogram'
+    fixed_settings = HISTOGRAM_SETTINGS
 
     def __init__(self, data):
         self.data = copy.deepcopy(data)
@@ -45,18 +46,18 @@ class HistogramManagementModels:
         binaries, expected, validation_expected = [], [], []
         for i, action in enumerate(cls.actions):
             with threadpool_limits(limits=1):
-                learner = HistGradientBoostingClassifier(**HISTOGRAM_SETTINGS).fit(x, y[:, i], **fit_options)
+                learner = HistGradientBoostingClassifier(**cls.fixed_settings).fit(x, y[:, i], **fit_options)
                 expected.append(learner.predict_proba(x)[:, 1])
                 validation_expected.append(learner.predict_proba(vx)[:, 1])
-            if (learner.n_iter_ != 64 or learner._baseline_prediction.shape != (1, 1)
-                or len(learner._predictors) != 64 or any(len(part) != 1 for part in learner._predictors)):
+            if (learner.n_iter_ != cls.fixed_settings['max_iter'] or learner._baseline_prediction.shape != (1, 1)
+                or len(learner._predictors) != cls.fixed_settings['max_iter'] or any(len(part) != 1 for part in learner._predictors)):
                 raise ValueError('관리 부스팅 내보내기의 반복·초기 점수 구조 오류')
             trees = []
             required = {'value', 'count', 'feature_idx', 'num_threshold', 'missing_go_to_left',
                 'left', 'right', 'gain', 'depth', 'is_leaf', 'bin_threshold', 'is_categorical', 'bitset_idx'}
             for part in learner._predictors:
                 nodes = part[0].nodes
-                if set(nodes.dtype.names) != required or nodes['is_categorical'].any() or nodes['depth'].max() > 2:
+                if set(nodes.dtype.names) != required or nodes['is_categorical'].any() or nodes['depth'].max() > cls.fixed_settings['max_depth']:
                     raise ValueError('관리 부스팅 내보내기의 지원하지 않는 노드 구조')
                 leaf = nodes['is_leaf'].astype(bool)
                 # 말단 값에 학습률이 이미 반영되어 있어 한 번만 합산한다.
@@ -67,7 +68,7 @@ class HistogramManagementModels:
                     'value': np.where(leaf, nodes['value'], 0.).tolist()})
             binaries.append({'action': action, 'baseline': float(learner._baseline_prediction[0, 0]), 'trees': trees})
         model = cls.from_dict({'format': cls.format, 'features': cls.features,
-                              'settings': HISTOGRAM_SETTINGS, 'models': binaries})
+                              'settings': cls.fixed_settings, 'models': binaries})
         error = float(np.max(np.abs(model.probabilities(x) - np.column_stack(expected))))
         validation_error = float(np.max(np.abs(model.probabilities(vx) - np.column_stack(validation_expected))))
         if error > 1e-12 or validation_error > 1e-12:
@@ -79,23 +80,23 @@ class HistogramManagementModels:
     @classmethod
     def from_dict(cls, data):
         if (data.get('format') != cls.format or data.get('features') != cls.features
-            or data.get('settings') != HISTOGRAM_SETTINGS or not isinstance(data.get('models'), list)
+            or data.get('settings') != cls.fixed_settings or not isinstance(data.get('models'), list)
             or len(data['models']) != len(cls.actions)):
             raise ValueError('관리 부스팅의 형식·특징·고정 설정 오류')
         for model, action in zip(data['models'], cls.actions, strict=True):
             if (model.get('action') != action or type(model.get('baseline')) not in (int, float)
                 or not np.isfinite(model['baseline']) or not isinstance(model.get('trees'), list)
-                or len(model['trees']) != 64):
+                or len(model['trees']) != cls.fixed_settings['max_iter']):
                 raise ValueError('관리 부스팅의 행동·초기 점수·트리 수 오류')
             for tree in model['trees']:
                 count = len(tree['left'])
-                if (not 1 <= count <= 7 or any(len(tree[k]) != count for k in ['right', 'feature', 'threshold', 'value'])
+                if (not 1 <= count <= 2 * cls.fixed_settings['max_leaf_nodes'] - 1 or any(len(tree[k]) != count for k in ['right', 'feature', 'threshold', 'value'])
                     or not np.isfinite(tree['threshold']).all() or not np.isfinite(tree['value']).all()):
                     raise ValueError('관리 부스팅의 노드 크기·숫자 오류')
                 visited, pending = set(), [(0, 0)]
                 while pending:
                     node, depth = pending.pop()
-                    if node in visited or not 0 <= node < count or depth > 2:
+                    if node in visited or not 0 <= node < count or depth > cls.fixed_settings['max_depth']:
                         raise ValueError('관리 부스팅의 순환·공유·범위·깊이 오류')
                     visited.add(node)
                     left, right, feature = (tree[k][node] for k in ['left', 'right', 'feature'])
@@ -138,7 +139,7 @@ class HistogramManagementModels:
             for tree in model['trees']:
                 left, right, feature = (np.asarray(tree[k]) for k in ['left', 'right', 'feature'])
                 threshold, nodes = np.asarray(tree['threshold']), np.zeros(len(matrix), dtype=int)
-                for _ in range(2):
+                for _ in range(self.fixed_settings['max_depth']):
                     active = left[nodes] != -1
                     selected = nodes[active]
                     go_left = matrix[active, feature[selected]] <= threshold[selected]
