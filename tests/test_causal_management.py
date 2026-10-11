@@ -102,6 +102,17 @@ def test_stream_rejects_duplicate_and_boolean_score():
         window.observe(MINUTE_NS, True)
 
 
+def test_large_reference_tail_gap_keeps_linear_quantile_accuracy():
+    times = pd.Series(pd.date_range('2021-01-01', periods=1000, freq='min', tz='UTC'))
+    values = np.r_[np.zeros(999), 1.]
+    pool = np.zeros(361041)
+    position = ((999 + .5) / 1000) * (len(pool) - 1)
+    pool[int(np.ceil(position)):] = 1.
+    result = map_past_scores(times, values, pool)
+    verify_past_mapping(times, values, pool, result)
+    assert abs(result.mapped.iloc[-1] - (position - np.floor(position))) < 1e-12
+
+
 @pytest.fixture(scope='module')
 def prepared():
     originals = {}

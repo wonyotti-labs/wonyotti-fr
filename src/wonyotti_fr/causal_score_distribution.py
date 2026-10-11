@@ -66,7 +66,8 @@ def map_past_scores(times, probabilities, reference):
     for index, (timestamp, score) in enumerate(zip(t, p, strict=True)):
         counts[index] = window.observe(timestamp, score)
     u = (counts[:, 1] + .5 * counts[:, 2] + .5) / (counts[:, 0] + 1)
-    mapped = np.interp(u, np.linspace(0., 1., len(pool)), pool)
+    # 균등 격자의 반올림이 드문 큰 점수 간격에서 확대되지 않게 직접 분위수를 계산한다.
+    mapped = np.quantile(pool, u, method="linear")
     return pd.DataFrame({"count": counts[:, 0], "less": counts[:, 1], "equal": counts[:, 2],
                          "mapped": mapped})
 
