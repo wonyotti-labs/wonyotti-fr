@@ -62,7 +62,8 @@ def independent_account_models(models, x, y, validation):
             values.append(learner.predict_proba(scaler.transform(validation))[:, 1])
         scores['linear'] = numeric_linear_scores(linear, validation)
         np.testing.assert_allclose(scores['linear'], np.column_stack(values), atol=1e-12, rtol=0)
-    scores['constant'] = np.array([[sum(y[:, i])/len(y) for i in range(3)] for _ in validation])
+    frequency = [sum(y[:, i])/len(y) for i in range(3)]
+    scores['constant'] = np.tile(frequency, (len(validation), 1))
     return scores
 
 
