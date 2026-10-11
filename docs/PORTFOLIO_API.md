@@ -150,3 +150,10 @@ for extra_days in (0, 1):
 ## 같은 행의 거래소 관리 모형 학습
 
 `python -m wonyotti_fr.management_market_learning --reference <v116 입력 검산 JSON> --sha256 <SHA-256>`은 검산된 공동 지원 행에서 원본·정렬 부스팅과 정렬 선형 모형을 적합한다. 상반기 절편·문턱 보정 뒤 하반기와 월별 지표를 평가하며, 별도 재학습의 384개 트리·선형 계수·전체 확률·선택·판정을 대조한다. 진단 자료는 모형·절편 적합에 사용하지 않는다. 기존 모델과 원본 입력·정답·제외 행은 보존하며 자체 계좌 매매 실행은 포함하지 않는다.
+
+
+## 원본 관리 행동의 체결 방향
+
+`python -m wonyotti_fr.management_flow_research --reference <v116 입력·모형 완료 참조 JSON> --sha256 <신뢰한 SHA-256>`은 원본 전체 행과 기존 50개 입력을 보존하고 열두 체결 입력·두 해상도 매수량·지원 및 독립 창 합을 검산한다. 실패 시 새 폴더에 원인을 기록한다.
+
+`python -m wonyotti_fr.management_flow_learning --reference <입력 완료 검산 JSON> --sha256 <신뢰한 SHA-256>`은 전체 지원·원본 연결을 확인한 뒤 고정 부스팅·선형을 학습하고 원본 v35와 대조한다. 모든 확률·절편·문턱·월별 지표·18개 조건을 검산하며 자기 계좌나 실제 주문은 실행하지 않는다. [계획](EXPERIMENT_V117.md)과 [입력 결과](EXPERIMENT_V117_INPUTS.md), [모형 결과](EXPERIMENT_V117_RESULTS.md)를 참조한다.
