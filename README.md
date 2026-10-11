@@ -478,3 +478,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v98](docs/EXPERIMENT_V98.md)의 변경량 학습·자체 계좌 실행은 [포트폴리오 API](docs/PORTFOLIO_API.md)의 `ExposureChangeModel`·`ExposurePolicy`·`ExposureEngine`·`backtest`·`verify_path`로 제공한다. 대조 상수는 로컬 학습 결과에서 명시적으로 전달하며 공개 코드와 합성 검사에 원본 학습값을 넣지 않는다.
 
 [v99](docs/EXPERIMENT_V99.md)의 `exposure_components`·`exposure_components_reference`는 [포트폴리오 API](docs/PORTFOLIO_API.md)로 제공한다. 가격·입출금·펀딩·수수료·체결 기여분과 모든 미지원 행을 보존하고 독립 계좌 계산으로 대조한다.
+
+[v100](docs/EXPERIMENT_V100.md)의 `SparseExposureModel`·`SparseExposurePolicy`와 전체 판단 기록 검산은 [포트폴리오 API](docs/PORTFOLIO_API.md)로 제공한다. 거래 없음은 기존 수량을 유지하며, 방향 행동에만 자체 계좌의 목표 변경을 적용한다. 모형·원본 자료는 로컬에 보관하고 기존 무거래 실패를 보존한다.

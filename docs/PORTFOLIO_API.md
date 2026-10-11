@@ -60,3 +60,11 @@ for extra_days in (0, 1):
 [v99](EXPERIMENT_V99.md)의 `exposure_components.account_snapshots`는 모든 원본 사건을 조회 시각 직전까지 누적한다. `price_lookup`에 실제 가격과 거래 활동을 함께 전달하고, `decompose(source, snapshots, book, specs)`로 v98 원본 행을 분해한다. 가격·외부 입출금·펀딩·수수료·체결 순으로 평가하며 각 단계의 평가액·BTC 민감도·노출과 다섯 기여분·사건 수·미지원 사유를 보존한다. 체결이 없는 구간의 가격 변화도 기록한다.
 
 `exposure_components_reference.reference_snapshots`·`reference_prices`·`verify_decomposition`은 별도 현금·평균 원가·가격 차분으로 모든 단계와 사건 수를 대조한다. `independent_statistics`와 `summarize_components`는 전체·월별 분모와 기여분을 비교한다. 이 분해는 고정한 단계 순서의 회계 항등식이며 유일한 인과 기여도가 아니다. 가격이 없는 행도 보존하고, v100 가격 보완 전후의 자료를 구분한다.
+
+## 희소 체결 행동과 자체 계좌 정책
+
+[v100](EXPERIMENT_V100.md)의 `sparse_exposure.SparseExposureModel.fit(x, y, validation)`은 감소·거래 없음·증가 분류기와 방향별 크기 회귀를 함께 학습한다. `x`는 시장 특징 14개와 현재 노출, `y`는 지원되는 회계 분해의 `execution_change`다. 학습·진단의 원본 상태와 연속 실행의 봇 상태를 구분하며, 모형과 학습 상수는 로컬 숫자 JSON으로 저장한다. `sparse_exposure_reference.independent_refit`와 `reference_metrics`는 전체 트리·예측·지표를 별도 계산한다.
+
+`sparse_exposure_policy.SparseExposurePolicy(model)`을 `sparse_exposure_backtest.backtest(frame, policy, config, output)`에 전달한다. 최대 확률 동률과 거래 없음·숫자상 0 크기는 `None`을 반환해 수량을 유지한다. 방향 행동은 자체 계좌 노출에 예측 변경량을 더하고 [-0.5, 0.5]로 제한한다. 위험 청산·다음 시가 체결·비용·펀딩은 `ExposureEngine`을 사용한다.
+
+`sparse_exposure_backtest.verify_path(frame, "sparse_execution", model.to_dict(), config, output, review)`는 전체 분봉뿐 아니라 각 판단 시각의 확률·크기·행동·목표·미지원 사유를 독립 재생한다. 입력과 새 출력 폴더의 규약은 v98과 같다. 이 API 등록은 후보 채택이 아니다. [기존 결과](EXPERIMENT_V100_RESULTS.md)의 두 자체 계좌는 거래가 없어 수익성 기준을 충족하지 못했다.
