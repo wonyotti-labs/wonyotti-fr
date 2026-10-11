@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pandas as pd
 
-from .close_flow import FLOW_FEATURES, FLOW_WINDOWS, flow_features
+from .close_flow import FLOW_FEATURES, FLOW_WINDOWS
 from .management_market import FEATURES, utc_minutes
 from .minute_data import compare_minute_bars, validate_minutes
 from .minute_first_inputs import MINUTE_FLOW_FEATURES
@@ -11,6 +13,20 @@ from .minute_management import ACTIONS
 
 EXTRA_FEATURES = [*FLOW_FEATURES, *MINUTE_FLOW_FEATURES]
 EXPANDED_FEATURES = [*FEATURES, *EXTRA_FEATURES]
+
+
+def stable_five_flow(five):
+    result = five[["end"]].copy()
+    for name, size in FLOW_WINDOWS.items():
+        # 큰 거래량이 창에서 빠진 뒤의 누적 잔차를 피하도록 창마다 합산한다.
+        volume = five.volume.rolling(size, min_periods=size).apply(math.fsum, raw=True)
+        buy = five.taker_buy_volume.rolling(size, min_periods=size).apply(math.fsum, raw=True)
+        values = (2*buy/volume.replace(0, np.nan)-1).mask(volume.eq(0), 0.)
+        known = volume.notna()
+        if not np.isfinite(values[known]).all() or values[known].abs().gt(1+1e-12).any():
+            raise ValueError("관리 체결 방향의 직접 창 합·비율 오류")
+        result[name] = values.clip(-1, 1)
+    return result
 
 
 def flow_tables(minute, five, last):
@@ -37,7 +53,7 @@ def flow_tables(minute, five, last):
     small = minute[["end"]].copy()
     volume, buy = minute.volume.to_numpy(float), minute.taker_buy_volume.to_numpy(float)
     small[MINUTE_FLOW_FEATURES[0]] = np.divide(2*buy, volume, out=np.ones(len(volume)), where=volume != 0)-1
-    return small, flow_features(five), {"aggregate": comparison, "buy_volume_buckets": len(totals),
+    return small, stable_five_flow(five), {"aggregate": comparison, "buy_volume_buckets": len(totals),
         "maximum_buy_volume_error": float(error.max()), "buy_volume_tolerance": 1e-7,
         "minute_rows": len(minute), "five_rows": len(five)}
 

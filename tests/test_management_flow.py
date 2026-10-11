@@ -83,6 +83,23 @@ def test_future_change_and_extension_leave_past_exact():
         pd.testing.assert_frame_equal(a, b, check_exact=True)
 
 
+def test_large_volume_leaving_window_does_not_leave_residual():
+    minute, _ = bars(5000)
+    rng = np.random.default_rng(0)
+    total = 10.**rng.uniform(-4, 8, 1000)
+    bought = total*rng.uniform(.1, .9, 1000)
+    minute["volume"] = np.repeat(total/5, 5)
+    minute["taker_buy_volume"] = np.repeat(bought/5, 5)
+    five = minute.groupby(minute.end.dt.ceil("5min")).agg(
+        open=("open", "first"), close=("close", "last"), high=("high", "max"), low=("low", "min"),
+        volume=("volume", "sum"), count=("count", "sum"), taker_buy_volume=("taker_buy_volume", "sum")).reset_index()
+    five["time"] = five.end-pd.Timedelta(minutes=5)
+    frame = frame_at(minute.end.iloc[1500:4500].reset_index(drop=True))
+    expanded, link = connect_flow(frame, *flow_tables(minute, five, frame.end.max())[:2])
+    verify_flow_connection(frame, expanded, link, minute, five, direct_flow_table(minute, five))
+    assert link.supported.all()
+
+
 def test_zero_volume_is_zero_but_warmup_stays_unsupported():
     minute, five = bars()
     for table in [minute, five]:
