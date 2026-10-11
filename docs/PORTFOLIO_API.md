@@ -98,3 +98,8 @@ for extra_days in (0, 1):
 `market_change_model.MarketChangeModel.fit(x, y, validation, timing=...)`는 XBTUSD 변경량의 세 행동 분류와 방향별 크기를 학습한다. `timing`은 `window_start` 또는 `window_end`이며 숫자 모형에 저장한다. 현재·종료 원본 노출이나 체결 이력을 받지 않는다. 원본 신호 없이 확정 시장 특징만 받는 `market_change_backtest.backtest(frame, model, config, output)`과 `verify_path(frame, model.to_dict(), config, output, review)`로 자체 계좌를 실행·검산한다.
 
 검산은 14개 시장 열만 참조하도록 모형을 검증한 뒤 기존 독립 희소 계좌 검산기를 사용한다. 두 중간 JSON 계좌 상태와 최종 상태도 별도 방정식으로 대조한다. 공유 검산기의 중간 상태 검사는 명시적으로 전달하는 콜백으로 추가했으며 기존 호출의 출력 규약은 유지했다. 원본 신호 공급 진단과 달리 실행 시 원본 자료를 읽지 않는다. 구현 검사와 실제 수익성 검증은 구분한다.
+# 희소 행동의 학습·선택 분리 API
+
+`weighted_action_model.WeightedMarketClassifier.fit(x, labels, validation)`은 학습 클래스 빈도로만 역빈도 가중치를 계산한다. `WeightedActionModel`은 기존 크기 모형과 A~D 조건을 조립하며, JSON에 학습 형식·클래스 수·조건을 보존한다. B·C의 선택 점수는 원래 모집단의 발생 확률로 해석하지 않는다.
+
+`weighted_action_evaluation.evaluate`는 네 조건의 행동·변경량과 A·D·빈도 대조의 Brier 점수·고정 신뢰도 구간을 평가한다. `weighted_action_backtest.backtest`와 `verify_path`는 자체 계좌 실행 및 별도 트리·계좌 재생을 제공한다. 실행 중 원본 신호나 원본 계좌는 입력하지 않는다. v105의 규약과 실제 성과는 별도 실험 기록을 따른다.

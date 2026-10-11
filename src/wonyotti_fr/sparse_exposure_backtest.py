@@ -128,7 +128,8 @@ def parquet_records(path):
         yield from batch.to_pylist()
 
 
-def verify_path(data, kind, model, config, output, review, progress=None, *, snapshot_validator=None):
+def verify_path(data, kind, model, config, output, review, progress=None, *, snapshot_validator=None,
+                reference_factory=ReferenceSparsePolicy):
     sealed = read_json(output/'files.json')
     for name, digest in sealed.items():
         if '/' in name or '\\' in name or sha256(output/name) != digest:
@@ -141,7 +142,7 @@ def verify_path(data, kind, model, config, output, review, progress=None, *, sna
     daily, rejected, exposure = {}, {}, 0.
     max_equity_error, max_quantity_error, residual = 0., 0., 0.
 
-    reference = ReferenceSparsePolicy(model)
+    reference = reference_factory(model)
 
     def decision(bar, cash, q):
         target, journal = reference(bar, cash, q)
