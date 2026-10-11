@@ -506,6 +506,18 @@ def main() -> None:
     expanded_first.add_argument('--expansion-verification-sha256', required=True)
     expanded_first.add_argument('--output', type=Path, default=Path('artifacts'))
     expanded_first.set_defaults(func=lambda a: print(run_expanded_first_diagnosis(a.diagnosis_run, a.verification, a.verification_sha256, a.expansion_run, a.expansion_verification, a.expansion_verification_sha256, a.output)))
+    from .position_boost_diagnostics import run_position_boost
+    from .position_boost_verification import verify_position_boost
+    position_boost = commands.add_parser('position-boost-diagnose', help='보유 방향의 고정 비선형 시장 모형 진단')
+    position_boost.add_argument('--reference', type=Path, required=True)
+    position_boost.add_argument('--reference-sha256', required=True)
+    position_boost.add_argument('--output', type=Path, default=Path('artifacts'))
+    position_boost.set_defaults(func=lambda a: print(run_position_boost(a.reference, a.reference_sha256, a.output)))
+    position_boost_verify = commands.add_parser('position-boost-verify', help='보유 방향 모형의 독립 재학습·지표 검산')
+    position_boost_verify.add_argument('--run', type=Path, required=True)
+    position_boost_verify.add_argument('--run-sha256', required=True)
+    position_boost_verify.add_argument('--output', type=Path, default=Path('artifacts'))
+    position_boost_verify.set_defaults(func=lambda a: print(verify_position_boost(a.run, a.run_sha256, a.output)))
     from .holding_ablation_research import run_holding_ablation, verify_holding_ablation
     ablation = commands.add_parser('holding-ablation', help='기존 보유 정책의 다른 시장·관리 기여 대조')
     ablation.add_argument('--reference', type=Path, required=True)
