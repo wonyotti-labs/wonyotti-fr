@@ -128,7 +128,7 @@ def parquet_records(path):
         yield from batch.to_pylist()
 
 
-def verify_path(data, kind, model, config, output, review, progress=None):
+def verify_path(data, kind, model, config, output, review, progress=None, *, snapshot_validator=None):
     sealed = read_json(output/'files.json')
     for name, digest in sealed.items():
         if '/' in name or '\\' in name or sha256(output/name) != digest:
@@ -174,12 +174,16 @@ def verify_path(data, kind, model, config, output, review, progress=None):
         counts['equity'] += 1
         daily[event['end'][:10]] = expected['equity']
         exposure += expected['exposure']
+        if snapshot_validator is not None and i+1 in {len(data)//3, 2*len(data)//3}:
+            snapshot_validator(read_json(output/f'checkpoint-{i+1}.json'), account, event, config)
         if progress is not None and (i+1) % 100000 == 0:
             progress(i+1)
     for name, stream in streams.items():
         if next(stream, None) is not None:
             raise ValueError(f'노출 검산 예상 밖 추가 행: {name}')
     final = read_json(output/'final_state.json')
+    if snapshot_validator is not None:
+        snapshot_validator(final, account, event, config, final=True)
     if not final['state']['completed'] or final['state']['quantity'] or final['state']['pending'] is not None or final['state']['deferred']:
         raise ValueError('노출 검산 최종 상태 오류')
     for key, expected in {'cash': account.cash, 'quantity': account.q, 'closed_net': account.closed_net,
@@ -208,5 +212,7 @@ def verify_path(data, kind, model, config, output, review, progress=None):
         'closed_trade_cash_flow_pnl': True, 'every_fill_and_trade_compared': True,
         'max_equity_difference': max_equity_error, 'max_quantity_difference': max_quantity_error,
         'metrics': metrics}
+    if snapshot_validator is not None:
+        proof['all_checkpoint_states_compared'] = sorted({len(data)//3, 2*len(data)//3})
     save_json(review, proof)
     return proof

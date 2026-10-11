@@ -90,3 +90,11 @@ for extra_days in (0, 1):
 출력에는 `source.parquet`·`decisions.parquet`·지원과 호출 차이를 집계한 `coverage.json`, 기존 `ExposureEngine`의 `account/`가 포함된다. 0 변경·미지원·정확한 창 없음은 수량을 유지한다. 가격 손절 0 설정에서도 나머지 위험·시간·기간 종료 규칙은 그대로 적용된다.
 
 `recorded_change_reference.verify_path(frame, source, config, output, review, target=..., timing=..., historical_lookahead=...)`는 별도 시각 검색·정책 계산과 현금 흐름 계좌로 모든 판단·분봉·체결·거래·지표, 두 중간 JSON 상태와 최종 상태를 대조한다. 전체 원본과 파일 목록·해시도 확인한다. 합성 검사의 통과와 실제 여덟 경로의 결과는 구분하며, 수익성 채택은 이 API의 기능이 아니다.
+
+## 행동 창과 시장 관측 시각 정렬
+
+[v104](EXPERIMENT_V104.md)의 `market_alignment.align_market(source, features, first, last)`는 v102 전체 원본 행을 보존하며 창 시작·종료 시각의 시장 특징을 정확히 연결한다. `first`·`last`는 UTC 경계이며 끝은 제외한다. `verify_alignment`는 별도 이진 검색으로 모든 연결·지원·사유를 대조한다. `aligned_matrix(frame, timing)`는 두 시각 모두 지원되는 동일 행의 시장 특징 14개만 반환한다.
+
+`market_change_model.MarketChangeModel.fit(x, y, validation, timing=...)`는 XBTUSD 변경량의 세 행동 분류와 방향별 크기를 학습한다. `timing`은 `window_start` 또는 `window_end`이며 숫자 모형에 저장한다. 현재·종료 원본 노출이나 체결 이력을 받지 않는다. 원본 신호 없이 확정 시장 특징만 받는 `market_change_backtest.backtest(frame, model, config, output)`과 `verify_path(frame, model.to_dict(), config, output, review)`로 자체 계좌를 실행·검산한다.
+
+검산은 14개 시장 열만 참조하도록 모형을 검증한 뒤 기존 독립 희소 계좌 검산기를 사용한다. 두 중간 JSON 계좌 상태와 최종 상태도 별도 방정식으로 대조한다. 공유 검산기의 중간 상태 검사는 명시적으로 전달하는 콜백으로 추가했으며 기존 호출의 출력 규약은 유지했다. 원본 신호 공급 진단과 달리 실행 시 원본 자료를 읽지 않는다. 구현 검사와 실제 수익성 검증은 구분한다.
