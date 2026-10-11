@@ -103,3 +103,9 @@ for extra_days in (0, 1):
 `weighted_action_model.WeightedMarketClassifier.fit(x, labels, validation)`은 학습 클래스 빈도로만 역빈도 가중치를 계산한다. `WeightedActionModel`은 기존 크기 모형과 A~D 조건을 조립하며, JSON에 학습 형식·클래스 수·조건을 보존한다. B·C의 선택 점수는 원래 모집단의 발생 확률로 해석하지 않는다.
 
 `weighted_action_evaluation.evaluate`는 네 조건의 행동·변경량과 A·D·빈도 대조의 Brier 점수·고정 신뢰도 구간을 평가한다. `weighted_action_backtest.backtest`와 `verify_path`는 자체 계좌 실행 및 별도 트리·계좌 재생을 제공한다. 실행 중 원본 신호나 원본 계좌는 입력하지 않는다. v105의 규약과 실제 성과는 별도 실험 기록을 따른다.
+
+## 신규 진입과 관측 경계 지원
+
+`entry_boundary_support.transition_ledger(events, actions)`는 정수 수량·행동·에피소드를 재생하고, 실제 무포지션 진입의 직전 공백과 1분·5분 경계 상태를 기록한다. 경계와 같은 시각의 체결은 직전 상태에 포함하지 않는다. `entry_support`는 신규 진입의 확정 시장 특징과 기존 정답 창을 정확한 시각으로 연결하고, `summarize_support`는 전체·연도·월별 사건·주문·지원 수를 반환한다.
+
+`entry_boundary_reference`의 원본 정수 집계·별도 수량 재생·이진 검색·요약으로 모든 행을 검산한다. 최초 기록 이전의 무포지션 길이는 미상이며, 펀딩은 수량이나 공백 시작을 변경하지 않는다. 이 API는 기술 통계용이며 원본 상태를 실행 봇에 제공하지 않는다.
