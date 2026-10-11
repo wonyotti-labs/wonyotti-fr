@@ -109,3 +109,9 @@ for extra_days in (0, 1):
 `entry_boundary_support.transition_ledger(events, actions)`는 정수 수량·행동·에피소드를 재생하고, 실제 무포지션 진입의 직전 공백과 1분·5분 경계 상태를 기록한다. 경계와 같은 시각의 체결은 직전 상태에 포함하지 않는다. `entry_support`는 신규 진입의 확정 시장 특징과 기존 정답 창을 정확한 시각으로 연결하고, `summarize_support`는 전체·연도·월별 사건·주문·지원 수를 반환한다.
 
 `entry_boundary_reference`의 원본 정수 집계·별도 수량 재생·이진 검색·요약으로 모든 행을 검산한다. 최초 기록 이전의 무포지션 길이는 미상이며, 펀딩은 수량이나 공백 시작을 변경하지 않는다. 이 API는 기술 통계용이며 원본 상태를 실행 봇에 제공하지 않는다.
+
+## 원거래소 전체 기간의 상태별 행동 정답
+
+`state_action_windows.requested_orders(executions, ledger)`는 정상 XBTUSD 주문의 최초 체결에서 관측된 요청 수량과 직전 포지션으로 요청 행동을 구분한다. 요청 반전과 첫 부분 체결의 축소는 서로 다른 의미로 보존한다. `action_windows(features, ledger, orders, episodes)`는 모든 5분 창과 실제 체결·독립 요청의 두 원장을 반환한다. 창 시작의 엄격한 이전 상태, 시작·종료 특징, 다중 행동 수와 양성 여부, 시간·에피소드 배제 사유를 보존한다.
+
+`state_action_windows_reference.verify_requests`·`verify_windows`·`independent_summary`는 원본 순회·별도 이진 검색·수동 집계로 모든 주문·창·특징·상태·정답·요약을 대조한다. 같은 시각의 후속 주문도 순서로 구분한다. 원본 상태는 오프라인 정답 구축용이며 실행 봇의 입력이 아니다. 새 모형이나 실제 체결 가격은 이 API의 범위에 포함하지 않는다.
