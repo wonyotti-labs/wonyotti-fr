@@ -140,3 +140,8 @@ for extra_days in (0, 1):
 ## 관리 모델의 거래소 시장 입력 정렬
 
 `management_market.connect_market`은 기존 50개 입력 중 시장 관측 36개만 교체하고 원본 상태·정답을 보존한다. `python -m wonyotti_fr.management_market_research --reference <고정 출처 JSON> --sha256 <SHA-256>`은 원래 BitMEX 입력을 재현하고 Binance 입력의 시각·공동 지원을 별도 계산으로 대조한다. 모든 원본 행과 제외 사유를 저장한다. 현재 명령은 [v116 계획](EXPERIMENT_V116.md)의 입력 검산 단계이며 새 모델 적합이나 매매 실행을 수행하지 않는다.
+
+
+## 반복 관리 가산 제거의 자체 계좌
+
+`RepeatDirectPolicy`는 고정 v48의 반복 추가·축소 문턱만 직접 적용한다. `ReferenceRepeatPolicy`는 원래 부모의 문턱 호출을 감싸 별도 계좌 검산에 사용한다. `python -m wonyotti_fr.repeat_direct_research --reference <고정 입력 JSON> --sha256 <SHA-256>`은 v114의 선행 통과를 확인하고 다섯 계좌와 비용·위험·집중 집계를 새 폴더에 저장한다. [계획](EXPERIMENT_V115.md)과 [결과](EXPERIMENT_V115_RESULTS.md)를 참조한다.
