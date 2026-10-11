@@ -222,3 +222,13 @@ python -m wonyotti_fr.quiet_state_learning --reference <v126_완료_증거_JSON>
 ```
 
 실행은 v126 모델을 복원해 전체 원시·기존 보정 점수와 요청·월별 지표를 재현한다. 새 모델 학습·자체 계좌 실행·실거래 연결은 포함하지 않는다.
+
+## v128 최초·재시작 관리 모델의 개별 학습
+
+`management_experts.fit_experts(training, calibration)`은 축소·추가의 first/restart 각각에서 부스팅·선형·절편·문턱·상태별 빈도 상수를 적합한다. `load_expert`는 행동·상태·모델 형식의 연결을 검증한다. `expert_predictions`는 quiet에 해당 모델을 적용하고 청산·recent 및 native/capacity 대조를 보존한다.
+
+```sh
+python -m wonyotti_fr.management_experts_learning --reference <v127_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+실행은 v126/v127 모델·보정·전체 예측·월별 결과를 재현하고 새 1,024개 트리·4개 선형·모든 지표·31개 조건을 독립 검산한다. 자체 계좌와 실거래 연결은 포함하지 않는다.
