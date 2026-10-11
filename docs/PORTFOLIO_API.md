@@ -54,3 +54,9 @@ for extra_days in (0, 1):
 `exposure_engine.ExposureConfig`에 [실행 명세](EXPERIMENT_V98_EXECUTION.md)의 비용·낙폭·보유·대기 설정을 명시한 뒤 `exposure_backtest.backtest(frame, policy, config, output)`으로 새 로컬 출력 폴더에 실행한다. 입력은 `minute_data.prepare_minute_period`가 반환하는 시세·펀딩·확정 특징과 같은 형식이다. `ExposureEngine`은 다음 시가 체결·부분 감소·반전·위험 청산·무거래 대기·JSON 상태 복원을 처리한다.
 
 `exposure_backtest.verify_path(frame, kind, model_dict, config, output, review, constant_exposure=...)`는 모든 분봉·체결·거래·목표·최종 잔고를 별도 수량 방정식과 현금 흐름으로 검산한다. `model_dict`는 모형의 `to_dict()`이며 상수 대조는 `None`이다. 상수 대조의 값은 검산에도 동일하게 명시해야 하며 다른 정책에는 생략한다. 저장된 정책 설정과 다르면 검산을 거부한다. 이 실행기는 오프라인 연구용이며 실제 주문 연결은 없다.
+
+## 가격·자금·체결의 변경량 분해
+
+[v99](EXPERIMENT_V99.md)의 `exposure_components.account_snapshots`는 모든 원본 사건을 조회 시각 직전까지 누적한다. `price_lookup`에 실제 가격과 거래 활동을 함께 전달하고, `decompose(source, snapshots, book, specs)`로 v98 원본 행을 분해한다. 가격·외부 입출금·펀딩·수수료·체결 순으로 평가하며 각 단계의 평가액·BTC 민감도·노출과 다섯 기여분·사건 수·미지원 사유를 보존한다. 체결이 없는 구간의 가격 변화도 기록한다.
+
+`exposure_components_reference.reference_snapshots`·`reference_prices`·`verify_decomposition`은 별도 현금·평균 원가·가격 차분으로 모든 단계와 사건 수를 대조한다. `independent_statistics`와 `summarize_components`는 전체·월별 분모와 기여분을 비교한다. 이 분해는 고정한 단계 순서의 회계 항등식이며 유일한 인과 기여도가 아니다. 가격이 없는 행도 보존하고, v100 가격 보완 전후의 자료를 구분한다.

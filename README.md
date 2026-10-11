@@ -476,3 +476,5 @@ CI는 합성 데이터만 사용한다. 원본·키를 이슈·PR·CI 로그에 
 [v97](docs/EXPERIMENT_V97.md)의 담보 포함 순노출 정답·고정 회귀·독립 검산은 [포트폴리오 API](docs/PORTFOLIO_API.md)의 `net_exposure_targets`·`net_exposure_model`·`net_exposure_reference`로 제공한다. 원본 상태와 시장 입력을 구분하고 숫자 모형의 변조·전체 정답·시간 경계와 예측을 대조한다.
 
 [v98](docs/EXPERIMENT_V98.md)의 변경량 학습·자체 계좌 실행은 [포트폴리오 API](docs/PORTFOLIO_API.md)의 `ExposureChangeModel`·`ExposurePolicy`·`ExposureEngine`·`backtest`·`verify_path`로 제공한다. 대조 상수는 로컬 학습 결과에서 명시적으로 전달하며 공개 코드와 합성 검사에 원본 학습값을 넣지 않는다.
+
+[v99](docs/EXPERIMENT_V99.md)의 `exposure_components`·`exposure_components_reference`는 [포트폴리오 API](docs/PORTFOLIO_API.md)로 제공한다. 가격·입출금·펀딩·수수료·체결 기여분과 모든 미지원 행을 보존하고 독립 계좌 계산으로 대조한다.
