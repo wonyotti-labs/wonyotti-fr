@@ -155,3 +155,13 @@ def test_pre_position_unknown_episode_retained_in_denominator():
     assert summary['all_rows'] == 8
     assert summary['groups'][0]['all']['episodes'] == 5
     assert result.account_reason.iloc[0] == 'missing_boundary'
+
+
+def test_account_features_survive_exact_parquet_roundtrip(tmp_path):
+    frame, ledger, activity, prices = source()
+    result = account_state_frame(frame, ledger.iloc[1:], activity, prices)
+    path = tmp_path/'account.parquet'
+    result.to_parquet(path, index=False)
+    restored = pd.read_parquet(path)
+    pd.testing.assert_frame_equal(result, restored, check_exact=True)
+    verify_account_state(frame, ledger.iloc[1:], activity, prices, restored)

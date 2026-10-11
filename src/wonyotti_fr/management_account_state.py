@@ -68,7 +68,7 @@ def account_state_frame(original, ledger, activity, prices):
     if not np.isfinite(out.loc[out.account_supported, 'futures_leverage']).all():
         raise ValueError('계좌 관리 포지션 크기 범위 오류')
     out['log_futures_leverage'] = np.log1p(out.futures_leverage)
-    out['account_band'] = pd.cut(out.futures_leverage, [-np.inf, 0, .5, 1, 2, 5, np.inf], labels=BANDS).astype('object').fillna('unsupported')
+    out['account_band'] = pd.cut(out.futures_leverage, [-np.inf, 0, .5, 1, 2, 5, np.inf], labels=BANDS).astype('object').fillna('unsupported').astype('str')
     return out
 
 
