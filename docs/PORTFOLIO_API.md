@@ -130,3 +130,8 @@ for extra_days in (0, 1):
 ## 고정 관리 정책의 입력 지원 범위
 
 `management_support.ManagementInputTrace`는 부모의 실제 관리 입력을 관찰하고 같은 판단을 반환한다. `training_profile`과 `SupportCounts`는 학습 경계와 비교 집계를 분리한다. `python -m wonyotti_fr.management_support_research --reference <로컬 출처 JSON> --sha256 <SHA-256>`은 고정 v48 두 계좌의 기존 출력 전체와 비교하고 새 폴더에 입력 기록·집계·지문을 저장한다. 새 모델 학습이나 실거래 기능은 없다. [계획](EXPERIMENT_V113.md)과 [결과](EXPERIMENT_V113_RESULTS.md)를 참조한다.
+
+
+## 관리 점수와 반복 문턱의 고정 비교
+
+`python -m wonyotti_fr.management_score_research --reference <v113 검산 JSON> --sha256 <SHA-256>`은 원본 세 구간과 두 봇의 봉인 입력에서 같은 모델을 재계산한다. 반복 가산의 유무, 행동 우선순위·수량·대기 영향을 분리하며 새 모델이나 계좌 수익을 만들지 않는다. 별도 말단 경로·문턱·집계 검산을 포함한다. [계획](EXPERIMENT_V114.md)과 [결과](EXPERIMENT_V114_RESULTS.md)를 참조한다.
