@@ -272,3 +272,13 @@ python -m wonyotti_fr.order_price_research --reference <v131_완료_증거_JSON>
 ```
 
 원본 열·정답·행을 유지하며 가격·원장·개별 입력은 로컬에만 기록한다. 예측 학습과 자체 계좌 실행은 포함하지 않는다.
+
+## v133 과거 주문 가격의 관리 모델 학습
+
+`order_price_models.fit_price_models(train, calibration)`는 54개 입력의 quiet 부스팅·선형과 전체 quiet 보정을 적합한다. `price_quiet_predictions`는 기존 청산·recent와 대조 점수를 유지하며, 상태별 보정은 기존 `quiet_state_calibration` 절차를 따른다.
+
+```sh
+python -m wonyotti_fr.order_price_learning --reference <v132_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+가격 입력·기존 모형·새 모형과 전체 확률·문턱·모든 월·37개 조건을 독립 검산한다. 원본 상태 연구이며 자체 계좌나 실제 주문 연결은 포함하지 않는다.
