@@ -212,3 +212,13 @@ python -m wonyotti_fr.quiet_management_learning --reference <v125_완료_증거_
 ```
 
 실행은 원본 분할·파일 봉인과 v125→v124 출처를 확인하고, 새 512개 트리·선형·모든 확률·월별 지표·27개 조건을 독립 검산한다. 새 계좌 실행과 주문 연결은 포함하지 않는다.
+
+## v127 최초·재시작 상태별 보정
+
+`quiet_state_calibration.fit_state_calibration(calibration)`은 v126 고정 점수의 first/restart 각각에서 부스팅·선형 절편과 문턱을 계산한다. 문턱만 분리하는 대조도 함께 반환한다. `state_predictions`는 quiet의 보정 점수와 요청만 바꾸고 recent·청산·기타 대조를 유지한다. `quiet_state_reference`는 별도 절편·문턱 계산, 전체 확률·요청·보존·평균·31개 판정을 검산한다.
+
+```sh
+python -m wonyotti_fr.quiet_state_learning --reference <v126_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+실행은 v126 모델을 복원해 전체 원시·기존 보정 점수와 요청·월별 지표를 재현한다. 새 모델 학습·자체 계좌 실행·실거래 연결은 포함하지 않는다.
