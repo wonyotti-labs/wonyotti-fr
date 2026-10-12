@@ -191,7 +191,7 @@ def fit_fixed_bins(training, parents, weighted, ledger, details):
                 raise ValueError("고정 구간의 원래 무가중 모델 재현 실패")
             bins[action] = {
                 "format": "fixed_unweighted_quiet_bins_v1",
-                "features": FEATURES,
+                "features": FEATURES.copy(),
                 "action": action,
                 "rows": len(x),
                 "parent_sha256": model_digest(parent["tree"]),

@@ -285,3 +285,19 @@ def test_fixed_source_requires_verified_weighted_parent(tmp_path, monkeypatch, d
     else:
         with pytest.raises(ValueError):
             checked_fixed_reference(proof, digest)
+
+
+def test_editing_returned_metadata_does_not_change_other_models(fixed_study):
+    bins = fixed_study[1]
+    original = FEATURES.copy()
+    other = bins["increase"]["features"].copy()
+    try:
+        bins["reduce"]["features"].reverse()
+        assert FEATURES == original
+        assert bins["increase"]["features"] == other
+        with pytest.raises(ValueError):
+            validate_bins(bins["reduce"], "reduce")
+    finally:
+        FEATURES[:] = original
+        bins["reduce"]["features"] = original.copy()
+        bins["increase"]["features"] = other.copy()
