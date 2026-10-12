@@ -322,3 +322,11 @@ python -m wonyotti_fr.error_budget_research --reference <v137_완료_증거_JSON
 ```
 
 모형 재학습·실행 정책 변경·실제 주문 연결은 포함하지 않는다.
+
+## v139 관리 시간 대응 진단
+
+management_temporal.match_temporal은 고정 요청과 같은 포지션의 목표 분을 [요청 시각, 요청 시각 + 범위)에서 한 번씩 연결한다. 범위는 1·15분이며 관측 창 부족도 반환한다. 원본 미래 행동은 사후 진단에서만 사용한다.
+
+```sh
+python -m wonyotti_fr.management_temporal_research --reference <v138_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
