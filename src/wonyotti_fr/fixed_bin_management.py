@@ -231,7 +231,14 @@ def fit_fixed_bins(training, parents, weighted, ledger, details):
     return models, bins, controls, encoded_models, levels
 
 
-def fixed_bin_admission(candidate, previous, unchanged, pre_limit, budget):
+def fixed_bin_admission(candidate, previous, unchanged, pre_limit, budget, *, model_name="v141"):
+    if (
+        not isinstance(model_name, str)
+        or not re.fullmatch("v[0-9]+[a-z]*", model_name)
+        or model_name == "v127"
+    ):
+        raise ValueError("고정 구간 판정의 후보 식별자 오류")
+    models = ("v127", model_name)
     result = causal_admission(candidate, previous, unchanged)
     checks = result["checks"]
     for action in ACTIONS:
@@ -239,9 +246,9 @@ def fixed_bin_admission(candidate, previous, unchanged, pre_limit, budget):
         checks[action + "_tail_weight_log_loss_gain"] = (
             bool(1 - new["log_loss"] / old["log_loss"] > 0.01 + 1e-12) if old["log_loss"] else False
         )
-    if set(pre_limit) != set(MODELS):
+    if set(pre_limit) != set(models):
         raise ValueError("꼬리 가중 관리의 한도 전 대조 누락")
-    old, new = pre_limit["v127"], pre_limit["v141"]
+    old, new = pre_limit["v127"], pre_limit[model_name]
     for data in [old, new]:
         if data is None or min(data["positive"], data["rows"] - data["positive"]) < 20:
             raise ValueError("꼬리 가중 관리의 한도 전 지원 부족")
@@ -255,7 +262,9 @@ def fixed_bin_admission(candidate, previous, unchanged, pre_limit, budget):
         new["precision"] >= old["precision"] - 1e-12
     )
     focal = budget["increase__restart__below"]["models"]
-    old, new = (focal[model]["budget_matched"] for model in MODELS)
+    if set(focal) != set(models):
+        raise ValueError("고정 구간 판정의 예산 후보 식별자 불일치")
+    old, new = (focal[model]["budget_matched"] for model in models)
     supported = old is not None and new is not None
     checks["budget_pre_limit_restart_increase_tp_improved"] = bool(
         supported and new["true_positive"] > old["true_positive"]

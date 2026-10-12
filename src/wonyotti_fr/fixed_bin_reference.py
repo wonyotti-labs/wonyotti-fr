@@ -210,7 +210,9 @@ def verify_fixed_refits(rows, parents, weighted, ledger, details, fitted):
     return result
 
 
-def verify_fixed_admission(candidate, previous, unchanged, pre_limit, budget, decision):
+def verify_fixed_admission(
+    candidate, previous, unchanged, pre_limit, budget, decision, *, model_name="v141"
+):
     extra = {a + "_tail_weight_log_loss_gain" for a in ["reduce", "increase"]}
     extra |= {"pre_limit_restart_increase_" + k + "_improved" for k in ["recall", "f_beta"]}
     extra |= {
@@ -236,7 +238,8 @@ def verify_fixed_admission(candidate, previous, unchanged, pre_limit, budget, de
         assert checks[action + "_tail_weight_log_loss_gain"] == bool(
             (1 - a["log_loss"] / b["log_loss"] if b["log_loss"] else 0) > 0.01 + 1e-12
         )
-    old, new = pre_limit["v127"], pre_limit["v141"]
+    assert set(pre_limit) == {"v127", model_name}
+    old, new = pre_limit["v127"], pre_limit[model_name]
     for key in ["recall", "f_beta"]:
         assert checks["pre_limit_restart_increase_" + key + "_improved"] == bool(
             new[key] > old[key] + 1e-12
@@ -245,7 +248,8 @@ def verify_fixed_admission(candidate, previous, unchanged, pre_limit, budget, de
         new["precision"] >= old["precision"] - 1e-12
     )
     focal = budget["increase__restart__below"]["models"]
-    old, new = (focal[m]["budget_matched"] for m in ["v127", "v141"])
+    assert set(focal) == {"v127", model_name}
+    old, new = (focal[m]["budget_matched"] for m in ["v127", model_name])
     supported = old is not None and new is not None
     assert checks["budget_pre_limit_restart_increase_tp_improved"] == bool(
         supported and new["true_positive"] > old["true_positive"]

@@ -362,3 +362,15 @@ python -m wonyotti_fr.forward_weight_learning --reference <v141_완료_증거_JS
 ```
 
 이 명령은 보조 1,536개 트리와 두 방식의 가중치 생성 단계다. 별도 달력 순회, 보조 모형 재적합, 모든 대상 점수·가중치·집계·저장 후 재읽기를 검산한다. `summary.complete`는 이 단계의 완료만 뜻하며 `scope=auxiliary_and_weight_stage`, `experiment_complete=false`를 함께 확인해야 한다. 최종 고정 구간 모형·선형·보정·42/48개 판정은 후속 단계이며 수익성 판단은 포함하지 않는다.
+
+## v142 두 가중치의 최종 모델 비교
+
+`forward_final_models.fit_forward_models`는 비중 단계의 모형·원장·출처를 다시 연결한 뒤 원래 무가중 구간의 동등성을 확인한다. 두 방식에 최종 트리 1,024개·원시 입력의 가중 선형 네 개를 적합한다. `calibrate_forward_models`는 별도의 2021년 상반기 자료만 받아 기존 보정과 문턱을 적용한다.
+
+```sh
+python -m wonyotti_fr.forward_final_learning --reference <v142_가중치_단계_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+이 명령은 v127·v140·v141 점수·요청·집계와 이전 42개 판정의 동일성을 먼저 검증한다. 보조 및 최종 모형의 독립 재적합 후 두 방식의 모든 기간·월·횟수·공통 예산과 42개 조건을 저장하고, forward 후보에만 matched 대비 여섯 조건을 더해 48개로 판정한다. matched 대조가 좋은 결과를 내더라도 후보로 대체하지 않는다.
+
+각 방식의 출력은 별도 하위 폴더로 봉인하며 상위 `child_seals.json`이 하위 `files.json`의 지문을 연결한다. 재사용할 때 상위 봉인뿐 아니라 두 하위 봉인도 확인해야 한다. `forward_weight_admitted`는 연구 조건의 판정이며 `profitability_accepted`와 구분한다. 실제 주문 연결은 없다.
