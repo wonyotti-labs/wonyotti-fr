@@ -312,3 +312,13 @@ python -m wonyotti_fr.count_region_learning --reference <v136_완료_증거_JSON
 ```
 
 원본·기존·새 모형, 모든 확률·월·횟수와 제한 전 재시작 직접 지표·40개 조건을 독립 검산한다. 자체 계좌나 실제 주문 연결은 포함하지 않는다.
+
+## v138 오신호 한도 진단
+
+error_budget.fit_budget_cutoffs(calibration, predictions)는 상반기 v127 저장 요청의 FP 수를 공통 예산으로 고정한다. 음성 점수의 B+1번째 큰 값 바로 다음 부동소수점 문턱을 사용하고 동점과 미지원 상태를 보존한다.
+
+```sh
+python -m wonyotti_fr.error_budget_research --reference <v137_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+모형 재학습·실행 정책 변경·실제 주문 연결은 포함하지 않는다.
