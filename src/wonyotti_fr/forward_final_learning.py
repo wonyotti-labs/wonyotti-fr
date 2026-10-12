@@ -367,7 +367,8 @@ def run_forward_final(reference, expected, output):
     sources = checked_forward_weight_reference(reference, expected)
     paths = {k: Path(v) for k, v in sources.items()}
     protocol = Path("docs/EXPERIMENT_V142.md")
-    inputs = [reference, protocol, *dependency_paths()]
+    implementation_note = Path("docs/EXPERIMENT_V142_BINNING_FIX.md")
+    inputs = [reference, protocol, implementation_note, *dependency_paths()]
     for key in [
         "teacher",
         "previous",
@@ -392,6 +393,7 @@ def run_forward_final(reference, expected, output):
             "reference_sha256": expected,
             "sources": sources,
             "protocol_sha256": sha256(protocol),
+            "implementation_note_sha256": sha256(implementation_note),
             "features": FEATURES.copy(),
             "arms": ARMS,
             "weight_rule": WEIGHT_RULE,

@@ -19,6 +19,19 @@ from .quiet_management import CLASSES
 from .quiet_management_reference import independent_groups
 
 
+class ReferenceFixedLevelHistogram(HistGradientBoostingClassifier):
+    def _bin_data(self, X, sample_weight, is_training_data):
+        if is_training_data:
+            # 구간에만 무가중 전체 수준을 사용하고 손실 적합의 가중치는 유지한다.
+            self._bin_mapper.subsample = None
+            self._bin_mapper.fit(X)
+            for j, edges in enumerate(self._bin_mapper.bin_thresholds_):
+                np.testing.assert_array_equal(edges, np.arange(int(np.max(X[:, j]))) + 0.5)
+        values = self._bin_mapper.transform(X)
+        np.testing.assert_array_equal(values, X)
+        return values if is_training_data else np.ascontiguousarray(values)
+
+
 def verify_forward_final_refits(rows, parents, bins, ledgers, fitted):
     models, controls, encoded, levels = fitted
     assert set(models) == set(encoded) == {"v142matched", "v142forward"}
@@ -57,7 +70,7 @@ def verify_forward_final_refits(rows, parents, bins, ledgers, fitted):
             verify_nodes(original, parents[action]["tree"])
             z, probes = verify_binning(bins[action], action, x, original._bin_mapper)
             result["boundary_probes"] += probes
-            control = HistGradientBoostingClassifier(**params).fit(z, y)
+            control = ReferenceFixedLevelHistogram(**params).fit(z, y)
             verify_nodes(control, controls[action])
             verify_projection(controls[action], parents[action]["tree"], bins[action])
             assert levels[action]["control"] == [
@@ -68,7 +81,7 @@ def verify_forward_final_refits(rows, parents, bins, ledgers, fitted):
             result["control_trees"] += 256
             for arm in ["v142matched", "v142forward"]:
                 weights = ledgers[arm].loc[quiet, action + "_weight"].to_numpy(float)
-                learner = HistGradientBoostingClassifier(**params).fit(z, y, sample_weight=weights)
+                learner = ReferenceFixedLevelHistogram(**params).fit(z, y, sample_weight=weights)
                 verify_nodes(learner, encoded[arm][action])
                 verify_projection(encoded[arm][action], models[arm][action]["tree"], bins[action])
                 assert levels[action][arm] == [

@@ -20,6 +20,7 @@ from .fixed_bin_management import (
     training_digest,
     validate_bins,
 )
+from .fixed_level_histogram import FixedLevelHistogram
 from .forward_management import ARMS, WEIGHT_RULE, build_forward_weights
 from .forward_management_reference import reference_forward_partition, verify_forward_weights
 from .management_capacity import validate_training
@@ -81,7 +82,7 @@ def fit_forward_models(training, parents, bins, auxiliary, weighted):
                 raise ValueError("과거 예측 최종 학습의 원래 모델·구간 재현 실패")
             z = encode_bins(bins[action], action, x)
             np.testing.assert_array_equal(z, original._bin_mapper.transform(x))
-            control = HistGradientBoostingClassifier(**CLASSES[action].fixed_settings).fit(z, y)
+            control = FixedLevelHistogram(**CLASSES[action].fixed_settings).fit(z, y)
             controls[action] = export_histogram(control, action)
             levels[action] = {"control": check_level_mapper(control, z)}
             if lift_thresholds(controls[action], bins[action], action) != parents[action]["tree"]:
@@ -89,7 +90,7 @@ def fit_forward_models(training, parents, bins, auxiliary, weighted):
             scaler = StandardScaler().fit(x)
             for arm in ARMS:
                 weights = ledgers[arm].loc[quiet, action + "_weight"].to_numpy(float)
-                learner = HistGradientBoostingClassifier(**CLASSES[action].fixed_settings).fit(
+                learner = FixedLevelHistogram(**CLASSES[action].fixed_settings).fit(
                     z, y, sample_weight=weights
                 )
                 levels[action][arm] = check_level_mapper(learner, z)
