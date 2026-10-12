@@ -302,3 +302,13 @@ python -m wonyotti_fr.cross_market_learning --reference <v136_입력_완료_증�
 ```
 
 원본·기존·새 모형, 모든 확률·월·횟수와 제한 전 재시작 직접 지표·40개 조건을 독립 검산한다. 자체 계좌나 실제 주문 연결은 포함하지 않는다.
+
+## v137 한도 전후 조건부 관리 모델 학습
+
+`count_region_management.fit_count_region_models(train, calibration)`는 기존 50개 입력을 유지하며 과거 추가 횟수에 따른 두 집단을 행동별로 학습한다. 기존 청산·recent와 대조를 보존하며 보정은 기존 quiet/최초/재시작 절차를 따른다.
+
+```sh
+python -m wonyotti_fr.count_region_learning --reference <v136_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+원본·기존·새 모형, 모든 확률·월·횟수와 제한 전 재시작 직접 지표·40개 조건을 독립 검산한다. 자체 계좌나 실제 주문 연결은 포함하지 않는다.
