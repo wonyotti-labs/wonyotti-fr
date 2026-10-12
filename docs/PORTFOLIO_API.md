@@ -330,3 +330,13 @@ management_temporal.match_temporal은 고정 요청과 같은 포지션의 목�
 ```sh
 python -m wonyotti_fr.management_temporal_research --reference <v138_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
 ```
+
+## v140 높은 점수 음성의 가중 학습
+
+`tail_weighted_management.fit_tail_models(training, parent_models)`는 2020년 원본 학습 행과 v126 무가중 부모만 받아 행동별 음성 상위 1% 경계·동점 포함 집합·평균 1 가중치를 만든다. 모든 행을 보존하며 새 부스팅과 선형, 행별 가중치 원장·지원 집계를 반환한다. 보정 자료는 별도 `calibrate_tail_models`에서만 사용한다.
+
+```sh
+python -m wonyotti_fr.tail_weighted_learning --reference <v139_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+`paired_error_budget`는 실제 두 모델 식별자를 유지해 공통 예산을 적합·평가·독립 검산한다. 이번 실행은 기존 모형과 새 512개 트리·두 선형, 모든 기간·월·횟수·가중치·42개 조건을 대조한다. `tail_weighted_admitted`와 `profitability_accepted`는 별도 결과이며 실제 주문 연결은 포함하지 않는다.
