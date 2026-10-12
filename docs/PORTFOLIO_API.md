@@ -282,3 +282,13 @@ python -m wonyotti_fr.order_price_learning --reference <v132_완료_증거_JSON>
 ```
 
 가격 입력·기존 모형·새 모형과 전체 확률·문턱·모든 월·37개 조건을 독립 검산한다. 원본 상태 연구이며 자체 계좌나 실제 주문 연결은 포함하지 않는다.
+
+## v135 실제 누적 횟수 관리 모델 학습
+
+`uncapped_management.fit_uncapped_models(train, calibration)`는 기존 50개 입력의 `adds_capped` 대신 `adds`를 사용한다. 기존 청산·recent와 대조를 보존하며 보정은 기존 quiet/최초/재시작 절차를 따른다.
+
+```sh
+python -m wonyotti_fr.uncapped_management_learning --reference <v134_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+원본·기존·새 모형, 모든 확률·월·횟수와 제한 전 재시작 직접 지표·40개 조건을 독립 검산한다. 자체 계좌나 실제 주문 연결은 포함하지 않는다.
