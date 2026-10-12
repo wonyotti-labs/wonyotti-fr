@@ -350,3 +350,15 @@ python -m wonyotti_fr.fixed_bin_learning --reference <v140_완료_증거_JSON> -
 ```
 
 `encode_bins`는 경계와 같은 값을 아래 구간에 넣고 비유한 입력을 거절한다. `lift_thresholds`는 정수 분기를 원래 경계로 되돌려 기존 숫자 추론과 연결한다. `verify_fixed_refits`는 별도 구간 변환·경계 주변·모형 재적합·모든 기간 확률을 대조한다. `fixed_bins_admitted`는 같은 42개 연구 조건의 결과이며 수익성 채택과 구분한다.
+
+## v142 과거 분기 예측과 학습 비중 생성
+
+`forward_management.fit_forward_auxiliaries(training)`는 2020년 원본에서 분기별 과거 학습과 다음 분기 대상을 분리하고 행동별 보조 모형·원시 예측·지원 원장을 반환한다. 달력 경계와 포지션을 직접 검사하며 어느 한 분기의 표본이 부족하면 학습을 시작하지 않는다.
+
+`build_forward_weights`는 같은 대상에서 기존 전체 학습 점수의 `v142matched`와 과거 예측의 `v142forward`를 비교한다. 높은 점수 음성의 분기별 동점을 포함하고, 대상 밖 quiet 행은 원시 비중 1로 보존한다. 가중치는 전체 2020년 quiet에서 평균 1로 정규화한다. 대상 분기 전체 정답으로 음성을 구분하는 사후 학습 비중이며 실시간 운용 비중은 아니다.
+
+```sh
+python -m wonyotti_fr.forward_weight_learning --reference <v141_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+이 명령은 보조 1,536개 트리와 두 방식의 가중치 생성 단계다. 별도 달력 순회, 보조 모형 재적합, 모든 대상 점수·가중치·집계·저장 후 재읽기를 검산한다. `summary.complete`는 이 단계의 완료만 뜻하며 `scope=auxiliary_and_weight_stage`, `experiment_complete=false`를 함께 확인해야 한다. 최종 고정 구간 모형·선형·보정·42/48개 판정은 후속 단계이며 수익성 판단은 포함하지 않는다.
