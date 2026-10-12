@@ -340,3 +340,13 @@ python -m wonyotti_fr.tail_weighted_learning --reference <v139_완료_증거_JSO
 ```
 
 `paired_error_budget`는 실제 두 모델 식별자를 유지해 공통 예산을 적합·평가·독립 검산한다. 이번 실행은 기존 모형과 새 512개 트리·두 선형, 모든 기간·월·횟수·가중치·42개 조건을 대조한다. `tail_weighted_admitted`와 `profitability_accepted`는 별도 결과이며 실제 주문 연결은 포함하지 않는다.
+
+## v141 구간 경계 고정 가중 학습
+
+`fixed_bin_management.fit_fixed_bins(training, parents, weighted, ledger, details)`는 원래 무가중 경계와 정수 구간을 복원하고 무가중 동등성 관문 뒤 같은 가중치의 부스팅을 학습한다. 선형은 기존 원시 입력 모형을 보존한다. 반환값은 원래 입력용 숫자 모형, 구간 메타데이터, 무가중 정수 대조, 가중 정수 모형, 두 적합의 수준 경계다.
+
+```sh
+python -m wonyotti_fr.fixed_bin_learning --reference <v140_완료_증거_JSON> --sha256 <신뢰한_SHA256> --output <로컬_출력_폴더>
+```
+
+`encode_bins`는 경계와 같은 값을 아래 구간에 넣고 비유한 입력을 거절한다. `lift_thresholds`는 정수 분기를 원래 경계로 되돌려 기존 숫자 추론과 연결한다. `verify_fixed_refits`는 별도 구간 변환·경계 주변·모형 재적합·모든 기간 확률을 대조한다. `fixed_bins_admitted`는 같은 42개 연구 조건의 결과이며 수익성 채택과 구분한다.
